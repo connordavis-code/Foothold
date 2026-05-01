@@ -10,12 +10,26 @@ import * as schema from './schema';
  *
  * For migrations (drizzle-kit), set DIRECT_DATABASE_URL in the env, which
  * connects to port 5432 directly without the pooler.
+ *
+ * Cache the postgres client on globalThis in development. Without this, every
+ * HMR cycle would create a new pool and eventually exhaust Supabase's
+ * connection limit. In production each lambda gets a fresh module load anyway.
  */
-const queryClient = postgres(env.DATABASE_URL, {
-  prepare: false,
-  max: 10,
-});
+const globalForDb = globalThis as unknown as {
+  pgClient?: ReturnType<typeof postgres>;
+};
 
-export const db = drizzle(queryClient, { schema });
+const client =
+  globalForDb.pgClient ??
+  postgres(env.DATABASE_URL, {
+    prepare: false,
+    max: 10,
+  });
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForDb.pgClient = client;
+}
+
+export const db = drizzle(client, { schema });
 
 export type DB = typeof db;

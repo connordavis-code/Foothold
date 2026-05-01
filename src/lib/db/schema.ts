@@ -1,5 +1,5 @@
-import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   boolean,
   date,
   index,
@@ -13,6 +13,17 @@ import {
 } from 'drizzle-orm/pg-core';
 import type { AdapterAccount } from 'next-auth/adapters';
 
+/**
+ * Convention for this file:
+ *   - All timestamp columns use `timestamp with time zone` (`withTimezone: true`)
+ *     so cross-tz Plaid data and DST boundaries don't silently drift.
+ *   - `date(...)` is used for calendar dates (transaction date, price-as-of)
+ *     where time-of-day is irrelevant.
+ *   - `mode: 'date'` keeps the JS-side type as `Date` rather than string.
+ */
+const ts = (name: string) =>
+  timestamp(name, { mode: 'date', withTimezone: true });
+
 // =============================================================================
 // Auth.js tables (managed by @auth/drizzle-adapter)
 // =============================================================================
@@ -24,9 +35,9 @@ export const users = pgTable('user', {
     .$defaultFn(() => crypto.randomUUID()),
   name: text('name'),
   email: text('email').unique().notNull(),
-  emailVerified: timestamp('email_verified', { mode: 'date' }),
+  emailVerified: ts('email_verified'),
   image: text('image'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
+  createdAt: ts('created_at').defaultNow().notNull(),
 });
 
 export const authAccounts = pgTable(
@@ -58,7 +69,7 @@ export const sessions = pgTable('session', {
   userId: text('user_id')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
-  expires: timestamp('expires', { mode: 'date' }).notNull(),
+  expires: ts('expires').notNull(),
 });
 
 export const verificationTokens = pgTable(
@@ -66,7 +77,7 @@ export const verificationTokens = pgTable(
   {
     identifier: text('identifier').notNull(),
     token: text('token').notNull(),
-    expires: timestamp('expires', { mode: 'date' }).notNull(),
+    expires: ts('expires').notNull(),
   },
   (vt) => ({
     pk: primaryKey({ columns: [vt.identifier, vt.token] }),
@@ -96,8 +107,8 @@ export const plaidItems = pgTable('plaid_item', {
   // Cursor for /transactions/sync incremental sync.
   transactionsCursor: text('transactions_cursor'),
   status: text('status').notNull().default('active'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  lastSyncedAt: timestamp('last_synced_at'),
+  createdAt: ts('created_at').defaultNow().notNull(),
+  lastSyncedAt: ts('last_synced_at'),
 });
 
 /**
@@ -122,8 +133,33 @@ export const financialAccounts = pgTable('financial_account', {
   currentBalance: numeric('current_balance', { precision: 14, scale: 2 }),
   availableBalance: numeric('available_balance', { precision: 14, scale: 2 }),
   isoCurrencyCode: text('iso_currency_code').default('USD'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  createdAt: ts('created_at').defaultNow().notNull(),
+  updatedAt: ts('updated_at').defaultNow().notNull(),
+});
+
+/**
+ * User-defined categories (overlay on top of Plaid PFC). System categories
+ * (userId IS NULL) seeded from Plaid PFC taxonomy in Phase 1.C.
+ *
+ * Declared above `transactions` so the FK on `categoryOverrideId` resolves
+ * at module evaluation time. `parentCategoryId` self-references via the
+ * AnyPgColumn workaround for forward references.
+ */
+export const categories = pgTable('category', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  icon: text('icon'),
+  color: text('color'),
+  budgetMonthly: numeric('budget_monthly', { precision: 14, scale: 2 }),
+  isDiscretionary: boolean('is_discretionary').notNull().default(false),
+  parentCategoryId: text('parent_category_id').references(
+    (): AnyPgColumn => categories.id,
+    { onDelete: 'set null' },
+  ),
+  createdAt: ts('created_at').defaultNow().notNull(),
 });
 
 /**
@@ -152,10 +188,13 @@ export const transactions = pgTable(
     primaryCategory: text('primary_category'),
     detailedCategory: text('detailed_category'),
     // User-overridden category (FK to categories table)
-    categoryOverrideId: text('category_override_id'),
+    categoryOverrideId: text('category_override_id').references(
+      () => categories.id,
+      { onDelete: 'set null' },
+    ),
     paymentChannel: text('payment_channel'),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    createdAt: ts('created_at').defaultNow().notNull(),
+    updatedAt: ts('updated_at').defaultNow().notNull(),
   },
   (t) => ({
     accountIdx: index('transaction_account_idx').on(t.accountId),
@@ -181,7 +220,7 @@ export const securities = pgTable('security', {
   closePrice: numeric('close_price', { precision: 14, scale: 4 }),
   closePriceAsOf: date('close_price_as_of'),
   isoCurrencyCode: text('iso_currency_code').default('USD'),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  updatedAt: ts('updated_at').defaultNow().notNull(),
 });
 
 /**
@@ -212,7 +251,7 @@ export const holdings = pgTable(
     }),
     institutionPriceAsOf: date('institution_price_as_of'),
     isoCurrencyCode: text('iso_currency_code').default('USD'),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    updatedAt: ts('updated_at').defaultNow().notNull(),
   },
   (h) => ({
     accountSecurityUnique: uniqueIndex('holding_account_security_idx').on(
@@ -253,31 +292,13 @@ export const investmentTransactions = pgTable(
     // dividend | qualified | non-qualified | etc.
     subtype: text('subtype'),
     isoCurrencyCode: text('iso_currency_code').default('USD'),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
+    createdAt: ts('created_at').defaultNow().notNull(),
   },
   (it) => ({
     accountIdx: index('investment_transaction_account_idx').on(it.accountId),
     dateIdx: index('investment_transaction_date_idx').on(it.date),
   }),
 );
-
-/**
- * User-defined categories (overlay on top of Plaid PFC). System categories
- * (userId IS NULL) seeded from Plaid PFC taxonomy in Phase 1.C.
- */
-export const categories = pgTable('category', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  icon: text('icon'),
-  color: text('color'),
-  budgetMonthly: numeric('budget_monthly', { precision: 14, scale: 2 }),
-  isDiscretionary: boolean('is_discretionary').notNull().default(false),
-  parentCategoryId: text('parent_category_id'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
 
 // =============================================================================
 // Type exports — convenient for queries

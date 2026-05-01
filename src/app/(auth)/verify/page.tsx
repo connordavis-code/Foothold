@@ -12,7 +12,7 @@ export default function VerifyPage() {
         <p className="text-sm text-muted-foreground leading-relaxed">
           We sent a sign-in link to your inbox. Click it to log in.
           <br />
-          The link expires in 24 hours.
+          The link will expire shortly — check your email now.
         </p>
       </div>
       <p className="text-xs text-muted-foreground">
