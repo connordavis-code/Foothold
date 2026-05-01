@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import {
   LayoutDashboard,
+  Repeat,
   TrendingUp,
   Receipt,
   Target,
@@ -12,6 +13,7 @@ import { SignOutButton } from './sign-out-button';
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/transactions', label: 'Transactions', icon: Receipt },
+  { href: '/recurring', label: 'Recurring', icon: Repeat },
   { href: '/investments', label: 'Investments', icon: TrendingUp },
   { href: '/goals', label: 'Goals', icon: Target },
   { href: '/settings', label: 'Settings', icon: Settings },

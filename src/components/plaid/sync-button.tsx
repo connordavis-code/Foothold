@@ -23,12 +23,16 @@ export function SyncButton({ itemId }: { itemId: string }) {
         const summary = await syncItemAction(itemId);
         const t = summary.transactions;
         const i = summary.investments;
+        const r = summary.recurring;
         const parts = [`${summary.accounts} accounts`];
         if (t.added || t.modified || t.removed) {
           parts.push(`${t.added} new tx, ${t.modified} updated, ${t.removed} removed`);
         }
         if (i.holdings || i.transactions) {
           parts.push(`${i.holdings} holdings, ${i.transactions} inv tx`);
+        }
+        if (r.inflows || r.outflows) {
+          parts.push(`${r.outflows} subs, ${r.inflows} income streams`);
         }
         setStatus({ kind: 'success', message: parts.join(' · ') });
         router.refresh();

@@ -12,16 +12,27 @@ import {
   getDashboardSummary,
   getRecentTransactions,
 } from '@/lib/db/queries/dashboard';
+import {
+  getMonthlyRecurringOutflow,
+  getRecurringStreams,
+} from '@/lib/db/queries/recurring';
 import { formatCurrency } from '@/lib/utils';
 
 export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user) return null;
 
-  const [summary, recent] = await Promise.all([
+  const [summary, recent, recurring, monthlyRecurring] = await Promise.all([
     getDashboardSummary(session.user.id),
     getRecentTransactions(session.user.id, 10),
+    getRecurringStreams(session.user.id),
+    getMonthlyRecurringOutflow(session.user.id),
   ]);
+
+  const activeOutflows = recurring.filter(
+    (r) => r.direction === 'outflow' && r.isActive,
+  );
+  const topSubs = activeOutflows.slice(0, 5);
 
   if (!summary.hasAnyItem) {
     return <EmptyState />;
@@ -38,7 +49,7 @@ export default async function DashboardPage() {
         </h1>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Net worth"
           value={formatCurrency(summary.netWorth)}
@@ -60,6 +71,15 @@ export default async function DashboardPage() {
             summary.investments === 0
               ? 'No investment accounts'
               : 'Account-level balances'
+          }
+        />
+        <StatCard
+          label="Recurring / month"
+          value={formatCurrency(monthlyRecurring)}
+          subline={
+            activeOutflows.length === 0
+              ? 'No subscriptions detected yet'
+              : `${activeOutflows.length} active ${activeOutflows.length === 1 ? 'subscription' : 'subscriptions'}`
           }
         />
       </div>
@@ -92,8 +112,81 @@ export default async function DashboardPage() {
           )}
         </CardContent>
       </Card>
+
+      {topSubs.length > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <div className="space-y-1.5">
+              <CardTitle>Top subscriptions</CardTitle>
+              <CardDescription>
+                Active recurring outflows detected from your transaction
+                history.
+              </CardDescription>
+            </div>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/recurring">View all</Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <ul className="divide-y divide-border">
+              {topSubs.map((s) => (
+                <SubscriptionRow key={s.id} s={s} />
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
+}
+
+function SubscriptionRow({
+  s,
+}: {
+  s: Awaited<ReturnType<typeof getRecurringStreams>>[number];
+}) {
+  return (
+    <li className="flex items-center justify-between py-3">
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium truncate">
+          {s.merchantName ?? s.description ?? 'Unknown'}
+          {s.status === 'EARLY_DETECTION' && (
+            <span className="ml-2 text-xs text-muted-foreground font-normal">
+              early detection
+            </span>
+          )}
+        </p>
+        <p className="text-xs text-muted-foreground truncate">
+          {humanizeFrequency(s.frequency)}
+          {s.predictedNextDate &&
+            ` · next ${formatTxDate(s.predictedNextDate)}`}
+          {' · '}
+          {s.accountName}
+          {s.accountMask && ` ····${s.accountMask}`}
+        </p>
+      </div>
+      <p className="tabular text-sm font-medium tabular-nums shrink-0 ml-4">
+        {s.averageAmount != null ? formatCurrency(s.averageAmount) : '—'}
+      </p>
+    </li>
+  );
+}
+
+function humanizeFrequency(f: string): string {
+  switch (f) {
+    case 'WEEKLY':
+      return 'Weekly';
+    case 'BIWEEKLY':
+      return 'Every 2 weeks';
+    case 'SEMI_MONTHLY':
+      return 'Twice a month';
+    case 'MONTHLY':
+      return 'Monthly';
+    case 'ANNUALLY':
+      return 'Annually';
+    default:
+      return 'Recurring';
+  }
 }
 
 function StatCard({

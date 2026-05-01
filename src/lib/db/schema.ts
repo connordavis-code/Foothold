@@ -262,6 +262,50 @@ export const holdings = pgTable(
 );
 
 /**
+ * Recurring transaction streams detected by Plaid (subscriptions, payroll,
+ * rent, etc.). Populated from /transactions/recurring/get.
+ *
+ * Plaid emits two kinds of streams: "inflow" (income / refunds) and
+ * "outflow" (subscriptions / bills). Both are stored here, distinguished
+ * by the `direction` column.
+ *
+ * `status` reflects Plaid's confidence: MATURE (proven recurring),
+ * EARLY_DETECTION (likely but not confirmed), TOMBSTONED (cancelled).
+ */
+export const recurringStreams = pgTable('recurring_stream', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  itemId: text('item_id')
+    .notNull()
+    .references(() => plaidItems.id, { onDelete: 'cascade' }),
+  accountId: text('account_id')
+    .notNull()
+    .references(() => financialAccounts.id, { onDelete: 'cascade' }),
+  plaidStreamId: text('plaid_stream_id').unique().notNull(),
+  // 'inflow' | 'outflow'
+  direction: text('direction').notNull(),
+  description: text('description'),
+  merchantName: text('merchant_name'),
+  // WEEKLY | BIWEEKLY | SEMI_MONTHLY | MONTHLY | ANNUALLY | UNKNOWN
+  frequency: text('frequency').notNull(),
+  // Plaid: positive = money OUT (outflow stream's natural sign).
+  averageAmount: numeric('average_amount', { precision: 14, scale: 2 }),
+  lastAmount: numeric('last_amount', { precision: 14, scale: 2 }),
+  firstDate: date('first_date'),
+  lastDate: date('last_date'),
+  predictedNextDate: date('predicted_next_date'),
+  isActive: boolean('is_active').notNull().default(true),
+  // MATURE | EARLY_DETECTION | TOMBSTONED
+  status: text('status').notNull(),
+  primaryCategory: text('primary_category'),
+  detailedCategory: text('detailed_category'),
+  isoCurrencyCode: text('iso_currency_code').default('USD'),
+  createdAt: ts('created_at').defaultNow().notNull(),
+  updatedAt: ts('updated_at').defaultNow().notNull(),
+});
+
+/**
  * Buys, sells, dividends, fees, transfers — anything that hits an investment
  * account. Plaid /investments/transactions returns these.
  */
@@ -312,3 +356,4 @@ export type Security = typeof securities.$inferSelect;
 export type Holding = typeof holdings.$inferSelect;
 export type InvestmentTransaction = typeof investmentTransactions.$inferSelect;
 export type Category = typeof categories.$inferSelect;
+export type RecurringStream = typeof recurringStreams.$inferSelect;

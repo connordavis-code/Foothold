@@ -16,6 +16,7 @@ import {
   transactions,
 } from '@/lib/db/schema';
 import { plaid } from './client';
+import { syncRecurringForItem } from './recurring';
 
 const num = (n: number | null | undefined): string | null =>
   n == null ? null : String(n);
@@ -28,6 +29,7 @@ export type SyncSummary = {
   accounts: number;
   transactions: { added: number; modified: number; removed: number };
   investments: { holdings: number; transactions: number; securities: number };
+  recurring: { inflows: number; outflows: number };
 };
 
 /**
@@ -57,15 +59,20 @@ export async function syncItem(itemId: string): Promise<SyncSummary> {
     .from(financialAccounts)
     .where(eq(financialAccounts.itemId, item.id));
 
-  const [txns, inv] = await Promise.all([
+  // Recurring depends on transaction history, but the recurring endpoint
+  // looks at server-side history Plaid already has — so it can run in
+  // parallel with transactionsSync. Investments is independent.
+  const [txns, inv, rec] = await Promise.all([
     syncTransactionsForItem(item, accs),
     syncInvestmentsForItem(item, accs),
+    syncRecurringForItem(item, accs),
   ]);
 
   return {
     accounts: accountsResult.count,
     transactions: txns,
     investments: inv,
+    recurring: rec,
   };
 }
 
