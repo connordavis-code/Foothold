@@ -166,7 +166,16 @@ at this scale; revisit when the prompt grows or the SDK is bumped. See
 _(none — last session ended cleanly at Phase 3-pt2)_
 
 ### Next up
-- **Phase 3-pt3** — per-goal coaching detail page
+- **Switch Plaid sandbox → development** before any further phase work.
+  All current data is fake sandbox; user has real bank + Amex credit
+  card ready to connect (Amex is the bulk of their real spending and
+  is missing from current insights/drift output entirely). Steps:
+  copy Development secret from <https://dashboard.plaid.com/team/keys>,
+  set `PLAID_ENV=development` in `.env.local`, decide whether to
+  delete existing sandbox `plaid_items` (and cascading data) before
+  reconnecting, restart dev server, reconnect via /settings.
+- **Phase 3-pt3** — per-goal coaching detail page (defer until real
+  data is flowing; sandbox data has zero useful goals signal)
 - **Phase 4** — predictive layer (forecasts, what-if simulator)
 - **Phase 5** — production deploy, Vercel cron (auto-generate insights
   weekly), Plaid Production access, encrypt
