@@ -1,14 +1,21 @@
+import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import { auth } from '@/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { signInWithEmail } from './actions';
 
-export default function LoginPage({
+export default async function LoginPage({
   searchParams,
 }: {
   searchParams: { error?: string };
 }) {
+  const session = await auth();
+  if (session?.user) {
+    redirect('/dashboard');
+  }
+
   const showInvalidEmail = searchParams.error === 'invalid_email';
 
   return (

@@ -1,11 +1,19 @@
+import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import { auth } from '@/auth';
 import { Button } from '@/components/ui/button';
 
 /**
- * Public landing page. Signed-in users get redirected to /dashboard by
- * middleware before they ever see this.
+ * Public landing page. Signed-in users skip past it to /dashboard. The
+ * redirect happens here (not in middleware) so it uses the real
+ * database-validated session — a stale cookie won't trigger a loop.
  */
-export default function HomePage() {
+export default async function HomePage() {
+  const session = await auth();
+  if (session?.user) {
+    redirect('/dashboard');
+  }
+
   return (
     <main className="min-h-screen flex items-center justify-center px-6">
       <div className="max-w-2xl w-full">
