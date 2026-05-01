@@ -261,6 +261,52 @@ export const holdings = pgTable(
   }),
 );
 
+// =============================================================================
+// Goals
+// =============================================================================
+
+/**
+ * User-defined goals. Two underlying types cover the common cases:
+ *
+ *   - `savings`: accumulate to `target_amount` across `account_ids`.
+ *     Examples: emergency fund, investing target, skill-building budget.
+ *
+ *   - `spend_cap`: keep monthly spend in `category_filter` (and optionally
+ *     in `account_ids`) under `monthly_amount`. Discretionary cap.
+ *
+ * Type-specific columns are nullable; the page-level form decides which
+ * to render based on `type`.
+ */
+export const goals = pgTable('goal', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  // 'savings' | 'spend_cap'
+  type: text('type').notNull(),
+  // For savings goals: dollar amount to accumulate
+  targetAmount: numeric('target_amount', { precision: 14, scale: 2 }),
+  // For spend_cap goals: monthly limit
+  monthlyAmount: numeric('monthly_amount', { precision: 14, scale: 2 }),
+  // For savings: which financial_account.id values count toward progress.
+  // For spend_cap: optional account scope. Stored as text[]; we don't FK
+  // these at the row level because Postgres can't FK array elements.
+  // Stale ids are filtered out when computing progress.
+  accountIds: text('account_ids').array(),
+  // For spend_cap: optional Plaid PFC primary_category filter (e.g.,
+  // ['FOOD_AND_DRINK', 'ENTERTAINMENT'] for a "fun money" cap). NULL
+  // means "all categories".
+  categoryFilter: text('category_filter').array(),
+  // Optional "by when" date for savings goals
+  targetDate: date('target_date'),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: ts('created_at').defaultNow().notNull(),
+  updatedAt: ts('updated_at').defaultNow().notNull(),
+});
+
 /**
  * Recurring transaction streams detected by Plaid (subscriptions, payroll,
  * rent, etc.). Populated from /transactions/recurring/get.
@@ -357,3 +403,4 @@ export type Holding = typeof holdings.$inferSelect;
 export type InvestmentTransaction = typeof investmentTransactions.$inferSelect;
 export type Category = typeof categories.$inferSelect;
 export type RecurringStream = typeof recurringStreams.$inferSelect;
+export type Goal = typeof goals.$inferSelect;
