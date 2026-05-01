@@ -8,10 +8,12 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { GoalsStrip } from '@/components/goals/goals-strip';
 import {
   getDashboardSummary,
   getRecentTransactions,
 } from '@/lib/db/queries/dashboard';
+import { getGoalsWithProgress } from '@/lib/db/queries/goals';
 import {
   getMonthlyRecurringOutflow,
   getRecurringStreams,
@@ -22,12 +24,14 @@ export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user) return null;
 
-  const [summary, recent, recurring, monthlyRecurring] = await Promise.all([
-    getDashboardSummary(session.user.id),
-    getRecentTransactions(session.user.id, 10),
-    getRecurringStreams(session.user.id),
-    getMonthlyRecurringOutflow(session.user.id),
-  ]);
+  const [summary, recent, recurring, monthlyRecurring, goals] =
+    await Promise.all([
+      getDashboardSummary(session.user.id),
+      getRecentTransactions(session.user.id, 10),
+      getRecurringStreams(session.user.id),
+      getMonthlyRecurringOutflow(session.user.id),
+      getGoalsWithProgress(session.user.id),
+    ]);
 
   const activeOutflows = recurring.filter(
     (r) => r.direction === 'outflow' && r.isActive,
@@ -83,6 +87,8 @@ export default async function DashboardPage() {
           }
         />
       </div>
+
+      <GoalsStrip goals={goals} />
 
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-4">

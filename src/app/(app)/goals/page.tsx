@@ -1,6 +1,10 @@
 import { Pencil, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { auth } from '@/auth';
+import {
+  ProgressBar,
+  spendCapTone,
+} from '@/components/goals/progress-bar';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -123,7 +127,6 @@ function GoalCard({ goal }: { goal: GoalWithProgress }) {
 function ProgressBlock({ goal }: { goal: GoalWithProgress }) {
   const p = goal.progress;
   if (p.type === 'savings') {
-    const pct = Math.min(1, p.fraction);
     return (
       <div className="space-y-2">
         <div className="flex items-baseline justify-between">
@@ -134,18 +137,48 @@ function ProgressBlock({ goal }: { goal: GoalWithProgress }) {
             of {formatCurrency(p.target)}
           </p>
         </div>
-        <ProgressBar fraction={pct} tone="positive" />
+        <ProgressBar
+          fraction={Math.min(1, p.fraction)}
+          tone={p.fraction >= 1 ? 'positive' : 'neutral'}
+        />
         <p className="text-xs text-muted-foreground">
-          {formatPercent(p.fraction)} ·{' '}
-          {p.remaining > 0
-            ? `${formatCurrency(p.remaining)} to go`
-            : 'Target hit 🎉'}
+          {formatPercent(p.fraction)}
+          {p.remaining === 0 ? (
+            ' · Target hit 🎉'
+          ) : (
+            <> · {formatCurrency(p.remaining)} to go</>
+          )}
         </p>
+        {p.remaining > 0 && (
+          <p className="text-xs text-muted-foreground">
+            {p.monthlyVelocity > 0 ? (
+              <>
+                Adding{' '}
+                <span className="text-positive font-medium">
+                  {formatCurrency(p.monthlyVelocity)}/mo
+                </span>{' '}
+                (90-day avg)
+                {p.projectedDate && (
+                  <> · projected to hit by {formatDate(p.projectedDate)}</>
+                )}
+              </>
+            ) : p.monthlyVelocity < 0 ? (
+              <span className="text-destructive">
+                Net{' '}
+                {formatCurrency(p.monthlyVelocity)}/mo (90-day avg) — not on
+                track
+              </span>
+            ) : (
+              <>No net contribution detected over the last 90 days</>
+            )}
+          </p>
+        )}
       </div>
     );
   }
   // spend_cap
   const overCap = p.fraction > 1;
+  const projectedOver = !overCap && p.projectedMonthly > p.cap;
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between">
@@ -162,36 +195,40 @@ function ProgressBlock({ goal }: { goal: GoalWithProgress }) {
       </div>
       <ProgressBar
         fraction={Math.min(1, p.fraction)}
-        tone={overCap ? 'negative' : p.fraction > 0.8 ? 'warning' : 'neutral'}
+        tone={spendCapTone(p.fraction)}
       />
       <p className="text-xs text-muted-foreground">
         {overCap
           ? `Over by ${formatCurrency(-p.remaining)}`
           : `${formatCurrency(p.remaining)} left`}
       </p>
-    </div>
-  );
-}
-
-function ProgressBar({
-  fraction,
-  tone,
-}: {
-  fraction: number;
-  tone: 'positive' | 'negative' | 'warning' | 'neutral';
-}) {
-  const fillClass = {
-    positive: 'bg-positive',
-    negative: 'bg-destructive',
-    warning: 'bg-yellow-500',
-    neutral: 'bg-foreground/70',
-  }[tone];
-  return (
-    <div className="h-2 rounded-full bg-muted overflow-hidden">
-      <div
-        className={`h-full ${fillClass} transition-all`}
-        style={{ width: `${Math.min(1, Math.max(0, fraction)) * 100}%` }}
-      />
+      <p className="text-xs text-muted-foreground">
+        {projectedOver ? (
+          <span className="text-yellow-600">
+            On pace to spend{' '}
+            <span className="font-medium">
+              {formatCurrency(p.projectedMonthly)}
+            </span>{' '}
+            this month — over cap by{' '}
+            {formatCurrency(p.projectedMonthly - p.cap)}
+          </span>
+        ) : overCap ? (
+          <>
+            Projected total this month:{' '}
+            <span className="font-medium">
+              {formatCurrency(p.projectedMonthly)}
+            </span>
+          </>
+        ) : (
+          <>
+            On pace for{' '}
+            <span className="font-medium">
+              {formatCurrency(p.projectedMonthly)}
+            </span>{' '}
+            this month
+          </>
+        )}
+      </p>
     </div>
   );
 }
