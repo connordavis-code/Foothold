@@ -6,6 +6,8 @@ import type {
 } from 'plaid';
 import { db } from '@/lib/db';
 import {
+  type FinancialAccount,
+  type PlaidItem,
   financialAccounts,
   holdings,
   investmentTransactions,
@@ -15,36 +17,65 @@ import {
 } from '@/lib/db/schema';
 import { plaid } from './client';
 
-/**
- * Plaid returns amounts as JS numbers; Drizzle's `numeric` columns want
- * strings to preserve precision. Centralize the conversion.
- */
 const num = (n: number | null | undefined): string | null =>
   n == null ? null : String(n);
-
 const numRequired = (n: number): string => String(n);
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-/** 90-day initial backfill window for /investments/transactions/get. */
 const INITIAL_BACKFILL_DAYS = 90;
 
+export type SyncSummary = {
+  accounts: number;
+  transactions: { added: number; modified: number; removed: number };
+  investments: { holdings: number; transactions: number; securities: number };
+};
+
 /**
- * Refresh financial_accounts for a Plaid item. One batched INSERT … ON
- * CONFLICT DO UPDATE FROM excluded — single round-trip regardless of how
- * many accounts the item has.
+ * Full sync for one item.
  *
- * Note: removed accounts are NOT pruned here — that needs richer state
- * tracking (Phase 5 cleanup). For now an account that disappears from Plaid
- * just becomes a stale row.
+ * Order:
+ *   1. Refresh accounts. Required first because transactions FK to them.
+ *   2. Run transaction sync and investment sync in parallel — independent
+ *      Plaid endpoints, independent DB writes (different tables).
+ *
+ * Each helper takes the already-loaded item + accounts so we don't
+ * re-query the DB for the same rows in each step.
  */
-export async function syncAccounts(itemId: string): Promise<{ count: number }> {
+export async function syncItem(itemId: string): Promise<SyncSummary> {
   const [item] = await db
     .select()
     .from(plaidItems)
-    .where(eq(plaidItems.id, itemId));
-  if (!item) throw new Error(`plaid_item ${itemId} not found`);
+    .where(and(eq(plaidItems.id, itemId), eq(plaidItems.status, 'active')));
+  if (!item) throw new Error(`plaid_item ${itemId} not found or not active`);
 
+  const accountsResult = await syncAccountsForItem(item);
+
+  // Reload accounts now that the upsert may have added new rows. Both
+  // downstream helpers need the plaid_account_id → financial_account.id map.
+  const accs = await db
+    .select()
+    .from(financialAccounts)
+    .where(eq(financialAccounts.itemId, item.id));
+
+  const [txns, inv] = await Promise.all([
+    syncTransactionsForItem(item, accs),
+    syncInvestmentsForItem(item, accs),
+  ]);
+
+  return {
+    accounts: accountsResult.count,
+    transactions: txns,
+    investments: inv,
+  };
+}
+
+/**
+ * Refresh financial_accounts. Single batched INSERT … ON CONFLICT DO
+ * UPDATE FROM excluded — one round-trip regardless of account count.
+ */
+async function syncAccountsForItem(
+  item: PlaidItem,
+): Promise<{ count: number }> {
   const res = await plaid.accountsGet({ access_token: item.accessToken });
   if (res.data.accounts.length === 0) return { count: 0 };
 
@@ -90,24 +121,14 @@ export async function syncAccounts(itemId: string): Promise<{ count: number }> {
  * The cursor is only persisted AFTER the full pagination completes — so a
  * mid-loop crash doesn't skip pages on retry.
  *
- * Each page does at most three round-trips: one batched upsert for added
- * + modified rows, one batched delete for removed, plus the Plaid call.
+ * Each page does at most three round-trips: one batched upsert for
+ * added + modified rows, one batched delete for removed, plus the
+ * Plaid call.
  */
-export async function syncTransactions(itemId: string): Promise<{
-  added: number;
-  modified: number;
-  removed: number;
-}> {
-  const [item] = await db
-    .select()
-    .from(plaidItems)
-    .where(eq(plaidItems.id, itemId));
-  if (!item) throw new Error(`plaid_item ${itemId} not found`);
-
-  const accs = await db
-    .select()
-    .from(financialAccounts)
-    .where(eq(financialAccounts.itemId, item.id));
+async function syncTransactionsForItem(
+  item: PlaidItem,
+  accs: FinancialAccount[],
+): Promise<{ added: number; modified: number; removed: number }> {
   const acctIdByPlaidId = new Map(accs.map((a) => [a.plaidAccountId, a.id]));
 
   let cursor = item.transactionsCursor ?? '';
@@ -196,34 +217,20 @@ export async function syncTransactions(itemId: string): Promise<{
 }
 
 /**
- * Refresh investments data — securities, holdings (current snapshot), and
+ * Refresh investments — securities, holdings (current snapshot), and
  * investment transactions in the date window.
  *
  * Skipped entirely if the item has no investment-type accounts; that
  * avoids a needless API call AND the PRODUCTS_NOT_SUPPORTED error from
  * institutions that only expose depository accounts.
  *
- * On first sync we look back 90 days. On subsequent syncs we look back to
- * (last_synced_at - 1 day) to catch any late-posting transactions.
- *
- * Each of the three writes (securities, holdings, investment_transactions)
- * is a single batched statement.
+ * The two Plaid endpoints (holdings + transactions) are called in
+ * parallel — they're independent.
  */
-export async function syncInvestments(itemId: string): Promise<{
-  holdings: number;
-  transactions: number;
-  securities: number;
-}> {
-  const [item] = await db
-    .select()
-    .from(plaidItems)
-    .where(eq(plaidItems.id, itemId));
-  if (!item) throw new Error(`plaid_item ${itemId} not found`);
-
-  const accs = await db
-    .select()
-    .from(financialAccounts)
-    .where(eq(financialAccounts.itemId, item.id));
+async function syncInvestmentsForItem(
+  item: PlaidItem,
+  accs: FinancialAccount[],
+): Promise<{ holdings: number; transactions: number; securities: number }> {
   if (!accs.some((a) => a.type === 'investment')) {
     return { holdings: 0, transactions: 0, securities: 0 };
   }
@@ -236,16 +243,29 @@ export async function syncInvestments(itemId: string): Promise<{
   const startStr = startDate.toISOString().slice(0, 10);
   const endStr = endDate.toISOString().slice(0, 10);
 
-  const holdingsRes = await plaid.investmentsHoldingsGet({
-    access_token: item.accessToken,
-  });
+  // Fire both Plaid endpoints concurrently; they're independent.
+  const [holdingsRes, firstTxPage] = await Promise.all([
+    plaid.investmentsHoldingsGet({ access_token: item.accessToken }),
+    plaid.investmentsTransactionsGet({
+      access_token: item.accessToken,
+      start_date: startStr,
+      end_date: endStr,
+      options: { count: 500, offset: 0 },
+    }),
+  ]);
+
   const allHoldings: PlaidHolding[] = holdingsRes.data.holdings;
   const securityIndex = new Map<string, PlaidSecurity>();
   for (const s of holdingsRes.data.securities) securityIndex.set(s.security_id, s);
+  for (const s of firstTxPage.data.securities) {
+    if (!securityIndex.has(s.security_id)) securityIndex.set(s.security_id, s);
+  }
 
-  const allTxs: PlaidInvestmentTransaction[] = [];
-  let offset = 0;
-  let total = Infinity;
+  const allTxs: PlaidInvestmentTransaction[] = [
+    ...firstTxPage.data.investment_transactions,
+  ];
+  let offset = firstTxPage.data.investment_transactions.length;
+  const total = firstTxPage.data.total_investment_transactions;
   while (offset < total) {
     const res = await plaid.investmentsTransactionsGet({
       access_token: item.accessToken,
@@ -253,18 +273,16 @@ export async function syncInvestments(itemId: string): Promise<{
       end_date: endStr,
       options: { count: 500, offset },
     });
-    total = res.data.total_investment_transactions;
     allTxs.push(...res.data.investment_transactions);
     for (const s of res.data.securities) {
       if (!securityIndex.has(s.security_id)) securityIndex.set(s.security_id, s);
     }
-    offset += res.data.investment_transactions.length;
     if (res.data.investment_transactions.length === 0) break;
+    offset += res.data.investment_transactions.length;
   }
   const allSecs = Array.from(securityIndex.values());
 
-  // 1) Securities — single upsert, RETURNING populates the id map for the
-  // subsequent holdings/transactions inserts.
+  // 1) Securities — single upsert; RETURNING populates the id map.
   const secIdByPlaidId = new Map<string, string>();
   if (allSecs.length > 0) {
     const secRows = allSecs.map((s) => ({
@@ -299,7 +317,8 @@ export async function syncInvestments(itemId: string): Promise<{
     for (const r of inserted) secIdByPlaidId.set(r.plaidSecurityId, r.id);
   }
 
-  // 2) Holdings — batched upsert.
+  // 2) Holdings + 3) investment_transactions — independent writes, run
+  // concurrently. Both depend only on the maps populated above.
   const holdingRows = allHoldings
     .map((h) => {
       const accountId = acctIdByPlaidId.get(h.account_id);
@@ -318,25 +337,6 @@ export async function syncInvestments(itemId: string): Promise<{
     })
     .filter((r): r is NonNullable<typeof r> => r !== null);
 
-  if (holdingRows.length > 0) {
-    await db
-      .insert(holdings)
-      .values(holdingRows)
-      .onConflictDoUpdate({
-        target: [holdings.accountId, holdings.securityId],
-        set: {
-          quantity: sql`excluded.quantity`,
-          costBasis: sql`excluded.cost_basis`,
-          institutionValue: sql`excluded.institution_value`,
-          institutionPrice: sql`excluded.institution_price`,
-          institutionPriceAsOf: sql`excluded.institution_price_as_of`,
-          updatedAt: new Date(),
-        },
-      });
-  }
-
-  // 3) Investment transactions — batched insert; on conflict do nothing
-  // (these are immutable once posted).
   const invTxRows = allTxs
     .map((t) => {
       const accountId = acctIdByPlaidId.get(t.account_id);
@@ -361,45 +361,36 @@ export async function syncInvestments(itemId: string): Promise<{
     })
     .filter((r): r is NonNullable<typeof r> => r !== null);
 
-  if (invTxRows.length > 0) {
-    await db
-      .insert(investmentTransactions)
-      .values(invTxRows)
-      .onConflictDoNothing({
-        target: investmentTransactions.plaidInvestmentTransactionId,
-      });
-  }
+  await Promise.all([
+    holdingRows.length > 0
+      ? db
+          .insert(holdings)
+          .values(holdingRows)
+          .onConflictDoUpdate({
+            target: [holdings.accountId, holdings.securityId],
+            set: {
+              quantity: sql`excluded.quantity`,
+              costBasis: sql`excluded.cost_basis`,
+              institutionValue: sql`excluded.institution_value`,
+              institutionPrice: sql`excluded.institution_price`,
+              institutionPriceAsOf: sql`excluded.institution_price_as_of`,
+              updatedAt: new Date(),
+            },
+          })
+      : Promise.resolve(),
+    invTxRows.length > 0
+      ? db
+          .insert(investmentTransactions)
+          .values(invTxRows)
+          .onConflictDoNothing({
+            target: investmentTransactions.plaidInvestmentTransactionId,
+          })
+      : Promise.resolve(),
+  ]);
 
   return {
     holdings: allHoldings.length,
     transactions: allTxs.length,
     securities: allSecs.length,
-  };
-}
-
-export type SyncSummary = {
-  accounts: number;
-  transactions: { added: number; modified: number; removed: number };
-  investments: { holdings: number; transactions: number; securities: number };
-};
-
-/**
- * Full sync for one item: accounts → transactions → investments. Order
- * matters: accounts must be in the DB before transactions can FK to them.
- */
-export async function syncItem(itemId: string): Promise<SyncSummary> {
-  const [item] = await db
-    .select()
-    .from(plaidItems)
-    .where(and(eq(plaidItems.id, itemId), eq(plaidItems.status, 'active')));
-  if (!item) throw new Error(`plaid_item ${itemId} not found or not active`);
-
-  const accounts = await syncAccounts(itemId);
-  const txns = await syncTransactions(itemId);
-  const inv = await syncInvestments(itemId);
-  return {
-    accounts: accounts.count,
-    transactions: txns,
-    investments: inv,
   };
 }
