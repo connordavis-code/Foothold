@@ -4,7 +4,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { signInWithEmail } from './actions';
 
-export default function LoginPage() {
+export default function LoginPage({
+  searchParams,
+}: {
+  searchParams: { error?: string };
+}) {
+  const showInvalidEmail = searchParams.error === 'invalid_email';
+
   return (
     <div className="space-y-8">
       <div className="space-y-2 text-center">
@@ -32,7 +38,13 @@ export default function LoginPage() {
             placeholder="you@example.com"
             required
             autoComplete="email"
+            aria-invalid={showInvalidEmail || undefined}
           />
+          {showInvalidEmail && (
+            <p className="text-sm text-destructive">
+              Please enter a valid email address.
+            </p>
+          )}
         </div>
         <Button type="submit" className="w-full">
           Send magic link

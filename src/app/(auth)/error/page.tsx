@@ -17,6 +17,11 @@ const errorMessages: Record<string, { title: string; message: string }> = {
     message:
       'The sign-in link has expired or has already been used. Request a new one.',
   },
+  EmailSignin: {
+    title: 'Could not send email',
+    message:
+      'We failed to deliver the magic-link email. Check that the address is correct and try again — if it keeps failing, the email provider may be down.',
+  },
   Default: {
     title: 'Something went wrong',
     message: 'An unexpected error occurred during sign-in. Please try again.',

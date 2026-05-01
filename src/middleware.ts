@@ -1,24 +1,39 @@
+import NextAuth from 'next-auth';
 import { NextResponse } from 'next/server';
-import { auth } from '@/auth';
+import authConfig from '@/auth.config';
 
 /**
- * Middleware: redirect signed-out users to /login (except for auth pages
- * themselves), and redirect signed-in users away from /login → /dashboard.
+ * Middleware uses the edge-safe Auth.js config (no DB adapter). With database
+ * sessions, `req.auth` here reflects cookie presence — the actual session row
+ * is verified later inside server components via `auth()` from `@/auth`.
+ *
+ * Behavior:
+ *   - Signed-out hits to a protected page → redirect to /login (with callbackUrl)
+ *   - Signed-out hits to a protected API → 401 JSON (NOT a redirect — API
+ *     clients can't follow HTML redirects sensibly)
+ *   - Signed-in hits to /login or / → redirect to /dashboard
  */
+const { auth } = NextAuth(authConfig);
+
 export default auth((req) => {
   const { pathname } = req.nextUrl;
   const isLoggedIn = !!req.auth;
+
+  const isApi = pathname.startsWith('/api');
+  const isAuthApi = pathname.startsWith('/api/auth');
 
   const isAuthRoute =
     pathname === '/login' ||
     pathname === '/verify' ||
     pathname === '/error' ||
-    pathname.startsWith('/api/auth');
+    isAuthApi;
 
-  // Allow the public landing page only when signed-out.
   const isLandingPage = pathname === '/';
 
   if (!isLoggedIn && !isAuthRoute && !isLandingPage) {
+    if (isApi) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     const loginUrl = new URL('/login', req.nextUrl);
     loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);
@@ -32,6 +47,7 @@ export default auth((req) => {
 });
 
 export const config = {
-  // Skip Next.js internals + static files + api/auth (handled by NextAuth)
+  // Skip Next.js internals + static files. /api/auth is handled by the
+  // matcher hitting it first, then bypassed via the isAuthApi check above.
   matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.svg|.*\\.png).*)'],
 };
