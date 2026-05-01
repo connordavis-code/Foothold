@@ -1,6 +1,7 @@
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { auth } from '@/auth';
 import { ConnectBankButton } from '@/components/plaid/connect-bank-button';
+import { SyncButton } from '@/components/plaid/sync-button';
 import {
   Card,
   CardContent,
@@ -9,7 +10,8 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { db } from '@/lib/db';
-import { plaidItems } from '@/lib/db/schema';
+import { financialAccounts, plaidItems } from '@/lib/db/schema';
+import { formatCurrency } from '@/lib/utils';
 
 export default async function SettingsPage() {
   const session = await auth();
@@ -20,6 +22,25 @@ export default async function SettingsPage() {
     .from(plaidItems)
     .where(eq(plaidItems.userId, session.user.id))
     .orderBy(plaidItems.createdAt);
+
+  const accounts = items.length
+    ? await db
+        .select()
+        .from(financialAccounts)
+        .where(
+          inArray(
+            financialAccounts.itemId,
+            items.map((i) => i.id),
+          ),
+        )
+    : [];
+
+  const accountsByItem = new Map<string, typeof accounts>();
+  for (const a of accounts) {
+    const list = accountsByItem.get(a.itemId) ?? [];
+    list.push(a);
+    accountsByItem.set(a.itemId, list);
+  }
 
   return (
     <div className="px-8 py-8 max-w-3xl mx-auto space-y-6">
@@ -49,9 +70,9 @@ export default async function SettingsPage() {
           <div className="space-y-1.5">
             <CardTitle>Connected institutions</CardTitle>
             <CardDescription>
-              Banks and brokerages connected via Plaid. Sandbox mode uses
-              fake test data — pick "First Platypus Bank" and log in with
-              <span className="font-mono"> user_good / pass_good</span>.
+              Banks and brokerages connected via Plaid. Sandbox uses fake
+              data — pick any institution and log in with{' '}
+              <span className="font-mono">user_good / pass_good</span>.
             </CardDescription>
           </div>
           <ConnectBankButton />
@@ -62,29 +83,76 @@ export default async function SettingsPage() {
               No institutions connected yet.
             </p>
           ) : (
-            <ul className="divide-y divide-border">
-              {items.map((item) => (
-                <li
-                  key={item.id}
-                  className="py-3 flex items-center justify-between"
-                >
-                  <div>
-                    <p className="font-medium">
-                      {item.institutionName ?? 'Unknown institution'}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Connected {item.createdAt.toLocaleDateString()}
-                    </p>
-                  </div>
-                  <span className="text-xs text-muted-foreground capitalize">
-                    {item.status}
-                  </span>
-                </li>
-              ))}
+            <ul className="space-y-6">
+              {items.map((item) => {
+                const itemAccounts = accountsByItem.get(item.id) ?? [];
+                return (
+                  <li key={item.id} className="space-y-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="font-medium">
+                          {item.institutionName ?? 'Unknown institution'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Connected {item.createdAt.toLocaleDateString()} ·{' '}
+                          {item.lastSyncedAt
+                            ? `synced ${formatRelative(item.lastSyncedAt)}`
+                            : 'never synced'}
+                        </p>
+                      </div>
+                      <SyncButton itemId={item.id} />
+                    </div>
+                    {itemAccounts.length > 0 && (
+                      <ul className="rounded-md border border-border divide-y divide-border text-sm">
+                        {itemAccounts.map((a) => (
+                          <li
+                            key={a.id}
+                            className="px-3 py-2 flex items-center justify-between"
+                          >
+                            <div>
+                              <p>
+                                {a.name}
+                                {a.mask && (
+                                  <span className="text-muted-foreground">
+                                    {' '}
+                                    ····{a.mask}
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-xs text-muted-foreground capitalize">
+                                {a.subtype ?? a.type}
+                              </p>
+                            </div>
+                            <p className="tabular text-sm">
+                              {a.currentBalance != null
+                                ? formatCurrency(Number(a.currentBalance))
+                                : '—'}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </CardContent>
       </Card>
     </div>
   );
+}
+
+/** "5 minutes ago" / "2 hours ago" / "yesterday" / locale date for older. */
+function formatRelative(d: Date): string {
+  const diffMs = Date.now() - d.getTime();
+  const min = Math.floor(diffMs / 60_000);
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  if (day === 1) return 'yesterday';
+  if (day < 7) return `${day}d ago`;
+  return d.toLocaleDateString();
 }

@@ -1,11 +1,13 @@
 'use server';
 
+import { and, eq } from 'drizzle-orm';
 import type { CountryCode, Products } from 'plaid';
 import { auth } from '@/auth';
 import { db } from '@/lib/db';
 import { plaidItems } from '@/lib/db/schema';
 import { env, plaidCountryCodes, plaidProducts } from '@/lib/env';
 import { plaid } from './client';
+import { syncItem, type SyncSummary } from './sync';
 
 /**
  * Mint a short-lived link_token that the browser-side Plaid Link UI uses
@@ -51,11 +53,43 @@ export async function exchangePublicToken(
     public_token: publicToken,
   });
 
-  await db.insert(plaidItems).values({
-    userId: session.user.id,
-    plaidItemId: exchange.data.item_id,
-    plaidInstitutionId: metadata.institution_id ?? null,
-    institutionName: metadata.institution_name ?? null,
-    accessToken: exchange.data.access_token,
-  });
+  const [inserted] = await db
+    .insert(plaidItems)
+    .values({
+      userId: session.user.id,
+      plaidItemId: exchange.data.item_id,
+      plaidInstitutionId: metadata.institution_id ?? null,
+      institutionName: metadata.institution_name ?? null,
+      accessToken: exchange.data.access_token,
+    })
+    .returning({ id: plaidItems.id });
+
+  // Run the initial backfill inline. On a sandbox item this is a few
+  // seconds; on a real institution with 24 months of history it can take
+  // up to ~30s. The Plaid Link UI is already closed, so the user is just
+  // staring at the connecting state on the button.
+  await syncItem(inserted.id);
+}
+
+/**
+ * Re-sync an item the user owns. Used by the "Sync now" button on /settings.
+ * Verifies ownership before doing any work.
+ */
+export async function syncItemAction(itemId: string): Promise<SyncSummary> {
+  const session = await auth();
+  if (!session?.user) {
+    throw new Error('Unauthorized');
+  }
+
+  const [item] = await db
+    .select({ id: plaidItems.id })
+    .from(plaidItems)
+    .where(
+      and(eq(plaidItems.id, itemId), eq(plaidItems.userId, session.user.id)),
+    );
+  if (!item) {
+    throw new Error('Item not found');
+  }
+
+  return syncItem(item.id);
 }
