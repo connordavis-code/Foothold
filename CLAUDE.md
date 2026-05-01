@@ -133,6 +133,21 @@ prompt under 4096 tokens won't cache anyway, so the marker is a no-op
 at this scale; revisit when the prompt grows or the SDK is bumped. See
 [src/lib/anthropic/insights.ts](src/lib/anthropic/insights.ts).
 
+### Don't assume Plaid Production = real data flowing (2026-05-01)
+Plaid deprecated the **Development** tier in 2024; only Sandbox and
+Production exist now. *And* Production is institution-gated: having a
+Production secret + `PLAID_ENV=production` is not enough — your app
+must be approved for each major consumer institution (Amex consumer,
+Fidelity, most big banks) before Link will let users connect them.
+Symptom: "Connectivity not supported" inside Plaid Link, with the
+search results filtered to only the institutions on your allowlist
+(e.g. Amex search returns Kabbage but not consumer Amex). Approval
+flow: dashboard.plaid.com/overview/production → app review, then
+per-institution requests. Days-to-weeks, sometimes denied for
+personal-use apps. Don't flip envs and wipe sandbox data until access
+is confirmed — burned ~30min wiping the sandbox `plaid_items` and
+discovering the gate post-flip.
+
 ---
 
 ## Coding conventions
@@ -163,17 +178,20 @@ at this scale; revisit when the prompt grows or the SDK is bumped. See
   Pure SQL, no AI. Same threshold rules as pt1's prompt.
 
 ### In progress
-_(none — last session ended cleanly at Phase 3-pt2)_
+- **Plaid Production access** — submitted via
+  dashboard.plaid.com/overview/production. App-level review pending,
+  then per-institution requests for Amex (consumer), Fidelity, and
+  primary bank. Until approved, env stays on `sandbox` and the previous
+  sandbox `plaid_items` row (Wells Fargo) has already been wiped — DB
+  is empty of Plaid data. (Rotate the brief-use Production secret on
+  the dashboard before reconnecting if you haven't already.) See
+  Lessons learned for why this is gated.
 
 ### Next up
-- **Switch Plaid sandbox → development** before any further phase work.
-  All current data is fake sandbox; user has real bank + Amex credit
-  card ready to connect (Amex is the bulk of their real spending and
-  is missing from current insights/drift output entirely). Steps:
-  copy Development secret from <https://dashboard.plaid.com/team/keys>,
-  set `PLAID_ENV=development` in `.env.local`, decide whether to
-  delete existing sandbox `plaid_items` (and cascading data) before
-  reconnecting, restart dev server, reconnect via /settings.
+- **Reconnect once approved** — flip `PLAID_ENV=production`, paste new
+  Production secret, reconnect via /settings. Watch for OAuth redirect
+  config (we don't pass `redirect_uri` in `linkTokenCreate`; fine for
+  localhost, breaks on Vercel deploy without config).
 - **Phase 3-pt3** — per-goal coaching detail page (defer until real
   data is flowing; sandbox data has zero useful goals signal)
 - **Phase 4** — predictive layer (forecasts, what-if simulator)

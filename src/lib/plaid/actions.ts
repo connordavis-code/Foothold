@@ -3,6 +3,7 @@
 import { and, eq } from 'drizzle-orm';
 import type { CountryCode, Products } from 'plaid';
 import { auth } from '@/auth';
+import { encryptToken } from '@/lib/crypto';
 import { db } from '@/lib/db';
 import { plaidItems } from '@/lib/db/schema';
 import { env, plaidCountryCodes, plaidProducts } from '@/lib/env';
@@ -60,7 +61,7 @@ export async function exchangePublicToken(
       plaidItemId: exchange.data.item_id,
       plaidInstitutionId: metadata.institution_id ?? null,
       institutionName: metadata.institution_name ?? null,
-      accessToken: exchange.data.access_token,
+      accessToken: encryptToken(exchange.data.access_token),
     })
     .returning({ id: plaidItems.id });
 

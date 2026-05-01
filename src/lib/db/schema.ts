@@ -102,7 +102,9 @@ export const plaidItems = pgTable('plaid_item', {
   plaidItemId: text('plaid_item_id').unique().notNull(),
   plaidInstitutionId: text('plaid_institution_id'),
   institutionName: text('institution_name'),
-  // Plaid access_token — sensitive. Phase 5 will encrypt at rest.
+  // Plaid access_token, encrypted at rest with AES-256-GCM. See
+  // [src/lib/crypto.ts]. Encrypted at write in `exchangePublicToken`,
+  // decrypted at read in `syncItem` (single boundary).
   accessToken: text('access_token').notNull(),
   // Cursor for /transactions/sync incremental sync.
   transactionsCursor: text('transactions_cursor'),

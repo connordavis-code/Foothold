@@ -4,6 +4,7 @@ import type {
   InvestmentTransaction as PlaidInvestmentTransaction,
   Security as PlaidSecurity,
 } from 'plaid';
+import { decryptToken } from '@/lib/crypto';
 import { db } from '@/lib/db';
 import {
   type FinancialAccount,
@@ -49,6 +50,10 @@ export async function syncItem(itemId: string): Promise<SyncSummary> {
     .from(plaidItems)
     .where(and(eq(plaidItems.id, itemId), eq(plaidItems.status, 'active')));
   if (!item) throw new Error(`plaid_item ${itemId} not found or not active`);
+
+  // Single decryption boundary: every helper below reads `item.accessToken`
+  // and expects plaintext. Mutating once here keeps the call sites unchanged.
+  item.accessToken = decryptToken(item.accessToken);
 
   const accountsResult = await syncAccountsForItem(item);
 

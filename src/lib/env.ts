@@ -21,6 +21,11 @@ const envSchema = z.object({
   PLAID_PRODUCTS: z.string().default('transactions,investments'),
   PLAID_COUNTRY_CODES: z.string().default('US'),
   PLAID_CLIENT_NAME: z.string().default('Personal Finance Tool'),
+  // 32 bytes, base64-encoded. Generate with:
+  //   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+  // Encrypts plaid_item.access_token at rest. Rotating means reconnecting
+  // every plaid_item.
+  PLAID_TOKEN_ENCRYPTION_KEY: z.string().min(1),
 
   // Anthropic (optional, used in Phase 3)
   ANTHROPIC_API_KEY: z.string().optional(),

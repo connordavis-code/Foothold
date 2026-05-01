@@ -38,8 +38,9 @@ export default function middleware(req: NextRequest) {
     isAuthApi;
 
   const isLandingPage = pathname === '/';
+  const isPublicPage = pathname === '/privacy';
 
-  if (!isLoggedIn && !isAuthRoute && !isLandingPage) {
+  if (!isLoggedIn && !isAuthRoute && !isLandingPage && !isPublicPage) {
     if (isApi) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
