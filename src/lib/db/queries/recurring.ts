@@ -105,7 +105,7 @@ export async function getMonthlyRecurringOutflow(
 }
 
 /** Convert a Plaid frequency to "how many of these per month". */
-function frequencyToMonthlyMultiplier(freq: string): number {
+export function frequencyToMonthlyMultiplier(freq: string): number {
   switch (freq) {
     case 'WEEKLY':
       return 52 / 12;

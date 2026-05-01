@@ -390,6 +390,39 @@ export const investmentTransactions = pgTable(
   }),
 );
 
+/**
+ * AI-generated weekly insights. One row per (user, week_start) — the unique
+ * index is the natural cache key. The "Generate insights" button always
+ * upserts (ON CONFLICT DO UPDATE), so the row reflects the most recent
+ * generation for that week. Page load reads the row directly.
+ */
+export const insights = pgTable(
+  'insight',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    weekStart: date('week_start').notNull(),
+    weekEnd: date('week_end').notNull(),
+    narrative: text('narrative').notNull(),
+    model: text('model').notNull(),
+    inputTokens: integer('input_tokens'),
+    outputTokens: integer('output_tokens'),
+    generatedAt: ts('generated_at').notNull(),
+    createdAt: ts('created_at').defaultNow().notNull(),
+    updatedAt: ts('updated_at').defaultNow().notNull(),
+  },
+  (i) => ({
+    userWeekUnique: uniqueIndex('insight_user_week_idx').on(
+      i.userId,
+      i.weekStart,
+    ),
+  }),
+);
+
 // =============================================================================
 // Type exports — convenient for queries
 // =============================================================================
@@ -404,3 +437,4 @@ export type InvestmentTransaction = typeof investmentTransactions.$inferSelect;
 export type Category = typeof categories.$inferSelect;
 export type RecurringStream = typeof recurringStreams.$inferSelect;
 export type Goal = typeof goals.$inferSelect;
+export type Insight = typeof insights.$inferSelect;
