@@ -118,6 +118,14 @@ an interactive arrow-key confirmation that `yes |` and `printf` can't
 satisfy — the process just hangs. For a one-shot push: temporarily flip
 to `strict: false`, push, flip back. Don't permanently disable strict.
 
+### Don't run `npm run build` while `next dev` is running
+Production build overwrites `.next/BUILD_ID` and the static chunk
+manifests; the live dev server's module map points at chunk URLs that
+no longer exist on disk, so the browser loads page HTML with no CSS
+or JS — pages render unstyled until you Ctrl+C dev, `rm -rf .next`,
+and restart `next dev`. Use `npm run typecheck` for verification while
+dev is running; reserve `build` for pre-commit / pre-deploy moments.
+
 ### Don't add `cache_control` to system blocks on SDK `^0.32.1`
 SDK 0.32.1 predates `cache_control` on `TextBlockParam` — typecheck
 fails. Either bump the SDK *or* drop the marker. On Haiku 4.5 a system
@@ -150,12 +158,14 @@ at this scale; revisit when the prompt grows or the SDK is bumped. See
   unified weekly narrative covering spending / drift / goals /
   subscriptions, cached in `insight` table keyed by
   `(user_id, week_start)`
+- **Phase 3-pt2** — `/drift` dashboard: 8-week multi-line trend chart
+  (Recharts), currently-elevated category cards, flag history table.
+  Pure SQL, no AI. Same threshold rules as pt1's prompt.
 
 ### In progress
-_(none — last session ended cleanly at Phase 3-pt1)_
+_(none — last session ended cleanly at Phase 3-pt2)_
 
 ### Next up
-- **Phase 3-pt2** — dedicated drift dashboard (thresholds, history)
 - **Phase 3-pt3** — per-goal coaching detail page
 - **Phase 4** — predictive layer (forecasts, what-if simulator)
 - **Phase 5** — production deploy, Vercel cron (auto-generate insights
