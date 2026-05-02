@@ -1,6 +1,8 @@
 import { eq, inArray } from 'drizzle-orm';
 import { auth } from '@/auth';
 import { ConnectBankButton } from '@/components/plaid/connect-bank-button';
+import { ReconnectButton } from '@/components/plaid/reconnect-button';
+import { statusLabel } from '@/components/plaid/reauth-banner';
 import { SyncButton } from '@/components/plaid/sync-button';
 import {
   Card,
@@ -90,8 +92,13 @@ export default async function SettingsPage() {
                   <li key={item.id} className="space-y-3">
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <p className="font-medium">
+                        <p className="font-medium flex items-center gap-2">
                           {item.institutionName ?? 'Unknown institution'}
+                          {item.status !== 'active' && (
+                            <span className="inline-flex items-center rounded-full border border-amber-500/50 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+                              {statusLabel(item.status)}
+                            </span>
+                          )}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           Connected {item.createdAt.toLocaleDateString()} ·{' '}
@@ -100,7 +107,11 @@ export default async function SettingsPage() {
                             : 'never synced'}
                         </p>
                       </div>
-                      <SyncButton itemId={item.id} />
+                      {item.status === 'active' ? (
+                        <SyncButton itemId={item.id} />
+                      ) : (
+                        <ReconnectButton itemId={item.id} />
+                      )}
                     </div>
                     {itemAccounts.length > 0 && (
                       <ul className="rounded-md border border-border divide-y divide-border text-sm">

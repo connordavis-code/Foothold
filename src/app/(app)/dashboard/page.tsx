@@ -9,11 +9,13 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { GoalsStrip } from '@/components/goals/goals-strip';
+import { ReauthBanner } from '@/components/plaid/reauth-banner';
 import {
   getDashboardSummary,
   getRecentTransactions,
 } from '@/lib/db/queries/dashboard';
 import { getGoalsWithProgress } from '@/lib/db/queries/goals';
+import { getItemsNeedingReauth } from '@/lib/db/queries/plaid';
 import {
   getMonthlyRecurringOutflow,
   getRecurringStreams,
@@ -24,13 +26,14 @@ export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user) return null;
 
-  const [summary, recent, recurring, monthlyRecurring, goals] =
+  const [summary, recent, recurring, monthlyRecurring, goals, reauthItems] =
     await Promise.all([
       getDashboardSummary(session.user.id),
       getRecentTransactions(session.user.id, 10),
       getRecurringStreams(session.user.id),
       getMonthlyRecurringOutflow(session.user.id),
       getGoalsWithProgress(session.user.id),
+      getItemsNeedingReauth(session.user.id),
     ]);
 
   const activeOutflows = recurring.filter(
@@ -52,6 +55,8 @@ export default async function DashboardPage() {
           Welcome{session.user.name ? `, ${session.user.name}` : ''}
         </h1>
       </div>
+
+      <ReauthBanner items={reauthItems} />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard

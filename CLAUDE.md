@@ -197,6 +197,24 @@ discovering the gate post-flip.
   Resend magic-link delivery, Auth.js DB session, dashboard render. Repo
   is public on GitHub (<https://github.com/connordavis-code/Foothold>);
   reviewer-inspectable.
+- **Plaid webhooks** (2026-05-01) — `POST /api/plaid/webhook` with JWS
+  verification (ES256, `webhookVerificationKeyGet` + 24h key cache,
+  `request_body_sha256` + 5-min `iat` window) in
+  [src/lib/plaid/webhook.ts]. Dispatch:
+  `TRANSACTIONS.SYNC_UPDATES_AVAILABLE` and
+  `RECURRING_TRANSACTIONS_UPDATE` → inline `syncItem`; `ITEM.ERROR`
+  (with error_code branching) / `PENDING_EXPIRATION` /
+  `USER_PERMISSION_REVOKED` / `LOGIN_REPAIRED` → mutate
+  `plaid_item.status`. New items pass `webhook:` in `linkTokenCreate`
+  (derived from `NEXT_PUBLIC_APP_URL`). Status surfaces as yellow
+  banner on `/dashboard` and per-item badge on `/settings`. When
+  status is non-active, /settings swaps the Sync button for a
+  Reconnect button that drives Plaid Link in update mode (no
+  public-token exchange — update mode keeps the same `access_token`);
+  `markItemReconnected` optimistically flips status + runs `syncItem`
+  so the UI doesn't have to wait on `LOGIN_REPAIRED`. Local testing
+  needs a tunnel (Plaid can't reach localhost); sandbox triggering via
+  `/sandbox/item/fire_webhook`.
 
 ### In progress
 - **Plaid Production access review** — submitted 2026-05-01 with the
@@ -218,10 +236,6 @@ discovering the gate post-flip.
   vars too. Watch for OAuth `redirect_uri` config — `linkTokenCreate`
   doesn't pass one; works on Vercel for non-OAuth institutions, breaks
   for Chase / Capital One / etc. without explicit redirect config.
-- **Plaid webhooks** — currently sync only fires on initial connect or
-  manual "Sync now". Adding `/api/plaid/webhook` for `TRANSACTIONS_*`
-  and `ITEM_*` events enables auto-refresh and login-required UX.
-  Buildable on sandbox; useful immediately on Production approval.
 - **Phase 3-pt3** — per-goal coaching detail page (defer until real
   data is flowing; sandbox data has zero useful goals signal)
 - **Phase 4** — predictive layer (forecasts, what-if simulator)

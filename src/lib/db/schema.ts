@@ -108,6 +108,9 @@ export const plaidItems = pgTable('plaid_item', {
   accessToken: text('access_token').notNull(),
   // Cursor for /transactions/sync incremental sync.
   transactionsCursor: text('transactions_cursor'),
+  // 'active' | 'login_required' | 'pending_expiration' | 'permission_revoked'
+  // | 'error'. Driven by Plaid ITEM webhooks; surfaces the reauth banner.
+  // syncItem only runs on 'active' rows.
   status: text('status').notNull().default('active'),
   createdAt: ts('created_at').defaultNow().notNull(),
   lastSyncedAt: ts('last_synced_at'),
