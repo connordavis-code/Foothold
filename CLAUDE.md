@@ -166,9 +166,14 @@ discovering the gate post-flip.
   ([.github/dependabot.yml]). Public privacy policy at `/privacy`.
   [SECURITY.md] for threat model + practices.
 - **Vercel deployment** (2026-05-01) — live at
-  <https://foothold-beta.vercel.app>. Validated end-to-end: login flow,
-  Resend magic-link delivery, Auth.js DB session, dashboard render. Repo
-  is public on GitHub (<https://github.com/connordavis-code/Foothold>);
+  <https://usefoothold.com> (Cloudflare-registered, Vercel-hosted; the
+  original `foothold-beta.vercel.app` alias is retained so existing
+  Plaid items keep firing webhooks at it). Magic-link emails send
+  from `noreply@usefoothold.com` via Resend (custom domain verified
+  via Cloudflare auto-configure). Validated end-to-end: login flow,
+  email delivery, Auth.js DB session, dashboard render, webhook
+  continuity on the alias. Repo is public on GitHub
+  (<https://github.com/connordavis-code/Foothold>);
   reviewer-inspectable.
 - **Plaid webhooks** (2026-05-01) — `POST /api/plaid/webhook` with
   ES256 JWS verification ([src/lib/plaid/webhook.ts]). ITEM events
@@ -197,8 +202,7 @@ discovering the gate post-flip.
 - **Phase 3-pt3** — per-goal coaching detail page (defer until real
   data is flowing; sandbox data has zero useful goals signal)
 - **Phase 4** — predictive layer (forecasts, what-if simulator)
-- **Phase 5** — Vercel cron (auto-generate insights weekly), custom
-  domain + Resend domain (move off `onboarding@resend.dev`), monitoring
+- **Phase 5** — Vercel cron (auto-generate insights weekly), monitoring
 
 ---
 
