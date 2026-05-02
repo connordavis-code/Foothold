@@ -126,6 +126,17 @@ or JS — pages render unstyled until you Ctrl+C dev, `rm -rf .next`,
 and restart `next dev`. Use `npm run typecheck` for verification while
 dev is running; reserve `build` for pre-commit / pre-deploy moments.
 
+### Don't trust Ctrl+C to kill the dev server's port binding
+After editing `src/middleware.ts`, Next's edge module map can hold a
+stale reference; symptom = `Error: Cannot find the middleware module`
+on every request, browser shows "missing required error components,
+refreshing..." in a loop. Standard fix is `Ctrl+C` + `rm -rf .next` +
+`npm run dev`. *But* Ctrl+C sometimes leaves a zombie node process
+holding port 3000 — the new dev server then binds 3001 and you keep
+hitting the broken zombie at :3000. Always verify with
+`lsof -nP -iTCP:3000 -sTCP:LISTEN` after a kill; `kill <pid>` the
+zombie if present. Burned ~15min during the 2026-05-01 deploy session.
+
 ### Don't add `cache_control` to system blocks on SDK `^0.32.1`
 SDK 0.32.1 predates `cache_control` on `TextBlockParam` — typecheck
 fails. Either bump the SDK *or* drop the marker. On Haiku 4.5 a system
@@ -176,28 +187,46 @@ discovering the gate post-flip.
 - **Phase 3-pt2** — `/drift` dashboard: 8-week multi-line trend chart
   (Recharts), currently-elevated category cards, flag history table.
   Pure SQL, no AI. Same threshold rules as pt1's prompt.
+- **Security hardening + Plaid review prep** (2026-05-01) — AES-256-GCM
+  encryption of `plaid_item.access_token` ([src/lib/crypto.ts]), single
+  decryption boundary in `syncItem`. Dependabot weekly grouped npm PRs
+  ([.github/dependabot.yml]). Public privacy policy at `/privacy`.
+  [SECURITY.md] for threat model + practices.
+- **Vercel deployment** (2026-05-01) — live at
+  <https://foothold-beta.vercel.app>. Validated end-to-end: login flow,
+  Resend magic-link delivery, Auth.js DB session, dashboard render. Repo
+  is public on GitHub (<https://github.com/connordavis-code/Foothold>);
+  reviewer-inspectable.
 
 ### In progress
-- **Plaid Production access** — submitted via
-  dashboard.plaid.com/overview/production. App-level review pending,
-  then per-institution requests for Amex (consumer), Fidelity, and
-  primary bank. Until approved, env stays on `sandbox` and the previous
-  sandbox `plaid_items` row (Wells Fargo) has already been wiped — DB
-  is empty of Plaid data. (Rotate the brief-use Production secret on
-  the dashboard before reconnecting if you haven't already.) See
-  Lessons learned for why this is gated.
+- **Plaid Production access review** — submitted 2026-05-01 with the
+  full security questionnaire. App name "Foothold", icon (slate-900 "F"
+  monogram), brand color `#0F172A`, products = Transactions + Recurring
+  + Investments, use case = "Personal budgeting and financial advice",
+  pay-as-you-go billing. Q9 amendment email sent to
+  building@plaid.com referencing the live `/privacy` URL. Honest
+  approval-odds estimate at submission: ~25–35% first-pass, ~60–70%
+  with follow-up clarification, ~25–35% denial with no path. May 6
+  follow-up agent scheduled to triage status (see
+  <https://claude.ai/code/routines>). DB is empty of Plaid data; the
+  Wells Fargo sandbox item was wiped pre-review. Brief-use Production
+  secret should be rotated on dashboard.plaid.com before reconnecting.
 
 ### Next up
-- **Reconnect once approved** — flip `PLAID_ENV=production`, paste new
-  Production secret, reconnect via /settings. Watch for OAuth redirect
-  config (we don't pass `redirect_uri` in `linkTokenCreate`; fine for
-  localhost, breaks on Vercel deploy without config).
+- **Reconnect once approved** — flip `PLAID_ENV=production`, paste
+  fresh Production secret, reconnect via `/settings`. Update Vercel env
+  vars too. Watch for OAuth `redirect_uri` config — `linkTokenCreate`
+  doesn't pass one; works on Vercel for non-OAuth institutions, breaks
+  for Chase / Capital One / etc. without explicit redirect config.
+- **Plaid webhooks** — currently sync only fires on initial connect or
+  manual "Sync now". Adding `/api/plaid/webhook` for `TRANSACTIONS_*`
+  and `ITEM_*` events enables auto-refresh and login-required UX.
+  Buildable on sandbox; useful immediately on Production approval.
 - **Phase 3-pt3** — per-goal coaching detail page (defer until real
   data is flowing; sandbox data has zero useful goals signal)
 - **Phase 4** — predictive layer (forecasts, what-if simulator)
-- **Phase 5** — production deploy, Vercel cron (auto-generate insights
-  weekly), Plaid Production access, encrypt
-  `plaid_item.access_token` at rest
+- **Phase 5** — Vercel cron (auto-generate insights weekly), custom
+  domain + Resend domain (move off `onboarding@resend.dev`), monitoring
 
 ---
 
