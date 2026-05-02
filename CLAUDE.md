@@ -132,6 +132,12 @@ personal-use apps. Don't flip envs and wipe sandbox data until access
 is confirmed — burned ~30min wiping the sandbox `plaid_items` and
 discovering the gate post-flip.
 
+### Don't trust DNS/RDAP for domain availability (2026-05-01)
+Both produce false positives — domains can be registered without NS
+records (parked) or with stale RDAP entries. Burned ~30min when most
+pre-checked "available" candidates were taken at Cloudflare's lookup.
+The registrar UI is the only ground truth; hand the user a short-list.
+
 ---
 
 ## Coding conventions
