@@ -92,26 +92,6 @@ Mutations live in `src/lib/<domain>/actions.ts`, called from
 > Wrong moves we don't want to repeat. Format: `### Don't <thing>`
 > (commit ref) · what happened · right approach. Prune stale entries.
 
-### Don't run independent Plaid endpoints sequentially (`dcb4317`)
-Original sync awaited accounts → transactions → investments → recurring
-in series. Accounts must come first (FK source); the rest are
-independent — `Promise.all` them.
-
-### Don't insert Plaid rows one at a time (`7b548a8`)
-First impl did one INSERT per transaction; a 90-day backfill produced
-hundreds of round-trips. Batch into one
-`INSERT … ON CONFLICT DO UPDATE FROM excluded` per section.
-
-### Don't re-query rows you already loaded this run (`dcb4317`)
-Sync helpers were each re-fetching `financial_accounts` for the same
-item. `syncItem` now loads accounts once after the upsert and threads
-the array into every helper.
-
-### Don't create a new postgres-js client per HMR reload (`489bef2`)
-Without `globalThis` caching, every dev-mode edit spawns a new pool and
-exhausts Supabase's quota in minutes. See
-[src/lib/db/index.ts](src/lib/db/index.ts).
-
 ### Don't try to feed `db:push` via stdin when `strict: true`
 [drizzle.config.ts](drizzle.config.ts) has `strict: true`, which renders
 an interactive arrow-key confirmation that `yes |` and `printf` can't
@@ -136,13 +116,6 @@ holding port 3000 — the new dev server then binds 3001 and you keep
 hitting the broken zombie at :3000. Always verify with
 `lsof -nP -iTCP:3000 -sTCP:LISTEN` after a kill; `kill <pid>` the
 zombie if present. Burned ~15min during the 2026-05-01 deploy session.
-
-### Don't add `cache_control` to system blocks on SDK `^0.32.1`
-SDK 0.32.1 predates `cache_control` on `TextBlockParam` — typecheck
-fails. Either bump the SDK *or* drop the marker. On Haiku 4.5 a system
-prompt under 4096 tokens won't cache anyway, so the marker is a no-op
-at this scale; revisit when the prompt grows or the SDK is bumped. See
-[src/lib/anthropic/insights.ts](src/lib/anthropic/insights.ts).
 
 ### Don't assume Plaid Production = real data flowing (2026-05-01)
 Plaid deprecated the **Development** tier in 2024; only Sandbox and
@@ -197,45 +170,30 @@ discovering the gate post-flip.
   Resend magic-link delivery, Auth.js DB session, dashboard render. Repo
   is public on GitHub (<https://github.com/connordavis-code/Foothold>);
   reviewer-inspectable.
-- **Plaid webhooks** (2026-05-01) — `POST /api/plaid/webhook` with JWS
-  verification (ES256, `webhookVerificationKeyGet` + 24h key cache,
-  `request_body_sha256` + 5-min `iat` window) in
-  [src/lib/plaid/webhook.ts]. Dispatch:
-  `TRANSACTIONS.SYNC_UPDATES_AVAILABLE` and
-  `RECURRING_TRANSACTIONS_UPDATE` → inline `syncItem`; `ITEM.ERROR`
-  (with error_code branching) / `PENDING_EXPIRATION` /
-  `USER_PERMISSION_REVOKED` / `LOGIN_REPAIRED` → mutate
-  `plaid_item.status`. New items pass `webhook:` in `linkTokenCreate`
-  (derived from `NEXT_PUBLIC_APP_URL`). Status surfaces as yellow
-  banner on `/dashboard` and per-item badge on `/settings`. When
-  status is non-active, /settings swaps the Sync button for a
-  Reconnect button that drives Plaid Link in update mode (no
-  public-token exchange — update mode keeps the same `access_token`);
-  `markItemReconnected` optimistically flips status + runs `syncItem`
-  so the UI doesn't have to wait on `LOGIN_REPAIRED`. Local testing
-  needs a tunnel (Plaid can't reach localhost); sandbox triggering via
-  `/sandbox/item/fire_webhook`.
+- **Plaid webhooks** (2026-05-01) — `POST /api/plaid/webhook` with
+  ES256 JWS verification ([src/lib/plaid/webhook.ts]). ITEM events
+  flip `plaid_item.status`; TRANSACTIONS events trigger inline
+  `syncItem`. Reauth surfaces as a banner on `/dashboard` + status
+  pill + Reconnect button on `/settings` (Plaid Link update mode +
+  `markItemReconnected` for optimistic recovery). E2E-tested via DB
+  flip; real webhook signing path verifiable post-Plaid approval.
+  Local testing requires a tunnel (Plaid can't reach localhost).
 
 ### In progress
-- **Plaid Production access review** — submitted 2026-05-01 with the
-  full security questionnaire. App name "Foothold", icon (slate-900 "F"
-  monogram), brand color `#0F172A`, products = Transactions + Recurring
-  + Investments, use case = "Personal budgeting and financial advice",
-  pay-as-you-go billing. Q9 amendment email sent to
-  building@plaid.com referencing the live `/privacy` URL. Honest
-  approval-odds estimate at submission: ~25–35% first-pass, ~60–70%
-  with follow-up clarification, ~25–35% denial with no path. May 6
-  follow-up agent scheduled to triage status (see
-  <https://claude.ai/code/routines>). DB is empty of Plaid data; the
-  Wells Fargo sandbox item was wiped pre-review. Brief-use Production
-  secret should be rotated on dashboard.plaid.com before reconnecting.
+- **Plaid Production access review** — submitted 2026-05-01 with full
+  security questionnaire; Q9 amendment emailed to building@plaid.com
+  referencing the live `/privacy` URL. Honest approval-odds estimate:
+  ~25–35% first-pass, ~60–70% with follow-up, ~25–35% denial. May 6
+  triage agent scheduled (claude.ai/code/routines). One sandbox Wells
+  Fargo item is reconnected for webhook E2E testing — wipe it before
+  flipping `PLAID_ENV=production` and rotate the brief-use Production
+  secret on dashboard.plaid.com first.
 
 ### Next up
 - **Reconnect once approved** — flip `PLAID_ENV=production`, paste
-  fresh Production secret, reconnect via `/settings`. Update Vercel env
-  vars too. Watch for OAuth `redirect_uri` config — `linkTokenCreate`
-  doesn't pass one; works on Vercel for non-OAuth institutions, breaks
-  for Chase / Capital One / etc. without explicit redirect config.
+  fresh secret, update Vercel env, reconnect via `/settings`.
+  `linkTokenCreate` doesn't pass `redirect_uri` — fine for non-OAuth
+  banks, breaks Chase / Cap One / etc. until configured.
 - **Phase 3-pt3** — per-goal coaching detail page (defer until real
   data is flowing; sandbox data has zero useful goals signal)
 - **Phase 4** — predictive layer (forecasts, what-if simulator)
