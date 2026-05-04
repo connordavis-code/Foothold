@@ -90,65 +90,63 @@ Mutations live in `src/lib/<domain>/actions.ts`, called from
 ## Lessons learned
 
 > Wrong moves we don't want to repeat. Format: `### Don't <thing>`
-> (commit ref) · what happened · right approach. Prune stale entries.
+> · what happened · right approach. Prune stale entries.
 
-### Don't try to feed `db:push` via stdin when `strict: true`
-[drizzle.config.ts](drizzle.config.ts) has `strict: true`, which renders
-an interactive arrow-key confirmation that `yes |` and `printf` can't
-satisfy — the process just hangs. For a one-shot push: temporarily flip
-to `strict: false`, push, flip back. Don't permanently disable strict.
+### Don't feed `db:push` via stdin when `strict: true`
+[drizzle.config.ts] strict:true renders an arrow-key prompt `yes |`
+and `printf` can't satisfy — the process hangs. One-shot: flip
+strict:false → push → flip back. Don't permanently disable.
 
 ### Don't run `npm run build` while `next dev` is running
-Production build overwrites `.next/BUILD_ID` and the static chunk
-manifests; the live dev server's module map points at chunk URLs that
-no longer exist on disk, so the browser loads page HTML with no CSS
-or JS — pages render unstyled until you Ctrl+C dev, `rm -rf .next`,
-and restart `next dev`. Use `npm run typecheck` for verification while
-dev is running; reserve `build` for pre-commit / pre-deploy moments.
+Build overwrites `.next/BUILD_ID` and chunk manifests; live dev's
+module map points at chunks no longer on disk → pages render unstyled
+until Ctrl+C, `rm -rf .next`, restart dev. Use `typecheck` for
+verification while dev runs; reserve `build` for pre-deploy.
 
-### Don't trust Ctrl+C to kill the dev server's port binding
-After editing `src/middleware.ts`, Next's edge module map can hold a
-stale reference; symptom = `Error: Cannot find the middleware module`
-on every request, browser shows "missing required error components,
-refreshing..." in a loop. Standard fix is `Ctrl+C` + `rm -rf .next` +
-`npm run dev`. *But* Ctrl+C sometimes leaves a zombie node process
-holding port 3000 — the new dev server then binds 3001 and you keep
-hitting the broken zombie at :3000. Always verify with
-`lsof -nP -iTCP:3000 -sTCP:LISTEN` after a kill; `kill <pid>` the
-zombie if present. Burned ~15min during the 2026-05-01 deploy session.
+### Don't trust Ctrl+C to fully kill `next dev` on :3000
+After editing middleware, edge module map can hold a stale ref
+("Cannot find the middleware module" loop). Standard fix: Ctrl+C +
+`rm -rf .next` + restart. But Ctrl+C sometimes leaves a zombie holding
+:3000; new dev binds :3001 and you keep hitting the broken zombie.
+Verify with `lsof -nP -iTCP:3000 -sTCP:LISTEN`; kill zombie if present.
 
 ### Don't assume Plaid Production = real data flowing (2026-05-01)
-Plaid deprecated the **Development** tier in 2024; only Sandbox and
-Production exist now. *And* Production is institution-gated: having a
-Production secret + `PLAID_ENV=production` is not enough — your app
-must be approved for each major consumer institution (Amex consumer,
-Fidelity, most big banks) before Link will let users connect them.
-Symptom: "Connectivity not supported" inside Plaid Link, with the
-search results filtered to only the institutions on your allowlist
-(e.g. Amex search returns Kabbage but not consumer Amex). Approval
-flow: dashboard.plaid.com/overview/production → app review, then
-per-institution requests. Days-to-weeks, sometimes denied for
-personal-use apps. Don't flip envs and wipe sandbox data until access
-is confirmed — burned ~30min wiping the sandbox `plaid_items` and
-discovering the gate post-flip.
+Plaid deprecated **Development** in 2024 (only Sandbox + Production).
+Production is institution-gated: secret + `PLAID_ENV=production` isn't
+enough — app must be approved per major institution before Link allows
+connections. Symptom: "Connectivity not supported" with filtered
+search results. Approval takes days-to-weeks via
+dashboard.plaid.com/overview/production. Don't wipe sandbox data
+until institution access confirmed.
 
 ### Don't trust DNS/RDAP for domain availability (2026-05-01)
-Both produce false positives — domains can be registered without NS
-records (parked) or with stale RDAP entries. Burned ~30min when most
-pre-checked "available" candidates were taken at Cloudflare's lookup.
-The registrar UI is the only ground truth; hand the user a short-list.
+False positives — domains can be registered without NS records or
+have stale RDAP. Registrar UI is the only ground truth.
+
+### Don't deploy an env-gated feature without setting the env first (2026-05-04)
+[src/lib/env.ts] validates required vars (zod `.min(...)`, no default)
+at module load. Module load happens during `next build` because route
+handlers import `env`, so a missing required var **fails the build
+fast (~25s)** — Vercel keeps serving the previous deploy, the new
+code never promotes, and Vercel doesn't email on failed deploys.
+Symptom: pushed commit, no errors in inbox, but feature isn't live.
+Always: set the env var in Vercel FIRST, push SECOND. Verify
+promotion via Vercel deployments tab (Ready, not Error).
+
+Side note from same incident: `.env.local` and Vercel both point at
+the same Supabase prod DB (no separate dev DB). Locally-triggered
+handlers write real rows to prod `error_log` — useful for testing,
+but local runs are indistinguishable from prod-cron runs in inbox/DB
+except for the from-address (`AUTH_EMAIL_FROM` in `.env.local` is the
+Resend sandbox sender; in Vercel it's the custom domain).
 
 ### Don't add `/api/*` routes without exempting them in middleware (2026-05-03)
-[src/middleware.ts] 401s every API path that lacks a session cookie
-unless its prefix is in `PUBLIC_API_PREFIXES`. `/api/auth` was the only
-exempt prefix originally; `/api/plaid/webhook` (Plaid signs the call,
-no cookie) and `/api/cron/*` (Vercel sends `Authorization: Bearer
-$CRON_SECRET`, no cookie) both authenticate themselves and must be
-added to that list. Symptom: route returns body
-`{"error":"Unauthorized"}` (JSON from middleware) rather than your
-handler's own 401 — the body shape gives away which layer fired. Cost
-~10min during Phase 5 testing AND the webhook had this bug latent for
-a week because no live signed Plaid call had ever hit production.
+[src/middleware.ts] 401s any API path lacking a session cookie unless
+its prefix matches `PUBLIC_API_PREFIXES`. `/api/auth`, `/api/plaid/webhook`
+(JWS-signed), and `/api/cron/*` (bearer-auth) all self-authenticate
+and must be in that list. Symptom: response body
+`{"error":"Unauthorized"}` (JSON from middleware) instead of the
+handler's own 401 — body shape reveals which layer fired.
 
 ---
 
@@ -169,80 +167,53 @@ a week because no live signed Plaid call had ever hit production.
 - **Phases 1.A–1.C** — auth, Plaid Link, sync infra, dashboard +
   transactions + investments pages
 - **Perf pass** — batched upserts + parallel Plaid endpoints
-- **Phase 2** — recurring streams (pt1) · savings + spend-cap goals
-  (pt2) · velocity + EOM projection + dashboard strip (pt3)
-- **Phase 3-pt1** — `/insights` page, on-demand "Generate" button,
-  unified weekly narrative covering spending / drift / goals /
-  subscriptions, cached in `insight` table keyed by
-  `(user_id, week_start)`
-- **Phase 3-pt2** — `/drift` dashboard: 8-week multi-line trend chart
-  (Recharts), currently-elevated category cards, flag history table.
-  Pure SQL, no AI. Same threshold rules as pt1's prompt.
-- **Security hardening + Plaid review prep** (2026-05-01) — AES-256-GCM
-  encryption of `plaid_item.access_token` ([src/lib/crypto.ts]), single
-  decryption boundary in `syncItem`. Dependabot weekly grouped npm PRs
-  ([.github/dependabot.yml]). Public privacy policy at `/privacy`.
-  [SECURITY.md] for threat model + practices.
-- **Vercel deployment** (2026-05-01) — live at
-  <https://usefoothold.com> (Cloudflare-registered, Vercel-hosted; the
-  original `foothold-beta.vercel.app` alias is retained so existing
-  Plaid items keep firing webhooks at it). Magic-link emails send
-  from `noreply@usefoothold.com` via Resend (custom domain verified
-  via Cloudflare auto-configure). Validated end-to-end: login flow,
-  email delivery, Auth.js DB session, dashboard render, webhook
-  continuity on the alias. Repo is public on GitHub
-  (<https://github.com/connordavis-code/Foothold>);
-  reviewer-inspectable.
+- **Phase 2** — recurring streams · savings + spend-cap goals · velocity
+  + EOM projection + dashboard strip
+- **Phase 3-pt1** — `/insights` page, on-demand Generate, weekly
+  narrative cached in `insight` table keyed by `(user_id, week_start)`
+- **Phase 3-pt2** — `/drift` dashboard: 8-week trend chart, currently-
+  elevated category cards, flag history. Pure SQL, no AI.
+- **Security hardening** (2026-05-01) — AES-256-GCM encryption of
+  `plaid_item.access_token` ([src/lib/crypto.ts]); single decryption
+  boundary in `syncItem`. Dependabot weekly grouped npm PRs.
+  Public /privacy. [SECURITY.md] threat model.
+- **Vercel deployment** (2026-05-01) — live at <https://usefoothold.com>;
+  `foothold-beta.vercel.app` alias retained for legacy webhook
+  continuity. Magic-link emails from `noreply@usefoothold.com` via
+  Resend (custom domain verified). Repo public on GitHub.
 - **Plaid webhooks** (2026-05-01) — `POST /api/plaid/webhook` with
-  ES256 JWS verification ([src/lib/plaid/webhook.ts]). ITEM events
-  flip `plaid_item.status`; TRANSACTIONS events trigger inline
-  `syncItem`. Reauth surfaces as a banner on `/dashboard` + status
-  pill + Reconnect button on `/settings` (Plaid Link update mode +
-  `markItemReconnected` for optimistic recovery). E2E-tested via DB
-  flip; real webhook signing path verifiable post-Plaid approval.
-  Local testing requires a tunnel (Plaid can't reach localhost).
-- **Phase 5 — Cron + monitoring** (2026-05-03) — four Vercel cron
-  handlers at `/api/cron/*`: weekly insight (smart-skip if no new
-  txns since last run), nightly safety-net `syncItem` loop, 4×-daily
-  live balance refresh via `accounts/balance/get`, daily Resend
-  digest. Bearer-auth via `CRON_SECRET`. New `error_log` table
-  (level=error|info) is the digest's source of truth — digest
-  surfaces error rows AND flags "NOT SEEN" for missing cron runs so
-  silence ≠ success. Logger ([src/lib/logger.ts]) is fail-soft
-  (never throws — death-spiral guard). Webhook + key-fetch failure
-  paths instrumented. Schedule needs Vercel Pro (4×-daily).
-  Side-fix: middleware now exempts `/api/cron` AND
-  `/api/plaid/webhook` from the session-cookie gate — webhook had a
-  latent 401 bug because real Plaid deliveries don't carry a session,
-  and the route's JWS verifier never got to run. Caught during cron
-  testing.
+  ES256 JWS verification ([src/lib/plaid/webhook.ts]). Reauth surfaces
+  as banner + status pill + Reconnect button (Link update mode). Local
+  testing requires a tunnel.
+- **Phase 5 — Cron + monitoring** (deployed 2026-05-04) — four Vercel
+  crons at `/api/cron/*` (insight Mon 04 UTC, sync 10 UTC, balances
+  every 6h, digest 14 UTC). Bearer-auth via `CRON_SECRET`. `error_log`
+  table is the digest's source of truth (level=error|info) — digest
+  surfaces errors AND flags "NOT SEEN" for missing crons (silence ≠
+  success). Logger fail-soft (never throws). 4×-daily balance refresh
+  needs Vercel Pro. Ultrareview pass (commit `00093bd`) fixed 7
+  findings post-merge: webhook DoS amplification, digest contract bugs
+  (subject ignored warnings; insight had no missed-Monday branch),
+  plus 5 nits.
 
 ### In progress
-- **Plaid Production access review** — submitted 2026-05-01 with full
-  security questionnaire; Q9 amendment emailed to building@plaid.com
-  referencing the live `/privacy` URL. Honest approval-odds estimate:
-  ~25–35% first-pass, ~60–70% with follow-up, ~25–35% denial. May 6
-  triage agent scheduled (claude.ai/code/routines). One sandbox Wells
-  Fargo item is reconnected for webhook E2E testing — wipe it before
-  flipping `PLAID_ENV=production` and rotate the brief-use Production
-  secret on dashboard.plaid.com first.
+- **Plaid Production access review** — submitted 2026-05-01 + Q9
+  amendment. Approval odds ~25-35% first-pass, ~60-70% with follow-up.
+  May 6 triage agent scheduled. One sandbox Wells Fargo item kept for
+  webhook E2E — wipe before flipping `PLAID_ENV=production`.
 
 ### Next up
-- **Deploy Phase 5 cron + monitoring** — add `CRON_SECRET` to the
-  Vercel project env (Production scope; same value is fine, or
-  regenerate). Confirm the project is on Vercel Pro — the 4×-daily
-  balance refresh exceeds Hobby's "one run per day per job" limit.
-  Push + deploy; Vercel registers the four schedules from
-  `vercel.json` automatically. Until `CRON_SECRET` is set in prod,
-  every cron handler 500s at env validation (zod throws on missing
-  required var). First successful run lands a digest in your inbox
-  the next morning.
-- **Reconnect once approved** — flip `PLAID_ENV=production`, paste
-  fresh secret, update Vercel env, reconnect via `/settings`.
+- **Verify Phase 5 deploy health** — (a) Vercel tier (Pro needed for
+  4×-daily; first digest reported `Balance refresh: 1/4 ⚠` — could be
+  Hobby OR partial window). (b) Confirm `AUTH_EMAIL_FROM` in Vercel is
+  custom domain not sandbox sender. First natural digest 14:00 UTC
+  May 5 will tell.
+- **Reconnect once Plaid approved** — flip `PLAID_ENV=production`,
+  paste fresh secret, update Vercel env, reconnect via `/settings`.
   `linkTokenCreate` doesn't pass `redirect_uri` — fine for non-OAuth
-  banks, breaks Chase / Cap One / etc. until configured.
+  banks, breaks Chase / Cap One until configured.
 - **Phase 3-pt3** — per-goal coaching detail page (defer until real
-  data is flowing; sandbox data has zero useful goals signal)
+  data flows)
 - **Phase 4** — predictive layer (forecasts, what-if simulator)
 
 ---
