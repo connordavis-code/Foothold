@@ -19,7 +19,7 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 /**
- * Weekly insight cron. Schedule: Sunday 04:00 UTC (Sunday 9pm PT).
+ * Weekly insight cron. Schedule: Monday 04:00 UTC (Sunday 9pm PT).
  *
  * For each user with an active plaid_item, smart-skip if no transactions
  * have landed in our DB since the last insight; otherwise generate.
@@ -47,8 +47,23 @@ export async function GET(request: NextRequest) {
       await generateInsightForUser(userId);
       generated++;
     } catch (err) {
-      failed++;
-      await logError('cron.insight.failed', err, { userId });
+      // hasNewActivity gates on transactions.createdAt (when we inserted)
+      // but collectSnapshot filters on transactions.date (when the txn
+      // happened). A backfill of historical rows trips the gate but
+      // produces an empty current week — surface that as a skip, not a
+      // false-positive failure that poisons the digest.
+      if (
+        err instanceof Error &&
+        err.message === 'Not enough data this week to summarize'
+      ) {
+        skipped++;
+        await logRun('cron.insight.skipped', 'no current-week data', {
+          userId,
+        });
+      } else {
+        failed++;
+        await logError('cron.insight.failed', err, { userId });
+      }
     }
   }
 

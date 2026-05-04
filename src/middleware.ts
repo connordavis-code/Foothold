@@ -41,7 +41,12 @@ export default function middleware(req: NextRequest) {
   const isLoggedIn = hasSessionCookie(req);
 
   const isApi = pathname.startsWith('/api');
-  const isPublicApi = PUBLIC_API_PREFIXES.some((p) => pathname.startsWith(p));
+  // Match exact path or path-segment boundary, NOT bare prefix — otherwise
+  // a future `/api/cron-status` would silently inherit `/api/cron`'s public
+  // exemption (see CLAUDE.md "Don't add /api/* routes without exempting").
+  const isPublicApi = PUBLIC_API_PREFIXES.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`),
+  );
 
   const isAuthRoute =
     pathname === '/login' ||

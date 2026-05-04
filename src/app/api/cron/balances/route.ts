@@ -50,15 +50,16 @@ export async function GET(request: NextRequest) {
       const res = await plaid.accountsBalanceGet({ access_token: accessToken });
 
       for (const a of res.data.accounts) {
-        await db
+        const updated = await db
           .update(financialAccounts)
           .set({
             currentBalance: num(a.balances.current),
             availableBalance: num(a.balances.available),
             updatedAt: new Date(),
           })
-          .where(eq(financialAccounts.plaidAccountId, a.account_id));
-        accountsTouched++;
+          .where(eq(financialAccounts.plaidAccountId, a.account_id))
+          .returning({ id: financialAccounts.id });
+        accountsTouched += updated.length;
       }
       refreshed++;
     } catch (err) {

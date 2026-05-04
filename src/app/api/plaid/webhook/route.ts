@@ -25,11 +25,17 @@ export async function POST(request: NextRequest) {
 
   const ok = await verifyPlaidWebhook(rawBody, jwt);
   if (!ok) {
-    await logError(
-      'webhook.verification_failed',
-      new Error('JWS verification failed'),
-      { jwtPresent: !!jwt },
-    );
+    // Skip the DB write when no JWS header is present at all — that's
+    // the dominant anonymous-probe shape on a public endpoint, and
+    // logging each one would let any flood balloon error_log unbounded
+    // (route is exempt from the session gate; see middleware).
+    if (jwt) {
+      await logError(
+        'webhook.verification_failed',
+        new Error('JWS verification failed'),
+        { jwtPresent: true },
+      );
+    }
     return new NextResponse('unauthorized', { status: 401 });
   }
 
