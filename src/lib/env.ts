@@ -32,6 +32,11 @@ const envSchema = z.object({
 
   // App
   NEXT_PUBLIC_APP_URL: z.string().url().default('http://localhost:3000'),
+
+  // Cron auth — Vercel Cron sets `Authorization: Bearer $CRON_SECRET` on
+  // scheduled invocations. Required so unauthenticated callers can't
+  // manually trigger expensive sync / digest jobs.
+  CRON_SECRET: z.string().min(32),
 });
 
 const parsed = envSchema.safeParse(process.env);

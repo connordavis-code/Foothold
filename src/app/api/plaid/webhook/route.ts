@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server';
+import { logError } from '@/lib/logger';
 import {
   handlePlaidWebhook,
   type PlaidWebhookEvent,
@@ -24,14 +25,19 @@ export async function POST(request: NextRequest) {
 
   const ok = await verifyPlaidWebhook(rawBody, jwt);
   if (!ok) {
-    console.warn('[plaid:webhook] verification failed');
+    await logError(
+      'webhook.verification_failed',
+      new Error('JWS verification failed'),
+      { jwtPresent: !!jwt },
+    );
     return new NextResponse('unauthorized', { status: 401 });
   }
 
   let event: PlaidWebhookEvent;
   try {
     event = JSON.parse(rawBody) as PlaidWebhookEvent;
-  } catch {
+  } catch (err) {
+    await logError('webhook.invalid_json', err);
     return new NextResponse('invalid json', { status: 400 });
   }
 
@@ -40,10 +46,11 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     // Single-user app — log and 200 so Plaid stops retrying. We can
     // replay manually via "Sync now" on /settings if a sync was missed.
-    console.error(
-      `[plaid:webhook] handler failed for ${event.webhook_type}/${event.webhook_code}`,
-      err,
-    );
+    await logError('webhook.handler', err, {
+      webhook_type: event.webhook_type,
+      webhook_code: event.webhook_code,
+      item_id: event.item_id,
+    });
   }
 
   return NextResponse.json({ ok: true });

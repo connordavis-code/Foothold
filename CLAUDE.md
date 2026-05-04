@@ -138,6 +138,18 @@ records (parked) or with stale RDAP entries. Burned ~30min when most
 pre-checked "available" candidates were taken at Cloudflare's lookup.
 The registrar UI is the only ground truth; hand the user a short-list.
 
+### Don't add `/api/*` routes without exempting them in middleware (2026-05-03)
+[src/middleware.ts] 401s every API path that lacks a session cookie
+unless its prefix is in `PUBLIC_API_PREFIXES`. `/api/auth` was the only
+exempt prefix originally; `/api/plaid/webhook` (Plaid signs the call,
+no cookie) and `/api/cron/*` (Vercel sends `Authorization: Bearer
+$CRON_SECRET`, no cookie) both authenticate themselves and must be
+added to that list. Symptom: route returns body
+`{"error":"Unauthorized"}` (JSON from middleware) rather than your
+handler's own 401 — the body shape gives away which layer fired. Cost
+~10min during Phase 5 testing AND the webhook had this bug latent for
+a week because no live signed Plaid call had ever hit production.
+
 ---
 
 ## Coding conventions
@@ -189,6 +201,21 @@ The registrar UI is the only ground truth; hand the user a short-list.
   `markItemReconnected` for optimistic recovery). E2E-tested via DB
   flip; real webhook signing path verifiable post-Plaid approval.
   Local testing requires a tunnel (Plaid can't reach localhost).
+- **Phase 5 — Cron + monitoring** (2026-05-03) — four Vercel cron
+  handlers at `/api/cron/*`: weekly insight (smart-skip if no new
+  txns since last run), nightly safety-net `syncItem` loop, 4×-daily
+  live balance refresh via `accounts/balance/get`, daily Resend
+  digest. Bearer-auth via `CRON_SECRET`. New `error_log` table
+  (level=error|info) is the digest's source of truth — digest
+  surfaces error rows AND flags "NOT SEEN" for missing cron runs so
+  silence ≠ success. Logger ([src/lib/logger.ts]) is fail-soft
+  (never throws — death-spiral guard). Webhook + key-fetch failure
+  paths instrumented. Schedule needs Vercel Pro (4×-daily).
+  Side-fix: middleware now exempts `/api/cron` AND
+  `/api/plaid/webhook` from the session-cookie gate — webhook had a
+  latent 401 bug because real Plaid deliveries don't carry a session,
+  and the route's JWS verifier never got to run. Caught during cron
+  testing.
 
 ### In progress
 - **Plaid Production access review** — submitted 2026-05-01 with full
@@ -201,6 +228,15 @@ The registrar UI is the only ground truth; hand the user a short-list.
   secret on dashboard.plaid.com first.
 
 ### Next up
+- **Deploy Phase 5 cron + monitoring** — add `CRON_SECRET` to the
+  Vercel project env (Production scope; same value is fine, or
+  regenerate). Confirm the project is on Vercel Pro — the 4×-daily
+  balance refresh exceeds Hobby's "one run per day per job" limit.
+  Push + deploy; Vercel registers the four schedules from
+  `vercel.json` automatically. Until `CRON_SECRET` is set in prod,
+  every cron handler 500s at env validation (zod throws on missing
+  required var). First successful run lands a digest in your inbox
+  the next morning.
 - **Reconnect once approved** — flip `PLAID_ENV=production`, paste
   fresh secret, update Vercel env, reconnect via `/settings`.
   `linkTokenCreate` doesn't pass `redirect_uri` — fine for non-OAuth
@@ -208,7 +244,6 @@ The registrar UI is the only ground truth; hand the user a short-list.
 - **Phase 3-pt3** — per-goal coaching detail page (defer until real
   data is flowing; sandbox data has zero useful goals signal)
 - **Phase 4** — predictive layer (forecasts, what-if simulator)
-- **Phase 5** — Vercel cron (auto-generate insights weekly), monitoring
 
 ---
 

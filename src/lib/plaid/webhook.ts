@@ -4,6 +4,7 @@ import * as jose from 'jose';
 import type { JWK } from 'jose';
 import { db } from '@/lib/db';
 import { plaidItems } from '@/lib/db/schema';
+import { logError } from '@/lib/logger';
 import { plaid } from './client';
 import { syncItem } from './sync';
 
@@ -88,7 +89,7 @@ async function getVerificationKey(kid: string): Promise<JWK | null> {
     KEY_CACHE.set(kid, { jwk, expiresAt: Date.now() + KEY_CACHE_MS });
     return jwk;
   } catch (err) {
-    console.error('[plaid:webhook] verification key fetch failed', err);
+    await logError('webhook.key_fetch_failed', err, { kid });
     return null;
   }
 }

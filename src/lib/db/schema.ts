@@ -4,6 +4,7 @@ import {
   date,
   index,
   integer,
+  jsonb,
   numeric,
   pgTable,
   primaryKey,
@@ -429,6 +430,47 @@ export const insights = pgTable(
 );
 
 // =============================================================================
+// Operational telemetry (Phase 5: cron + monitoring)
+// =============================================================================
+
+/**
+ * Cross-cutting log table. Two row shapes share the schema:
+ *   - level='error': failures from sync, webhooks, plaid actions, cron jobs
+ *   - level='info':  cron run summaries — so the digest can distinguish
+ *                    "all clear" from "the cron didn't run at all"
+ *
+ * Daily Resend digest scans the last 24h. We index on occurred_at desc since
+ * every read is "what happened recently."
+ *
+ * `plaid_item_id` uses ON DELETE SET NULL because losing an item shouldn't
+ * blow away its error history — operators may want to audit why an item
+ * was disconnected after the fact.
+ */
+export const errorLog = pgTable(
+  'error_log',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    occurredAt: ts('occurred_at').defaultNow().notNull(),
+    // 'error' | 'info'
+    level: text('level').notNull(),
+    // e.g. 'cron.nightly_sync', 'webhook.transactions', 'sync.investments'
+    op: text('op').notNull(),
+    plaidItemId: text('plaid_item_id').references(() => plaidItems.id, {
+      onDelete: 'set null',
+    }),
+    message: text('message').notNull(),
+    // For errors: { stack, plaid_error_code, ... }
+    // For run summaries: { duration_ms, items_synced, txns_added, ... }
+    context: jsonb('context'),
+  },
+  (e) => ({
+    occurredAtIdx: index('error_log_occurred_at_idx').on(e.occurredAt),
+  }),
+);
+
+// =============================================================================
 // Type exports — convenient for queries
 // =============================================================================
 
@@ -443,3 +485,4 @@ export type Category = typeof categories.$inferSelect;
 export type RecurringStream = typeof recurringStreams.$inferSelect;
 export type Goal = typeof goals.$inferSelect;
 export type Insight = typeof insights.$inferSelect;
+export type ErrorLog = typeof errorLog.$inferSelect;

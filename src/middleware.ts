@@ -20,6 +20,18 @@ const SESSION_COOKIE_NAMES = [
   '__Secure-authjs.session-token',
 ];
 
+// API paths that authenticate themselves and must NOT require a session cookie.
+//   - /api/auth: Auth.js endpoints (the cookie doesn't exist yet during login)
+//   - /api/plaid/webhook: Plaid signs each call with ES256 JWS; verified in
+//     the route. No session — the caller is Plaid, not a browser.
+//   - /api/cron: Vercel Cron sends `Authorization: Bearer $CRON_SECRET`;
+//     verified by isAuthorizedCronRequest. No session — the caller is Vercel.
+const PUBLIC_API_PREFIXES = [
+  '/api/auth',
+  '/api/plaid/webhook',
+  '/api/cron',
+];
+
 function hasSessionCookie(req: NextRequest): boolean {
   return SESSION_COOKIE_NAMES.some((name) => req.cookies.has(name));
 }
@@ -29,13 +41,13 @@ export default function middleware(req: NextRequest) {
   const isLoggedIn = hasSessionCookie(req);
 
   const isApi = pathname.startsWith('/api');
-  const isAuthApi = pathname.startsWith('/api/auth');
+  const isPublicApi = PUBLIC_API_PREFIXES.some((p) => pathname.startsWith(p));
 
   const isAuthRoute =
     pathname === '/login' ||
     pathname === '/verify' ||
     pathname === '/error' ||
-    isAuthApi;
+    isPublicApi;
 
   const isLandingPage = pathname === '/';
   const isPublicPage = pathname === '/privacy';
