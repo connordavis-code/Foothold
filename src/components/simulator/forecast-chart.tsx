@@ -32,14 +32,15 @@ export function ForecastChart({ baseline, scenario }: Props) {
 
   return (
     <section>
-      <header className="flex items-baseline justify-between mb-3">
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            Cash forecast
-          </div>
-          <div className="text-sm text-foreground mt-0.5">
-            {scenario.length} months · {lastMonth} projected {formatCurrency(finalEndCash)}
-          </div>
+      <header className="mb-3 flex items-baseline justify-between">
+        <div className="space-y-0.5">
+          <p className="text-eyebrow">Cash forecast</p>
+          <p className="text-sm text-foreground">
+            {scenario.length} months · {lastMonth} projected{' '}
+            <span className="font-mono tabular-nums">
+              {formatCurrency(finalEndCash)}
+            </span>
+          </p>
         </div>
         <div className="text-[11px] text-muted-foreground">
           <span className="inline-block w-3 h-px bg-muted-foreground/50 align-middle mr-1.5"></span>
@@ -48,7 +49,7 @@ export function ForecastChart({ baseline, scenario }: Props) {
           scenario
         </div>
       </header>
-      <div className="h-[220px]">
+      <div className="h-[280px]">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 4 }}>
             <CartesianGrid stroke="hsl(var(--border))" strokeOpacity={0.4} vertical={false} />

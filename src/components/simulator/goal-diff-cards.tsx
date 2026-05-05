@@ -37,10 +37,10 @@ function shiftPill(impact: GoalImpact): { text: string; tone: 'sooner' | 'later'
 }
 
 const toneStyles: Record<string, string> = {
-  sooner: 'bg-sky-50 text-sky-700',
-  later: 'bg-amber-50 text-amber-700',
+  sooner: 'bg-positive/10 text-positive',
+  later: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
   same: 'bg-muted text-muted-foreground',
-  hypo: 'bg-amber-50 text-amber-700',
+  hypo: 'bg-accent text-foreground/80',
   unreachable: 'bg-muted text-muted-foreground/70',
 };
 
@@ -85,11 +85,9 @@ export function GoalDiffCards({
 }: Props) {
   if (goalImpacts.length === 0) {
     return (
-      <section>
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-3">
-          Goals impact
-        </div>
-        <p className="text-sm text-muted-foreground italic">
+      <section className="space-y-3">
+        <p className="text-eyebrow">Goals impact</p>
+        <p className="text-sm italic text-muted-foreground">
           No goals yet. Add real goals from /goals or hypothetical goals on the left.
         </p>
       </section>
@@ -97,33 +95,37 @@ export function GoalDiffCards({
   }
 
   // Single card looks lonely in a 2-col grid; let it expand.
-  const gridCols = goalImpacts.length === 1 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2';
+  const gridCols =
+    goalImpacts.length === 1 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2';
 
   return (
-    <section>
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-3">
-        Goals impact
-      </div>
+    <section className="space-y-3">
+      <p className="text-eyebrow">Goals impact</p>
       <div className={`grid gap-3 ${gridCols}`}>
         {goalImpacts.map((g) => {
           const pill = shiftPill(g);
           const ctx = findContext(g, history, hypotheticalGoals);
-          const monthsOut = g.scenarioETA ? diffMonths(g.scenarioETA, currentMonth) : null;
+          const monthsOut = g.scenarioETA
+            ? diffMonths(g.scenarioETA, currentMonth)
+            : null;
           const progressPct =
             ctx && !ctx.isHypo && ctx.targetAmount > 0
-              ? Math.min(100, Math.round((ctx.currentSaved / ctx.targetAmount) * 100))
+              ? Math.min(
+                  100,
+                  Math.round((ctx.currentSaved / ctx.targetAmount) * 100),
+                )
               : null;
 
           return (
             <article
               key={g.goalId}
-              className="bg-muted/40 border border-border/60 rounded-lg p-3.5"
+              className="rounded-card border border-border bg-surface-elevated p-4"
             >
-              <div className="flex items-start justify-between mb-2">
-                <div className="text-sm text-foreground font-medium">{g.name}</div>
+              <div className="mb-2 flex items-start justify-between gap-2">
+                <div className="text-sm font-medium text-foreground">{g.name}</div>
                 {pill && (
                   <span
-                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full tracking-wide ${toneStyles[pill.tone]}`}
+                    className={`rounded-pill px-2 py-0.5 text-[10px] font-semibold tracking-wide ${toneStyles[pill.tone]}`}
                   >
                     {pill.text}
                   </span>
@@ -131,7 +133,7 @@ export function GoalDiffCards({
               </div>
 
               <div className="flex items-baseline gap-2">
-                <div className="text-lg font-semibold text-foreground">
+                <div className="font-mono text-lg font-semibold tabular-nums text-foreground">
                   {g.scenarioETA ?? '—'}
                 </div>
                 {monthsOut !== null && monthsOut >= 0 && (
@@ -142,13 +144,13 @@ export function GoalDiffCards({
               </div>
 
               {g.baselineETA && g.baselineETA !== g.scenarioETA && (
-                <div className="text-xs text-muted-foreground mt-0.5">
+                <div className="mt-0.5 text-xs text-muted-foreground">
                   was {g.baselineETA}
                 </div>
               )}
 
               {ctx && (
-                <div className="mt-3 pt-3 border-t border-border/40 space-y-1">
+                <div className="mt-3 space-y-1 border-t border-border pt-3">
                   <div className="flex items-baseline justify-between text-xs text-muted-foreground">
                     <span>
                       {formatCurrency(ctx.targetAmount, { compact: true })} target
@@ -156,11 +158,13 @@ export function GoalDiffCards({
                         ` · ${formatCurrency(ctx.monthlyContribution, { compact: true })}/mo`}
                     </span>
                     {!ctx.isHypo && progressPct !== null && (
-                      <span className="text-foreground/80 font-medium">{progressPct}%</span>
+                      <span className="font-medium text-foreground/80">
+                        {progressPct}%
+                      </span>
                     )}
                   </div>
                   {!ctx.isHypo && progressPct !== null && (
-                    <div className="h-1 bg-border/60 rounded-full overflow-hidden">
+                    <div className="h-1 overflow-hidden rounded-full bg-muted">
                       <div
                         className="h-full bg-foreground/70"
                         style={{ width: `${progressPct}%` }}

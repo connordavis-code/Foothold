@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useTransition } from 'react';
+import { Button } from '@/components/ui/button';
 import {
   generateForecastNarrativeAction,
   lookupForecastNarrative,
@@ -98,11 +99,9 @@ export function NarrativePanel({ scenarioId, overrides, isDirty, hasOverrides }:
   };
 
   return (
-    <section className="bg-muted/40 border border-border/60 rounded-lg p-4">
-      <div className="flex items-baseline justify-between mb-2">
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-          Summary
-        </div>
+    <section className="rounded-card border border-border bg-surface-elevated p-5 sm:p-6">
+      <div className="mb-3 flex items-baseline justify-between">
+        <p className="text-eyebrow">Summary</p>
         {state.kind === 'has-narrative' && (
           <button
             onClick={() => handleGenerate(true)}
@@ -115,19 +114,20 @@ export function NarrativePanel({ scenarioId, overrides, isDirty, hasOverrides }:
       </div>
 
       {isDirty && (
-        <p className="text-sm text-muted-foreground italic">
+        <p className="text-sm italic text-muted-foreground">
           Save the scenario to enable AI summary.
         </p>
       )}
 
       {!isDirty && state.kind === 'idle' && (
-        <button
+        <Button
+          variant="outline"
+          size="sm"
           onClick={() => handleGenerate(false)}
           disabled={isPending}
-          className="text-sm text-foreground bg-background border border-border rounded px-3 py-1.5 hover:bg-accent disabled:opacity-50"
         >
           Generate AI summary
-        </button>
+        </Button>
       )}
 
       {!isDirty && state.kind === 'loading' && (
@@ -136,11 +136,11 @@ export function NarrativePanel({ scenarioId, overrides, isDirty, hasOverrides }:
 
       {!isDirty && state.kind === 'has-narrative' && (
         <>
-          <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
             {state.narrative}
           </p>
           {state.isStale && (
-            <p className="text-[11px] text-amber-600 mt-2">
+            <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">
               Couldn&apos;t refresh — using cached version from{' '}
               {state.generatedAt.toLocaleDateString()}.
             </p>
@@ -150,12 +150,16 @@ export function NarrativePanel({ scenarioId, overrides, isDirty, hasOverrides }:
 
       {!isDirty && state.kind === 'error' && (
         <>
-          <p className="text-sm text-destructive">Couldn&apos;t generate a summary for this scenario.</p>
-          <p className="text-[11px] text-muted-foreground mt-1">{state.message}</p>
+          <p className="text-sm text-destructive">
+            Couldn&apos;t generate a summary for this scenario.
+          </p>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {state.message}
+          </p>
           <button
             onClick={() => handleGenerate(false)}
             disabled={isPending}
-            className="text-[11px] text-muted-foreground hover:text-foreground mt-2 underline disabled:opacity-50"
+            className="mt-2 text-[11px] text-muted-foreground underline hover:text-foreground disabled:opacity-50"
           >
             try again
           </button>

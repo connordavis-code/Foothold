@@ -94,7 +94,7 @@ export function SimulatorClient({
 
   if (hasNoData) {
     return (
-      <div className="px-6 py-8 max-w-6xl">
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-8">
         <ScenarioHeader
           scenarios={scenarios}
           selectedScenarioId={selectedScenarioId}
@@ -102,9 +102,11 @@ export function SimulatorClient({
           isDirty={isDirty}
           onSelect={handleSelectScenario}
         />
-        <div className="bg-muted/40 border border-border rounded-lg p-8 text-center">
-          <h2 className="text-lg font-semibold text-foreground mb-2">No data yet</h2>
-          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+        <div className="rounded-card border border-border bg-surface-elevated p-8 text-center">
+          <h2 className="mb-2 text-lg font-semibold text-foreground">
+            No data yet
+          </h2>
+          <p className="mx-auto max-w-md text-sm text-muted-foreground">
             The simulator forecasts forward from your synced transactions and
             recurring streams. Once Plaid finishes its first sync (typically
             within a few minutes of connecting), the forecast will fill in here.
@@ -115,7 +117,7 @@ export function SimulatorClient({
   }
 
   return (
-    <div className="px-6 py-8 max-w-6xl">
+    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-8">
       <ScenarioHeader
         scenarios={scenarios}
         selectedScenarioId={selectedScenarioId}
@@ -125,18 +127,16 @@ export function SimulatorClient({
       />
 
       {scenarios.length === 0 && (
-        <p className="text-xs text-muted-foreground -mt-4 mb-6">
-          You're viewing the baseline forecast. Add overrides on the left and click
-          "Save as…" to keep a scenario for later.
+        <p className="-mt-4 mb-6 text-xs text-muted-foreground">
+          You&apos;re viewing the baseline forecast. Add overrides on the left
+          and click &ldquo;Save as…&rdquo; to keep a scenario for later.
         </p>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-6 md:gap-10">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-[260px_1fr] md:gap-10">
         {/* Left: override editor */}
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-3">
-            Overrides
-          </div>
+          <p className="text-eyebrow mb-3">Overrides</p>
           <OverrideSection label="Categories" count={liveOverrides.categoryDeltas?.length ?? 0}>
             <CategoryOverrides
               value={liveOverrides.categoryDeltas}

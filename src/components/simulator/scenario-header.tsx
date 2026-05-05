@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import {
   createScenario,
   deleteScenario,
@@ -19,7 +20,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 type Props = {
@@ -30,18 +32,16 @@ type Props = {
   onSelect: (id: string | null) => void;
 };
 
-type Toast = { kind: 'success' | 'error'; message: string };
-
 /**
  * Top-of-page header. Scenario name + selector + actions.
  *
  * Save semantics:
  *   - No scenario selected (baseline): inline name input → createScenario.
  *   - Scenario selected and dirty: updateScenario in place.
- *   - Save flow stays inline (no window.prompt / alert).
  *
- * After mutation, router.refresh() re-fetches the scenarios list. The Save
- * button doubles as a Cmd/Ctrl+S target via the document keydown listener.
+ * Sonner surfaces success/failure toasts; AlertDialog gates Delete.
+ * After mutation, router.refresh() re-fetches the scenarios list. The
+ * Save button doubles as a Cmd/Ctrl+S target via document keydown.
  */
 export function ScenarioHeader({
   scenarios,
@@ -52,19 +52,11 @@ export function ScenarioHeader({
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [toast, setToast] = useState<Toast | null>(null);
   const [nameDraft, setNameDraft] = useState<string | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   const selected = scenarios.find((s) => s.id === selectedScenarioId) ?? null;
-
-  // Auto-dismiss the toast after 3s. Re-runs whenever a new toast arrives.
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3000);
-    return () => clearTimeout(t);
-  }, [toast]);
 
   // Focus the name input the moment it appears so the user can just type.
   useEffect(() => {
@@ -75,28 +67,31 @@ export function ScenarioHeader({
     startTransition(async () => {
       const result = await updateScenario({ id, overrides: liveOverrides });
       if (result.ok) {
-        setToast({ kind: 'success', message: 'Saved.' });
+        toast.success('Saved.');
         router.refresh();
       } else {
-        setToast({ kind: 'error', message: result.error });
+        toast.error(result.error);
       }
     });
   };
 
   const persistCreate = (name: string) => {
     if (!name.trim()) {
-      setToast({ kind: 'error', message: 'Name can’t be empty.' });
+      toast.error("Name can't be empty.");
       return;
     }
     startTransition(async () => {
-      const result = await createScenario({ name: name.trim(), overrides: liveOverrides });
+      const result = await createScenario({
+        name: name.trim(),
+        overrides: liveOverrides,
+      });
       if (result.ok) {
-        setToast({ kind: 'success', message: `Saved “${name.trim()}.”` });
+        toast.success(`Saved "${name.trim()}".`);
         setNameDraft(null);
         onSelect(result.data.id);
         router.refresh();
       } else {
-        setToast({ kind: 'error', message: result.error });
+        toast.error(result.error);
       }
     });
   };
@@ -121,12 +116,12 @@ export function ScenarioHeader({
     startTransition(async () => {
       const result = await deleteScenario({ id: selected.id });
       if (result.ok) {
-        setToast({ kind: 'success', message: 'Deleted.' });
+        toast.success('Deleted.');
         setConfirmDeleteOpen(false);
         onSelect(null);
         router.refresh();
       } else {
-        setToast({ kind: 'error', message: result.error });
+        toast.error(result.error);
       }
     });
   };
@@ -154,16 +149,15 @@ export function ScenarioHeader({
   }, [isDirty, isPending, selected?.id, liveOverrides]);
 
   return (
-    <header className="flex items-baseline justify-between mb-6 md:mb-8 pb-4 border-b border-border relative">
-      <div>
-        <div className="text-2xl font-semibold tracking-tight text-foreground">
-          Simulator
-        </div>
-        <div className="flex items-baseline gap-2 mt-1 text-sm text-muted-foreground">
+    <header className="mb-6 flex items-baseline justify-between border-b border-border pb-4 md:mb-8">
+      <div className="space-y-1.5">
+        <p className="text-eyebrow">Plan</p>
+        <h1 className="text-xl font-semibold tracking-tight">Simulator</h1>
+        <div className="flex items-baseline gap-2 text-sm text-muted-foreground">
           <select
             value={selectedScenarioId ?? ''}
             onChange={(e) => onSelect(e.target.value || null)}
-            className="bg-transparent border-0 -ml-1 px-1 py-0 hover:bg-accent rounded cursor-pointer"
+            className="-ml-1 cursor-pointer rounded border-0 bg-transparent px-1 py-0 hover:bg-accent"
             disabled={isPending}
           >
             <option value="">Baseline (no overrides)</option>
@@ -174,12 +168,14 @@ export function ScenarioHeader({
             ))}
           </select>
           {isDirty && (
-            <span className="text-amber-600 font-medium">· unsaved changes</span>
+            <span className="font-medium text-amber-600 dark:text-amber-400">
+              · unsaved changes
+            </span>
           )}
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         {nameDraft !== null ? (
           // Inline name editor — replaces window.prompt for new scenarios.
           <form
@@ -189,7 +185,7 @@ export function ScenarioHeader({
             }}
             className="flex items-center gap-2"
           >
-            <input
+            <Input
               ref={nameInputRef}
               value={nameDraft}
               onChange={(e) => setNameDraft(e.target.value)}
@@ -198,67 +194,54 @@ export function ScenarioHeader({
               }}
               placeholder="Scenario name"
               maxLength={120}
-              className="text-sm bg-background border border-border rounded-md px-2 py-1.5 text-foreground w-48"
               disabled={isPending}
+              className="h-9 w-48 text-sm"
             />
-            <button
-              type="submit"
-              disabled={isPending}
-              className="bg-foreground text-background px-3 py-1.5 rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50"
-            >
+            <Button type="submit" size="sm" disabled={isPending}>
               {isPending ? 'Saving…' : 'Save'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => setNameDraft(null)}
               disabled={isPending}
-              className="text-sm text-muted-foreground hover:text-foreground"
             >
               Cancel
-            </button>
+            </Button>
           </form>
         ) : (
           <>
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={handleReset}
               disabled={!isDirty || isPending}
-              className="text-sm text-muted-foreground hover:text-foreground disabled:opacity-50"
             >
               Reset
-            </button>
-            <button
+            </Button>
+            <Button
+              size="sm"
               onClick={handleSave}
               disabled={!isDirty || isPending}
               title={selected ? 'Save (⌘S)' : 'Save as new scenario (⌘S)'}
-              className="bg-foreground text-background px-3 py-1.5 rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50"
             >
               {isPending ? 'Saving…' : selected ? 'Save' : 'Save as…'}
-            </button>
+            </Button>
             {selected && (
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={handleDelete}
                 disabled={isPending}
-                className="text-sm text-muted-foreground hover:text-destructive disabled:opacity-50"
+                className="text-muted-foreground hover:text-destructive"
               >
                 Delete
-              </button>
+              </Button>
             )}
           </>
         )}
       </div>
-
-      {toast && (
-        <div
-          role="status"
-          className={`absolute top-full right-0 mt-2 px-3 py-2 rounded-md text-sm shadow-md transition-opacity ${
-            toast.kind === 'error'
-              ? 'bg-red-50 text-red-800 border border-red-200'
-              : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-          }`}
-        >
-          {toast.message}
-        </div>
-      )}
 
       <AlertDialog
         open={confirmDeleteOpen}
@@ -279,8 +262,6 @@ export function ScenarioHeader({
             <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
-                // Hold the dialog open through the transition;
-                // performDelete closes it on success.
                 e.preventDefault();
                 performDelete();
               }}
