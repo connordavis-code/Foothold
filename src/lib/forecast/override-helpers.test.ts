@@ -5,6 +5,8 @@ import {
   updateItem,
   setSingle,
   clearSingle,
+  removeItemAt,
+  updateItemAt,
 } from './override-helpers';
 
 describe('addItem', () => {
@@ -86,5 +88,57 @@ describe('setSingle / clearSingle', () => {
 
   it('clearSingle returns undefined', () => {
     expect(clearSingle()).toBeUndefined();
+  });
+});
+
+describe('removeItemAt', () => {
+  it('returns undefined when removing the last item from a single-item array', () => {
+    expect(removeItemAt([{ id: 'a' }], 0)).toBeUndefined();
+  });
+
+  it('removes the item at the specified index', () => {
+    const result = removeItemAt([{ id: 'a' }, { id: 'b' }, { id: 'c' }], 1);
+    expect(result).toEqual([{ id: 'a' }, { id: 'c' }]);
+  });
+
+  it('returns the array unchanged when index is out of bounds', () => {
+    const input = [{ id: 'a' }];
+    expect(removeItemAt(input, 5)).toBe(input);
+  });
+
+  it('returns undefined for an undefined input', () => {
+    expect(removeItemAt<{ id: string }>(undefined, 0)).toBeUndefined();
+  });
+
+  it('does not mutate the input array', () => {
+    const input = [{ id: 'a' }, { id: 'b' }];
+    removeItemAt(input, 0);
+    expect(input).toEqual([{ id: 'a' }, { id: 'b' }]);
+  });
+});
+
+describe('updateItemAt', () => {
+  it('updates the item at the specified index with the patch', () => {
+    const result = updateItemAt(
+      [{ id: 'a', value: 1 }, { id: 'b', value: 2 }],
+      1,
+      { value: 99 },
+    );
+    expect(result).toEqual([{ id: 'a', value: 1 }, { id: 'b', value: 99 }]);
+  });
+
+  it('returns the array unchanged when index is out of bounds', () => {
+    const input = [{ id: 'a', value: 1 }];
+    expect(updateItemAt(input, 5, { value: 99 })).toBe(input);
+  });
+
+  it('returns undefined for an undefined input', () => {
+    expect(updateItemAt<{ value: number }>(undefined, 0, { value: 1 })).toBeUndefined();
+  });
+
+  it('does not mutate the input array', () => {
+    const input = [{ id: 'a', value: 1 }];
+    updateItemAt(input, 0, { value: 99 });
+    expect(input).toEqual([{ id: 'a', value: 1 }]);
   });
 });

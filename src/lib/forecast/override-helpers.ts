@@ -40,3 +40,33 @@ export function setSingle<T>(value: T): T {
 export function clearSingle<T>(): T | undefined {
   return undefined;
 }
+
+/**
+ * Index-based variant of removeItem. Useful when the array can have items
+ * that are equivalent by predicate but distinct by position (e.g., a list
+ * of recurring stream changes where two entries pause the same stream in
+ * different month ranges).
+ */
+export function removeItemAt<T>(
+  arr: T[] | undefined,
+  index: number,
+): T[] | undefined {
+  if (!arr) return undefined;
+  if (index < 0 || index >= arr.length) return arr;
+  const next = arr.filter((_, i) => i !== index);
+  if (next.length === 0) return undefined;
+  return next;
+}
+
+/**
+ * Index-based variant of updateItem. Same use case as removeItemAt.
+ */
+export function updateItemAt<T>(
+  arr: T[] | undefined,
+  index: number,
+  patch: Partial<T>,
+): T[] | undefined {
+  if (!arr) return undefined;
+  if (index < 0 || index >= arr.length) return arr;
+  return arr.map((item, i) => (i === index ? { ...item, ...patch } : item));
+}

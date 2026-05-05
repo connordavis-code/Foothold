@@ -1,7 +1,7 @@
 'use client';
 
 import { X } from 'lucide-react';
-import { addItem } from '@/lib/forecast/override-helpers';
+import { addItem, removeItemAt, updateItemAt } from '@/lib/forecast/override-helpers';
 import type { ForecastHistory, ScenarioOverrides } from '@/lib/forecast/types';
 
 type RecurringChange = NonNullable<ScenarioOverrides['recurringChanges']>[number];
@@ -15,24 +15,6 @@ type Props = {
 
 const changeKey = (c: RecurringChange, i: number) =>
   `${c.action}-${c.streamId ?? 'new'}-${i}`;
-
-// Index-based helpers (the shared helpers are predicate-based; we need index here
-// because duplicate entries with the same streamId would otherwise collide).
-function removeAtIndex(
-  arr: RecurringChange[],
-  i: number,
-): RecurringChange[] | undefined {
-  const next = arr.filter((_, idx) => idx !== i);
-  return next.length === 0 ? undefined : next;
-}
-
-function patchAtIndex(
-  arr: RecurringChange[],
-  i: number,
-  patch: Partial<RecurringChange>,
-): RecurringChange[] {
-  return arr.map((item, idx) => (idx === i ? { ...item, ...patch } : item));
-}
 
 export function RecurringOverrides({ value, onChange, baseStreams }: Props) {
   const items = value ?? [];
@@ -72,7 +54,7 @@ export function RecurringOverrides({ value, onChange, baseStreams }: Props) {
               {item.action}
             </span>
             <button
-              onClick={() => onChange(removeAtIndex(items, i))}
+              onClick={() => onChange(removeItemAt(items, i))}
               className="p-0.5 text-muted-foreground hover:text-destructive"
               aria-label="Remove"
             >
@@ -84,7 +66,7 @@ export function RecurringOverrides({ value, onChange, baseStreams }: Props) {
             <select
               value={item.streamId ?? ''}
               onChange={(e) =>
-                onChange(patchAtIndex(items, i, { streamId: e.target.value }))
+                onChange(updateItemAt(items, i, { streamId: e.target.value }))
               }
               className="w-full bg-background border border-border rounded px-2 py-1 text-foreground"
             >
@@ -103,7 +85,7 @@ export function RecurringOverrides({ value, onChange, baseStreams }: Props) {
                   type="text"
                   value={item.label ?? ''}
                   onChange={(e) =>
-                    onChange(patchAtIndex(items, i, { label: e.target.value }))
+                    onChange(updateItemAt(items, i, { label: e.target.value }))
                   }
                   placeholder="Label"
                   className="flex-1 bg-background border border-border rounded px-2 py-1 text-foreground"
@@ -113,7 +95,7 @@ export function RecurringOverrides({ value, onChange, baseStreams }: Props) {
                 type="number"
                 value={item.amount ?? 0}
                 onChange={(e) =>
-                  onChange(patchAtIndex(items, i, { amount: Number(e.target.value) }))
+                  onChange(updateItemAt(items, i, { amount: Number(e.target.value) }))
                 }
                 className="w-20 bg-background border border-border rounded px-2 py-1 text-right text-foreground"
               />
@@ -121,7 +103,7 @@ export function RecurringOverrides({ value, onChange, baseStreams }: Props) {
                 value={item.cadence ?? 'monthly'}
                 onChange={(e) =>
                   onChange(
-                    patchAtIndex(items, i, {
+                    updateItemAt(items, i, {
                       cadence: e.target.value as 'weekly' | 'biweekly' | 'monthly',
                     }),
                   )
@@ -137,7 +119,7 @@ export function RecurringOverrides({ value, onChange, baseStreams }: Props) {
                   value={item.direction ?? 'outflow'}
                   onChange={(e) =>
                     onChange(
-                      patchAtIndex(items, i, {
+                      updateItemAt(items, i, {
                         direction: e.target.value as 'inflow' | 'outflow',
                       }),
                     )
