@@ -9,14 +9,23 @@ type Props = {
   sparkline: SparklinePoint[];
 };
 
+// Sub-dollar movement reads as noise — Plaid pending amounts and
+// rounding can produce ±$0.01 deltas that shouldn't shout from the hero.
+const FLAT_THRESHOLD = 1;
+
 /**
  * Editorial hero — net worth as a confident display number over the
  * --gradient-hero deep-green canvas. The sparkline is decorative
  * context, not a precise chart. Monthly delta sits on a small pill so
  * gain/loss is unambiguous without a separate value+arrow tile.
+ *
+ * When the month is essentially flat, the delta pill is suppressed in
+ * favor of a quieter "No change yet this month" label — printing
+ * "↑ $0.00" misrepresents nothing-happened as something-happened.
  */
 export function HeroCard({ netWorth, monthlyDelta, sparkline }: Props) {
-  const isUp = monthlyDelta >= 0;
+  const isFlat = Math.abs(monthlyDelta) < FLAT_THRESHOLD;
+  const isUp = monthlyDelta > 0;
   const Arrow = isUp ? ArrowUpRight : ArrowDownRight;
 
   return (
@@ -36,17 +45,25 @@ export function HeroCard({ netWorth, monthlyDelta, sparkline }: Props) {
             {formatCurrency(netWorth)}
           </p>
           <div className="flex items-center gap-2">
-            <span
-              className={`inline-flex items-center gap-1 rounded-pill px-2 py-0.5 text-xs font-medium tabular-nums ${
-                isUp
-                  ? 'bg-emerald-400/15 text-emerald-200'
-                  : 'bg-rose-400/15 text-rose-200'
-              }`}
-            >
-              <Arrow className="h-3 w-3" />
-              {formatCurrency(Math.abs(monthlyDelta))}
-            </span>
-            <span className="text-xs text-white/55">this month</span>
+            {isFlat ? (
+              <span className="text-xs text-white/55">
+                No change yet this month
+              </span>
+            ) : (
+              <>
+                <span
+                  className={`inline-flex items-center gap-1 rounded-pill px-2 py-0.5 text-xs font-medium tabular-nums ${
+                    isUp
+                      ? 'bg-emerald-400/15 text-emerald-200'
+                      : 'bg-rose-400/15 text-rose-200'
+                  }`}
+                >
+                  <Arrow className="h-3 w-3" />
+                  {formatCurrency(Math.abs(monthlyDelta))}
+                </span>
+                <span className="text-xs text-white/55">this month</span>
+              </>
+            )}
           </div>
         </div>
 

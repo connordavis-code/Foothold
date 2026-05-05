@@ -53,7 +53,7 @@ export function UpcomingRecurringCard({ upcoming, days = 7 }: Props) {
               <CalendarClock className="h-4 w-4 shrink-0 text-muted-foreground" />
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">
-                  {r.merchantName ?? r.description ?? 'Recurring charge'}
+                  {pickLabel(r.merchantName, r.description)}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {formatHitDate(r.predictedNextDate)}
@@ -69,6 +69,19 @@ export function UpcomingRecurringCard({ upcoming, days = 7 }: Props) {
         ))}
       </ul>
     </section>
+  );
+}
+
+// Plaid sometimes returns empty strings for merchantName / description on
+// recurring streams. `??` only catches `null`/`undefined`, so empty-string
+// names slipped through and rendered a blank merchant slot. Trim + `||`
+// catches all the unhelpful cases.
+function pickLabel(
+  merchantName: string | null,
+  description: string | null,
+): string {
+  return (
+    merchantName?.trim() || description?.trim() || 'Recurring charge'
   );
 }
 
