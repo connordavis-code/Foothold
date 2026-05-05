@@ -3,30 +3,26 @@
 import { X } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState, useTransition } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import type { AccountOption } from '@/lib/db/queries/transactions';
 import { cn } from '@/lib/utils';
 
-const SELECT_CLASS = cn(
-  'flex h-10 rounded-md border border-input bg-background px-3 py-2',
-  'text-sm ring-offset-background',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-  'disabled:cursor-not-allowed disabled:opacity-50',
+export const SEARCH_INPUT_ID = 'tx-search';
+
+const CHIP_BASE = cn(
+  'inline-flex h-8 items-center rounded-card border border-border bg-surface-elevated px-3 text-sm',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
+  'transition-colors duration-fast ease-out-quart',
 );
 
 /**
- * Plaid PFC primary categories come back like 'FOOD_AND_DRINK'. Make readable.
+ * Operator-styled inline filter row. Replaces the old Card-headered
+ * form. Tighter row, shorter heights, monospaced spacing — meant to
+ * read as a command-line strip rather than a form. Search is
+ * debounced; account/category/date are committed on change.
+ *
+ * "/" focuses the search input, courtesy of the page-level shell.
  */
-function humanize(c: string): string {
-  return c
-    .toLowerCase()
-    .split('_')
-    .map((w) => w[0]?.toUpperCase() + w.slice(1))
-    .join(' ');
-}
-
-export function TransactionFilters({
+export function FilterRow({
   accounts,
   categories,
 }: {
@@ -36,16 +32,15 @@ export function TransactionFilters({
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
-  // Search has its own controlled state for debouncing.
   const initialSearch = params.get('q') ?? '';
   const [search, setSearch] = useState(initialSearch);
 
   function pushParams(mutator: (p: URLSearchParams) => void) {
     const next = new URLSearchParams(params.toString());
     mutator(next);
-    next.delete('page'); // reset paging when filters change
+    next.delete('page');
     startTransition(() => {
       router.push(next.size ? `${pathname}?${next}` : pathname);
     });
@@ -58,7 +53,6 @@ export function TransactionFilters({
     });
   }
 
-  // Debounced search → URL
   useEffect(() => {
     const current = params.get('q') ?? '';
     if (search === current) return;
@@ -66,8 +60,6 @@ export function TransactionFilters({
       setParam('q', search || undefined);
     }, 350);
     return () => clearTimeout(timer);
-    // We intentionally only react to `search` here; reading the latest
-    // params in setParam is fine because it pulls from useSearchParams.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
@@ -79,19 +71,26 @@ export function TransactionFilters({
     params.has('to');
 
   return (
-    <div className="flex flex-wrap gap-2 items-end">
-      <div className="flex-1 min-w-[200px]">
-        <Input
-          placeholder="Search by name or merchant…"
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="relative flex-1 min-w-[220px]">
+        <input
+          id={SEARCH_INPUT_ID}
+          type="text"
+          placeholder="Search transactions ( / )"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          className={cn(
+            CHIP_BASE,
+            'h-9 w-full font-mono placeholder:font-sans placeholder:text-muted-foreground',
+          )}
         />
       </div>
 
       <select
-        className={SELECT_CLASS}
+        className={cn(CHIP_BASE, 'h-9 cursor-pointer text-muted-foreground')}
         value={params.get('account') ?? ''}
         onChange={(e) => setParam('account', e.target.value || undefined)}
+        aria-label="Account"
       >
         <option value="">All accounts</option>
         {accounts.map((a) => (
@@ -103,9 +102,10 @@ export function TransactionFilters({
       </select>
 
       <select
-        className={SELECT_CLASS}
+        className={cn(CHIP_BASE, 'h-9 cursor-pointer text-muted-foreground')}
         value={params.get('category') ?? ''}
         onChange={(e) => setParam('category', e.target.value || undefined)}
+        aria-label="Category"
       >
         <option value="">All categories</option>
         {categories.map((c) => (
@@ -117,33 +117,43 @@ export function TransactionFilters({
 
       <input
         type="date"
-        className={SELECT_CLASS}
+        className={cn(CHIP_BASE, 'h-9 cursor-pointer text-muted-foreground')}
         value={params.get('from') ?? ''}
         onChange={(e) => setParam('from', e.target.value || undefined)}
         aria-label="From date"
       />
       <input
         type="date"
-        className={SELECT_CLASS}
+        className={cn(CHIP_BASE, 'h-9 cursor-pointer text-muted-foreground')}
         value={params.get('to') ?? ''}
         onChange={(e) => setParam('to', e.target.value || undefined)}
         aria-label="To date"
       />
 
       {hasAnyFilter && (
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={isPending}
+        <button
+          type="button"
           onClick={() => {
             setSearch('');
             startTransition(() => router.push(pathname));
           }}
+          className={cn(
+            CHIP_BASE,
+            'h-9 gap-1 px-2 text-muted-foreground hover:text-foreground',
+          )}
         >
           <X className="h-3.5 w-3.5" />
           Clear
-        </Button>
+        </button>
       )}
     </div>
   );
+}
+
+function humanize(c: string): string {
+  return c
+    .toLowerCase()
+    .split('_')
+    .map((w) => w[0]?.toUpperCase() + w.slice(1))
+    .join(' ');
 }
