@@ -50,6 +50,10 @@ next-env.d.ts
 # superpowers brainstorm session artifacts (HTML mockups, ephemeral state)
 .superpowers/
 
+# skills CLI plugin output (npx skills add ...) — installed locally, not source
+.agents/
+skills-lock.json
+
 # editor settings (per-machine, never commit)
 .vscode/
 *.code-workspace
