@@ -102,7 +102,7 @@ export const forecastNarratives = pgTable(
 export type ForecastNarrative = typeof forecastNarratives.$inferSelect;
 ```
 
-Note: the `overrides` column is plain `jsonb` (not `jsonb('overrides').$type<ScenarioOverrides>()`) because the type lives in `src/lib/forecast/types.ts` (Task 2) and importing it into schema would create a circular concern. The type is enforced at server-action boundaries via zod (Task 12) instead.
+Note: the `overrides` column is plain `jsonb` in this Task 1 commit because `ScenarioOverrides` doesn't exist yet — Task 2 creates it and then bundles a one-line schema edit to apply `.$type<ScenarioOverrides>()`. (The original concern about a "circular import" doesn't apply: `import type` is erased at compile time and `schema.ts` is a leaf node nothing in `src/lib/forecast/` re-imports.) Server-action boundaries also enforce shape via zod (Task 11).
 
 - [ ] **Step 3: Run typecheck to confirm schema additions compile**
 
