@@ -769,7 +769,7 @@ describe('applyCategoryDeltas', () => {
     expect(result[0].outflows).toBe(50);
     expect(result[0].endCash).toBe(950);
     expect(result[1].byCategory.dining).toBe(50);
-    expect(result[1].endCash).toBe(950);
+    expect(result[1].endCash).toBe(900); // chains from month 0's endCash (950), then minus 50
   });
 
   it('respects startMonth — delta only applies from startMonth forward', () => {
