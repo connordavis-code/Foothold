@@ -269,6 +269,22 @@ inside the client component. Fixed in `d955dd4` for `<NavLink>`.
   cmdk picker), visual refresh of /drift /goals /insights /recurring
   (IA preserved; per-page IA rework deferred). 134 vitest tests.
 
+- **Phase 6.5 — /insights IA rework** (2026-05-05) — `/insights`
+  becomes a latest-read + drilldown surface: serif narrative stays
+  the hero, with a "What Claude saw" receipts grid below (conditional
+  Spending/Drift/Goals/Recurring tiles linking into their detail
+  pages) and an "Earlier weeks" footer using `?week=YYYY-MM-DD` deep
+  links. `<GenerateButton>` is now 3-mode (generate/regenerate/back-
+  to-current) and strips `?week=` on success. New shared utils
+  (`firstSentence`, `formatWeekRange`) and pure-predicate modules
+  (`week-param`, `button-mode`, `tile-visibility`, `pace`) — all
+  vitest-tested. `getInsightSupplements` composes drift + goals +
+  recurring into the receipts payload via live-recompute for past
+  weeks (no schema change). Pace bug caught + fixed mid-walkthrough:
+  savings goals with negative velocity and no `targetDate` now
+  correctly report "behind". 175 vitest tests. Spec at
+  `docs/superpowers/specs/2026-05-05-insights-ia-rework-design.md`.
+
 ### In progress
 - **Plaid Production access review** — submitted 2026-05-01 + Q9
   amendment. Approval odds ~25-35% first-pass, ~60-70% with follow-up.
@@ -280,11 +296,11 @@ inside the client component. Fixed in `d955dd4` for `<NavLink>`.
   paste fresh secret, update Vercel env, reconnect via `/settings`.
   `linkTokenCreate` doesn't pass `redirect_uri` — fine for non-OAuth
   banks, breaks Chase / Cap One until configured.
-- **Per-page IA reworks** for /drift, /insights, /goals, /recurring
-  — Phase 6 shipped a visual refresh; the underlying IA on these
-  surfaces is still legacy. Each is roughly phase-sized. /insights
-  is the highest-leverage candidate (narrative is the value prop;
-  current page is a single Card).
+- **Per-page IA reworks** for /drift, /goals, /recurring — Phase 6
+  shipped a visual refresh on these; /insights got its IA rework in
+  Phase 6.5. /drift is the next highest-leverage candidate (already
+  pure-SQL; receipts language from /insights may inform the rework).
+  Each remaining surface is roughly phase-sized.
 - **Dark-mode visual sweep** — tokens defined in 6.1 and parity-
   mapped in `:root` / `.dark`, but the dark variant has never been
   walked through against the new editorial chrome.
