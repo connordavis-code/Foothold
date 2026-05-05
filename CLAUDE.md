@@ -239,10 +239,6 @@ handler's own 401 — body shape reveals which layer fired.
   webhook E2E — wipe before flipping `PLAID_ENV=production`.
 
 ### Next up
-- **Verify sender domain** — confirm `AUTH_EMAIL_FROM` in Vercel env
-  is the custom domain (`noreply@usefoothold.com`) not the Resend
-  sandbox sender (`onboarding@resend.dev`). The 14:00 UTC May 5
-  digest's From header will tell.
 - **Reconnect once Plaid approved** — flip `PLAID_ENV=production`,
   paste fresh secret, update Vercel env, reconnect via `/settings`.
   `linkTokenCreate` doesn't pass `redirect_uri` — fine for non-OAuth
