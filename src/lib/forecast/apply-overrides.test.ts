@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyCategoryDeltas, applyIncomeDelta, applyRecurringChanges } from './apply-overrides';
+import { applyCategoryDeltas, applyIncomeDelta, applyRecurringChanges, applySkipRecurringInstances, applyLumpSums } from './apply-overrides';
 import type { MonthlyProjection, ForecastHistory } from './types';
 
 function makeProjection(months: string[]): MonthlyProjection[] {
@@ -300,5 +300,138 @@ describe('applyIncomeDelta', () => {
     // Month 2 (out of range again): startCash 1300, inflows 0 → 1200
     expect(result[2].startCash).toBe(1300);
     expect(result[2].endCash).toBe(1200);
+  });
+});
+
+describe('applySkipRecurringInstances', () => {
+  it('returns input unchanged (same reference) when no skips', () => {
+    const proj = makeProjection(['2026-05']);
+    expect(applySkipRecurringInstances(proj, baseStreams, undefined)).toBe(proj);
+  });
+
+  it('subtracts a one-time outflow stream instance from the specified month', () => {
+    const proj: MonthlyProjection[] = [
+      { month: '2026-08', startCash: 5000, inflows: 0, outflows: 2000, endCash: 3000, byCategory: {}, goalProgress: {} },
+    ];
+    const result = applySkipRecurringInstances(proj, baseStreams, [
+      { streamId: 'rent', skipMonth: '2026-08' },
+    ]);
+    expect(result[0].outflows).toBe(0); // Rent skipped — 2000 monthly equivalent removed
+    expect(result[0].endCash).toBe(5000);
+  });
+
+  it('does not affect other months', () => {
+    const proj: MonthlyProjection[] = [
+      { month: '2026-08', startCash: 5000, inflows: 0, outflows: 2000, endCash: 3000, byCategory: {}, goalProgress: {} },
+      { month: '2026-09', startCash: 3000, inflows: 0, outflows: 2000, endCash: 1000, byCategory: {}, goalProgress: {} },
+    ];
+    const result = applySkipRecurringInstances(proj, baseStreams, [
+      { streamId: 'rent', skipMonth: '2026-08' },
+    ]);
+    expect(result[1].outflows).toBe(2000); // unchanged
+    expect(result[1].startCash).toBe(5000); // chain forward from skipped month's new endCash
+    expect(result[1].endCash).toBe(3000);
+  });
+
+  it('handles inflow stream skips (e.g. skipping a paycheck)', () => {
+    const proj: MonthlyProjection[] = [
+      { month: '2026-08', startCash: 5000, inflows: 5000, outflows: 0, endCash: 10000, byCategory: {}, goalProgress: {} },
+    ];
+    const result = applySkipRecurringInstances(proj, baseStreams, [
+      { streamId: 'salary', skipMonth: '2026-08' },
+    ]);
+    expect(result[0].inflows).toBe(0);
+    expect(result[0].endCash).toBe(5000);
+  });
+
+  it('returns empty array unchanged for empty projection', () => {
+    const result = applySkipRecurringInstances([], baseStreams, [
+      { streamId: 'rent', skipMonth: '2026-08' },
+    ]);
+    expect(result).toEqual([]);
+  });
+
+  it('silently ignores unknown streamId (no matching stream in baseStreams)', () => {
+    const proj: MonthlyProjection[] = [
+      { month: '2026-08', startCash: 5000, inflows: 0, outflows: 2000, endCash: 3000, byCategory: {}, goalProgress: {} },
+    ];
+    const result = applySkipRecurringInstances(proj, baseStreams, [
+      { streamId: 'nonexistent', skipMonth: '2026-08' },
+    ]);
+    expect(result[0].outflows).toBe(2000); // unchanged
+    expect(result[0].endCash).toBe(3000);
+  });
+});
+
+describe('applyLumpSums', () => {
+  it('returns input unchanged (same reference) when no lump sums', () => {
+    const proj = makeProjection(['2026-05']);
+    expect(applyLumpSums(proj, undefined)).toBe(proj);
+  });
+
+  it('adds positive amount to inflows in the target month', () => {
+    const proj: MonthlyProjection[] = [
+      { month: '2026-04', startCash: 1000, inflows: 0, outflows: 0, endCash: 1000, byCategory: {}, goalProgress: {} },
+    ];
+    const result = applyLumpSums(proj, [
+      { id: 'tax', label: 'Tax refund', amount: 2400, month: '2026-04' },
+    ]);
+    expect(result[0].inflows).toBe(2400);
+    expect(result[0].endCash).toBe(3400);
+  });
+
+  it('adds negative amount to outflows in the target month', () => {
+    const proj: MonthlyProjection[] = [
+      { month: '2026-04', startCash: 1000, inflows: 0, outflows: 0, endCash: 1000, byCategory: {}, goalProgress: {} },
+    ];
+    const result = applyLumpSums(proj, [
+      { id: 'vet', label: 'Vet bill', amount: -800, month: '2026-04' },
+    ]);
+    expect(result[0].outflows).toBe(800);
+    expect(result[0].endCash).toBe(200);
+  });
+
+  it('ignores lump sums outside the projection range', () => {
+    const proj: MonthlyProjection[] = [
+      { month: '2026-04', startCash: 1000, inflows: 0, outflows: 0, endCash: 1000, byCategory: {}, goalProgress: {} },
+    ];
+    const result = applyLumpSums(proj, [
+      { id: 'far-future', label: 'Bonus', amount: 10000, month: '2030-01' },
+    ]);
+    expect(result[0]).toEqual(proj[0]);
+  });
+
+  it('chains endCash through subsequent months after a lump sum', () => {
+    const proj: MonthlyProjection[] = [
+      { month: '2026-04', startCash: 1000, inflows: 0, outflows: 0, endCash: 1000, byCategory: {}, goalProgress: {} },
+      { month: '2026-05', startCash: 1000, inflows: 0, outflows: 0, endCash: 1000, byCategory: {}, goalProgress: {} },
+    ];
+    const result = applyLumpSums(proj, [
+      { id: 'tax', label: 'Tax refund', amount: 2400, month: '2026-04' },
+    ]);
+    expect(result[0].endCash).toBe(3400);
+    expect(result[1].startCash).toBe(3400);
+    expect(result[1].endCash).toBe(3400);
+  });
+
+  it('returns empty array unchanged for empty projection', () => {
+    const result = applyLumpSums([], [
+      { id: 'tax', label: 'Tax refund', amount: 2400, month: '2026-04' },
+    ]);
+    expect(result).toEqual([]);
+  });
+
+  it('applies multiple lump sums in the same month cumulatively', () => {
+    const proj: MonthlyProjection[] = [
+      { month: '2026-04', startCash: 1000, inflows: 0, outflows: 0, endCash: 1000, byCategory: {}, goalProgress: {} },
+    ];
+    const result = applyLumpSums(proj, [
+      { id: 'a', label: 'Bonus', amount: 500, month: '2026-04' },
+      { id: 'b', label: 'Refund', amount: 300, month: '2026-04' },
+      { id: 'c', label: 'Bill', amount: -100, month: '2026-04' },
+    ]);
+    expect(result[0].inflows).toBe(800);
+    expect(result[0].outflows).toBe(100);
+    expect(result[0].endCash).toBe(1700); // 1000 + 800 - 100
   });
 });

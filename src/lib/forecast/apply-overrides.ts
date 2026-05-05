@@ -164,3 +164,92 @@ export function applyRecurringChanges(
 
   return result;
 }
+
+/**
+ * Skip a specific instance of a recurring stream in a target month.
+ * Subtracts the stream's monthly equivalent from inflows or outflows for
+ * that month only, then re-chains endCash forward.
+ * Silently ignores unknown streamIds.
+ */
+export function applySkipRecurringInstances(
+  projection: MonthlyProjection[],
+  baseStreams: ForecastHistory['recurringStreams'],
+  skips: ScenarioOverrides['skipRecurringInstances'],
+): MonthlyProjection[] {
+  if (!skips || skips.length === 0) return projection;
+
+  const baseById = new Map(baseStreams.map((s) => [s.id, s]));
+  const result: MonthlyProjection[] = [];
+  let runningCash = projection.length > 0 ? projection[0].startCash : 0;
+
+  for (const month of projection) {
+    let inflowDelta = 0;
+    let outflowDelta = 0;
+
+    for (const skip of skips) {
+      if (skip.skipMonth !== month.month) continue;
+      const stream = baseById.get(skip.streamId);
+      if (!stream) continue;
+      const monthly = monthlyEquivalent(stream.amount, stream.cadence);
+      if (stream.direction === 'outflow') outflowDelta -= monthly;
+      else inflowDelta -= monthly;
+    }
+
+    const newInflows = Math.max(0, month.inflows + inflowDelta);
+    const newOutflows = Math.max(0, month.outflows + outflowDelta);
+    const startCash = runningCash;
+    const endCash = startCash + newInflows - newOutflows;
+    result.push({
+      ...month,
+      startCash,
+      inflows: newInflows,
+      outflows: newOutflows,
+      endCash,
+    });
+    runningCash = endCash;
+  }
+
+  return result;
+}
+
+/**
+ * Apply one-time lump sums to specific months.
+ * Positive amount → inflow; negative amount → outflow.
+ * Multiple lump sums in the same month accumulate.
+ * Re-chains endCash forward from the affected month.
+ */
+export function applyLumpSums(
+  projection: MonthlyProjection[],
+  lumpSums: ScenarioOverrides['lumpSums'],
+): MonthlyProjection[] {
+  if (!lumpSums || lumpSums.length === 0) return projection;
+
+  const result: MonthlyProjection[] = [];
+  let runningCash = projection.length > 0 ? projection[0].startCash : 0;
+
+  for (const month of projection) {
+    let inflowDelta = 0;
+    let outflowDelta = 0;
+
+    for (const sum of lumpSums) {
+      if (sum.month !== month.month) continue;
+      if (sum.amount >= 0) inflowDelta += sum.amount;
+      else outflowDelta += -sum.amount;
+    }
+
+    const newInflows = month.inflows + inflowDelta;
+    const newOutflows = month.outflows + outflowDelta;
+    const startCash = runningCash;
+    const endCash = startCash + newInflows - newOutflows;
+    result.push({
+      ...month,
+      startCash,
+      inflows: newInflows,
+      outflows: newOutflows,
+      endCash,
+    });
+    runningCash = endCash;
+  }
+
+  return result;
+}
