@@ -101,6 +101,42 @@ export async function syncItemAction(itemId: string): Promise<SyncSummary> {
 }
 
 /**
+ * Re-sync every Plaid item the signed-in user owns. Powers the top-bar
+ * sync pill's "Sync now" click. Items in `login_required` / `error` /
+ * etc. are skipped — `syncItem` only runs on active rows, and a stale
+ * item just routes the user to /settings via the reauth pill anyway.
+ */
+export async function syncAllItemsAction(): Promise<{
+  synced: number;
+  failed: number;
+}> {
+  const session = await auth();
+  if (!session?.user) {
+    throw new Error('Unauthorized');
+  }
+
+  const items = await db
+    .select({ id: plaidItems.id })
+    .from(plaidItems)
+    .where(
+      and(
+        eq(plaidItems.userId, session.user.id),
+        eq(plaidItems.status, 'active'),
+      ),
+    );
+
+  // Bounded fan-out: a single user has 1–5 items in practice, and
+  // syncItem already serializes per-endpoint inside. No global rate-limit
+  // risk worth a queue.
+  const results = await Promise.allSettled(items.map((i) => syncItem(i.id)));
+
+  return {
+    synced: results.filter((r) => r.status === 'fulfilled').length,
+    failed: results.filter((r) => r.status === 'rejected').length,
+  };
+}
+
+/**
  * Mint a link_token for Plaid Link in *update mode* — used to repair an
  * item whose connection is `login_required` / `pending_expiration` /
  * etc. Update mode keeps the same `access_token`, so there's no

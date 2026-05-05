@@ -2,7 +2,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { auth } from '@/auth';
 import { ConnectBankButton } from '@/components/plaid/connect-bank-button';
 import { ReconnectButton } from '@/components/plaid/reconnect-button';
-import { statusLabel } from '@/components/plaid/reauth-banner';
+import { statusLabel } from '@/components/plaid/status';
 import { SyncButton } from '@/components/plaid/sync-button';
 import {
   Card,
