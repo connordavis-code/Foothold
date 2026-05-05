@@ -1,7 +1,23 @@
-import type { GoalImpact } from '@/lib/forecast/types';
+import { formatCurrency } from '@/lib/utils';
+import type {
+  ForecastHistory,
+  GoalImpact,
+  ScenarioOverrides,
+} from '@/lib/forecast/types';
 
 type Props = {
   goalImpacts: GoalImpact[];
+  history: ForecastHistory;
+  hypotheticalGoals?: ScenarioOverrides['hypotheticalGoals'];
+  /** YYYY-MM — used to compute "X mo from now" subtitle. */
+  currentMonth: string;
+};
+
+type GoalContext = {
+  targetAmount: number;
+  monthlyContribution: number;
+  currentSaved: number;
+  isHypo: boolean;
 };
 
 function shiftPill(impact: GoalImpact): { text: string; tone: 'sooner' | 'later' | 'same' | 'hypo' | 'unreachable' } | null {
@@ -28,7 +44,45 @@ const toneStyles: Record<string, string> = {
   unreachable: 'bg-muted text-muted-foreground/70',
 };
 
-export function GoalDiffCards({ goalImpacts }: Props) {
+function diffMonths(target: string, current: string): number {
+  const [ty, tm] = target.split('-').map(Number);
+  const [cy, cm] = current.split('-').map(Number);
+  return (ty - cy) * 12 + (tm - cm);
+}
+
+function findContext(
+  impact: GoalImpact,
+  history: ForecastHistory,
+  hypoGoals: ScenarioOverrides['hypotheticalGoals'],
+): GoalContext | null {
+  // Engine encodes hypothetical goal ids as "hypo:<uuid>" — see goal-projection.ts.
+  if (impact.goalId.startsWith('hypo:')) {
+    const baseId = impact.goalId.slice('hypo:'.length);
+    const hypo = hypoGoals?.find((g) => g.id === baseId);
+    if (!hypo) return null;
+    return {
+      targetAmount: hypo.targetAmount,
+      monthlyContribution: hypo.monthlyContribution ?? 0,
+      currentSaved: 0,
+      isHypo: true,
+    };
+  }
+  const real = history.goals.find((g) => g.id === impact.goalId);
+  if (!real) return null;
+  return {
+    targetAmount: real.targetAmount,
+    monthlyContribution: real.monthlyContribution ?? 0,
+    currentSaved: real.currentSaved,
+    isHypo: false,
+  };
+}
+
+export function GoalDiffCards({
+  goalImpacts,
+  history,
+  hypotheticalGoals,
+  currentMonth,
+}: Props) {
   if (goalImpacts.length === 0) {
     return (
       <section>
@@ -42,14 +96,24 @@ export function GoalDiffCards({ goalImpacts }: Props) {
     );
   }
 
+  // Single card looks lonely in a 2-col grid; let it expand.
+  const gridCols = goalImpacts.length === 1 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2';
+
   return (
     <section>
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-3">
         Goals impact
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className={`grid gap-3 ${gridCols}`}>
         {goalImpacts.map((g) => {
           const pill = shiftPill(g);
+          const ctx = findContext(g, history, hypotheticalGoals);
+          const monthsOut = g.scenarioETA ? diffMonths(g.scenarioETA, currentMonth) : null;
+          const progressPct =
+            ctx && !ctx.isHypo && ctx.targetAmount > 0
+              ? Math.min(100, Math.round((ctx.currentSaved / ctx.targetAmount) * 100))
+              : null;
+
           return (
             <article
               key={g.goalId}
@@ -65,12 +129,44 @@ export function GoalDiffCards({ goalImpacts }: Props) {
                   </span>
                 )}
               </div>
-              <div className="text-lg font-semibold text-foreground">
-                {g.scenarioETA ?? '—'}
+
+              <div className="flex items-baseline gap-2">
+                <div className="text-lg font-semibold text-foreground">
+                  {g.scenarioETA ?? '—'}
+                </div>
+                {monthsOut !== null && monthsOut >= 0 && (
+                  <div className="text-xs text-muted-foreground">
+                    {monthsOut === 0 ? 'this month' : `${monthsOut} mo from now`}
+                  </div>
+                )}
               </div>
+
               {g.baselineETA && g.baselineETA !== g.scenarioETA && (
                 <div className="text-xs text-muted-foreground mt-0.5">
                   was {g.baselineETA}
+                </div>
+              )}
+
+              {ctx && (
+                <div className="mt-3 pt-3 border-t border-border/40 space-y-1">
+                  <div className="flex items-baseline justify-between text-xs text-muted-foreground">
+                    <span>
+                      {formatCurrency(ctx.targetAmount, { compact: true })} target
+                      {ctx.monthlyContribution > 0 &&
+                        ` · ${formatCurrency(ctx.monthlyContribution, { compact: true })}/mo`}
+                    </span>
+                    {!ctx.isHypo && progressPct !== null && (
+                      <span className="text-foreground/80 font-medium">{progressPct}%</span>
+                    )}
+                  </div>
+                  {!ctx.isHypo && progressPct !== null && (
+                    <div className="h-1 bg-border/60 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-foreground/70"
+                        style={{ width: `${progressPct}%` }}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </article>

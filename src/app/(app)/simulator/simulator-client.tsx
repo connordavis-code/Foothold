@@ -209,7 +209,12 @@ export function SimulatorClient({
               baseline={baselineResult.projection}
               scenario={engineResult.projection}
             />
-            <GoalDiffCards goalImpacts={engineResult.goalImpacts} />
+            <GoalDiffCards
+              goalImpacts={engineResult.goalImpacts}
+              history={history}
+              hypotheticalGoals={liveOverrides.hypotheticalGoals}
+              currentMonth={currentMonth}
+            />
             <NarrativePanel
               scenarioId={selectedScenarioId}
               overrides={liveOverrides}
