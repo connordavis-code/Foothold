@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import type { InsightSupplements } from '@/lib/insights/types';
+import { paceLabel } from '@/lib/insights/pace';
 
 type Props = {
   data: InsightSupplements['goals'];
@@ -18,9 +19,9 @@ export function GoalsTile({ data }: Props) {
         <span className="text-muted-foreground"> / {data.activeCount}</span>
       </p>
       <p className="mt-1 text-xs text-muted-foreground">on pace</p>
-      {lead && (
+      {lead && lead.pacePct < 1 && (
         <p className="mt-3 truncate text-xs text-foreground/80">
-          {lead.name} · {Math.round(lead.pacePct * 100)}%
+          {lead.name} · {paceLabel(lead.pacePct)}
         </p>
       )}
       <Link

@@ -6,8 +6,8 @@ import {
   transactions,
 } from '@/lib/db/schema';
 import type { InsightSupplements } from '@/lib/insights/types';
+import { paceForGoal } from '@/lib/insights/pace';
 import { getDriftAnalysis } from './drift';
-import type { GoalWithProgress } from './goals';
 import { getGoalsWithProgress } from './goals';
 import {
   frequencyToMonthlyMultiplier,
@@ -181,35 +181,3 @@ export async function getInsightSupplements(
   };
 }
 
-/**
- * Pace as a comparable number where 1.0 = "on pace".
- *
- *   savings: months-remaining-by-target-date / months-remaining-at-velocity.
- *            >1 = ahead, 1 = on pace, <1 = behind. 0 if velocity ≤ 0.
- *            Defaults to 1 when there's no targetDate (no concept of pace).
- *   spend_cap: 1 if spent ≤ cap, else 0. Binary because SpendCapProgress
- *              doesn't expose month-progress fields here; finer pace
- *              measurement belongs on /goals proper.
- */
-function paceForGoal(goal: Pick<GoalWithProgress, 'type' | 'targetDate' | 'progress'>): number {
-  const { progress } = goal;
-  if (progress.type === 'spend_cap') {
-    return progress.cap > 0 && progress.spent <= progress.cap ? 1 : 0;
-  }
-  // savings branch
-  if (goal.targetDate == null) return 1;
-  if (progress.monthsToTarget == null) return 0; // velocity ≤ 0
-  const monthsRemainingByDate = monthsBetween(
-    new Date().toISOString().slice(0, 10),
-    goal.targetDate,
-  );
-  if (monthsRemainingByDate <= 0) return progress.fraction >= 1 ? 1 : 0;
-  return monthsRemainingByDate / progress.monthsToTarget;
-}
-
-
-function monthsBetween(fromIso: string, toIso: string): number {
-  const from = new Date(`${fromIso}T00:00:00Z`);
-  const to = new Date(`${toIso}T00:00:00Z`);
-  return (to.getTime() - from.getTime()) / (30 * DAY_MS);
-}
