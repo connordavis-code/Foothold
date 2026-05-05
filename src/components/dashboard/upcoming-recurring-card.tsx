@@ -53,7 +53,7 @@ export function UpcomingRecurringCard({ upcoming, days = 7 }: Props) {
               <CalendarClock className="h-4 w-4 shrink-0 text-muted-foreground" />
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">
-                  {pickLabel(r.merchantName, r.description)}
+                  {pickLabel(r)}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {formatHitDate(r.predictedNextDate)}
@@ -72,17 +72,31 @@ export function UpcomingRecurringCard({ upcoming, days = 7 }: Props) {
   );
 }
 
-// Plaid sometimes returns empty strings for merchantName / description on
-// recurring streams. `??` only catches `null`/`undefined`, so empty-string
-// names slipped through and rendered a blank merchant slot. Trim + `||`
-// catches all the unhelpful cases.
-function pickLabel(
-  merchantName: string | null,
-  description: string | null,
-): string {
+// Plaid sandbox commonly returns empty merchantName + empty description
+// for recurring streams (the /recurring table sees this too — most rows
+// fall back to category). Order: real merchant → description → humanized
+// category → generic literal. `||` instead of `??` so empty/whitespace
+// strings fall through, not just nulls.
+function pickLabel(r: {
+  merchantName: string | null;
+  description: string | null;
+  primaryCategory: string | null;
+}): string {
   return (
-    merchantName?.trim() || description?.trim() || 'Recurring charge'
+    r.merchantName?.trim() ||
+    r.description?.trim() ||
+    (r.primaryCategory ? humanizeCategory(r.primaryCategory) : '') ||
+    'Recurring charge'
   );
+}
+
+function humanizeCategory(c: string): string {
+  if (c === 'UNCATEGORIZED') return 'Uncategorized';
+  return c
+    .toLowerCase()
+    .split('_')
+    .map((w) => w[0]?.toUpperCase() + w.slice(1))
+    .join(' ');
 }
 
 function formatHitDate(yyyymmdd: string): string {
