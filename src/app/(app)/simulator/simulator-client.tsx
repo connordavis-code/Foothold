@@ -10,6 +10,7 @@ import { CategoryOverrides } from '@/components/simulator/category-overrides';
 import { LumpSumOverrides } from '@/components/simulator/lump-sum-overrides';
 import { RecurringOverrides } from '@/components/simulator/recurring-overrides';
 import { IncomeOverrides } from '@/components/simulator/income-overrides';
+import { HypotheticalGoalOverrides } from '@/components/simulator/hypothetical-goal-overrides';
 
 type Props = {
   history: ForecastHistory;
@@ -116,7 +117,15 @@ export function SimulatorClient({
               availableMonths={availableMonths}
             />
           </OverrideSection>
-          {/* More sections in Tasks 11-13 */}
+          <OverrideSection label="Hypothetical goals" count={liveOverrides.hypotheticalGoals?.length ?? 0}>
+            <HypotheticalGoalOverrides
+              value={liveOverrides.hypotheticalGoals}
+              onChange={(next) =>
+                setLiveOverrides((o) => ({ ...o, hypotheticalGoals: next }))
+              }
+            />
+          </OverrideSection>
+          {/* More sections in Tasks 12-13 */}
         </div>
 
         {/* Right: debug for now (chart + cards in Wave 4) */}
