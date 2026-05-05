@@ -285,6 +285,31 @@ inside the client component. Fixed in `d955dd4` for `<NavLink>`.
   correctly report "behind". 175 vitest tests. Spec at
   `docs/superpowers/specs/2026-05-05-insights-ia-rework-design.md`.
 
+- **Phase 6.6 — UI quality pass** (2026-05-05) — driven by an
+  `impeccable critique` sweep across all 8 surfaces. Added
+  [PRODUCT.md](PRODUCT.md) (register, users, brand personality,
+  anti-references, 5 design principles) for impeccable + future-
+  agent context. Extracted `.text-eyebrow` Tailwind utility (sweeps
+  21 files where the recipe was inline). Standardized warning hue
+  (`yellow-500` → `amber-500`). Killed the TrendChart rainbow
+  with brand-tinted `--chart-1..6` derived from the 160-hue
+  gradient + 40-hue paper-canvas families. Added shadcn
+  `alert-dialog` primitive; gated `/goals` + `/simulator` delete
+  behind it (P1 error prevention; sonner success/failure). Fixed
+  `/simulator` `searchParams` to async Promise (Next 14 correctness;
+  was the synchronous Next 13 shape). Tokenize-bridge for
+  `/simulator` (the visible "design island" pre-Phase 6): in-
+  component toast → sonner, hand-rolled buttons → shadcn
+  `<Button>`, raw `bg-red-50/sky-50/amber-50` → tokens, page shell
+  aligned with Phase 6 pattern (`mx-auto max-w-6xl px-4 py-6
+  sm:px-8 sm:py-8`), eyebrow recipe normalized, ForecastChart
+  height 220→280px. Sparkles glyph audit: kept on `/insights`
+  GenerateButton + nav route only; replaced on `/insights` empty
+  (Newspaper + "First read coming up"), `<InsightTeaserCard>`
+  (BookOpen), `/dashboard` empty (Mountain — literal Foothold
+  mark). 175 vitest tests; typecheck clean. Browser walkthrough
+  pending.
+
 ### In progress
 - **Plaid Production access review** — submitted 2026-05-01 + Q9
   amendment. Approval odds ~25-35% first-pass, ~60-70% with follow-up.
