@@ -54,6 +54,16 @@ export function NarrativePanel({ scenarioId, overrides, isDirty, hasOverrides }:
         } else {
           setState({ kind: 'idle' });
         }
+      })
+      // Server actions normally return {ok:false} on errors, but a network/
+      // runtime rejection (timeout, server unreachable) would otherwise leave
+      // the panel stuck in 'loading' forever.
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setState({
+          kind: 'error',
+          message: err instanceof Error ? err.message : 'Lookup failed',
+        });
       });
     return () => {
       cancelled = true;
