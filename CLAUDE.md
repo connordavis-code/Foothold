@@ -86,6 +86,28 @@ Mutations live in `src/lib/<domain>/actions.ts`, called from
 `<form action={...}>`. Zod-validate at the boundary, then
 `revalidatePath()`. No tRPC, no API routes for app-internal mutations.
 
+### App shell — where chrome lives
+- [src/components/nav/top-bar.tsx](src/components/nav/top-bar.tsx)
+  — sticky chrome with sync pill + ⌘K trigger + user dropdown
+- [src/components/nav/app-sidebar.tsx](src/components/nav/app-sidebar.tsx)
+  — Today / Plan / Records groups; active state via `<NavLink>`
+- [src/components/nav/nav-routes.ts](src/components/nav/nav-routes.ts)
+  — single source of truth for sidebar groups + top-bar title resolution
+- [src/components/command-palette/](src/components/command-palette/)
+  — global ⌘K palette with Navigate / Search / Actions sections;
+  open state via `<CommandPaletteProvider>` (mounted by `(app)/layout.tsx`)
+- Editorial tokens: `--surface-paper` / `-elevated` / `-sunken`,
+  `--gradient-hero`, `radius-card` / `radius-pill`, motion + easing.
+  See [globals.css](src/app/globals.css). `font-serif` reserved for
+  /insights narrative only.
+
+### Transaction category override is display-only
+`transactions.categoryOverrideId` overrides the row's displayed
+category (table + dashboard recent), but the filter dropdown still
+uses raw Plaid PFC (`getDistinctCategories` reads
+`transactions.primaryCategory`). Filtering by an override-applied
+category doesn't surface those rows yet — follow-on if needed.
+
 ---
 
 ## Lessons learned
@@ -149,6 +171,17 @@ and must be in that list. Symptom: response body
 `{"error":"Unauthorized"}` (JSON from middleware) instead of the
 handler's own 401 — body shape reveals which layer fired.
 
+### Don't pass forwardRef components across the server→client boundary (2026-05-05)
+Lucide icons + most shadcn primitives are `forwardRef` components
+(functions). Next 14 RSC refuses to serialize functions as props.
+Symptom: `Error: Functions cannot be passed directly to Client
+Components ... {$$typeof: ..., render: function <ComponentName>}`.
+The named function in the error is always the offending component.
+Two fixes: (a) pre-render the icon as a children prop (server
+component renders `<Icon />`, the resulting element crosses cleanly),
+or (b) store a string identifier and resolve to the component
+inside the client component. Fixed in `d955dd4` for `<NavLink>`.
+
 ---
 
 ## Coding conventions
@@ -211,26 +244,30 @@ handler's own 401 — body shape reveals which layer fired.
   tables; scenario CRUD server actions with zod validation. Sidebar
   reorganized into Today / Plan / Records groups; brand "Finance" →
   "Foothold". `/simulator` page builds in Plan B.
-- **Phase 4-B1 — Simulator UI shell** (2026-05-05) — `/simulator`
-  page on top of Plan A's engine. Override editor with 7 collapsible
-  sections (categories, lump sums, recurring changes, income,
-  hypothetical goals, goal target edits, skip recurring). Recharts
-  forecast chart with baseline + scenario overlay. Goal diff cards
-  with direction pills (sooner / later / hypo / unreachable).
-  Scenario header with selector + Save + Delete via existing scenario
-  CRUD actions. Empty + first-time states. Responsive single-column
-  collapse below md. 116 vitest tests (94 + 22 new for index-based
-  override helpers). UI is a starting hypothesis — expected to be
-  refined in use.
-- **Phase 4-B2 — AI coaching narrative** (2026-05-05) — `<NarrativePanel>`
-  on `/simulator` powered by Anthropic Haiku 4.5 via existing client.
-  Cache-first via `forecast_narrative` table (keyed on
-  `(scenarioId, sha256(overrides + history fingerprint))`). Two server
-  actions: `lookupForecastNarrative` (cache-only) and
-  `generateForecastNarrativeAction` (cache-first then LLM, stale-fallback
-  on failure). Pure prompt builder + history fingerprint with vitest
-  coverage (133 total, +17 new). Panel suppressed on baseline /
-  no-overrides / dirty unsaved state. Phase 4 milestone complete.
+- **Phase 4-B — Simulator UI + AI coaching** (2026-05-05) —
+  `/simulator` page over Plan A's engine: 7-section override editor,
+  Recharts baseline+scenario overlay, goal diff cards (sooner /
+  later / hypo / unreachable), scenario CRUD via existing actions.
+  `<NarrativePanel>` powered by Anthropic Haiku 4.5; cache-first via
+  `forecast_narrative` keyed on `(scenarioId, sha256(overrides +
+  history fingerprint))`. Stale-fallback on LLM failure. Panel
+  suppressed on baseline / no-overrides / dirty unsaved. 133 vitest
+  tests at end of Phase 4.
+
+- **Phase 6 — UI redesign + polish** (2026-05-05) — full visual +
+  IA rework against `docs/superpowers/specs/2026-05-05-foothold-redesign-design.md`.
+  Sub-phases: 6.1 foundation (editorial tokens, sonner + cmdk +
+  framer-motion, top-bar shell with sync pill + ⌘K trigger,
+  sidebar restyle); 6.2 dashboard card-newsfeed (hero gradient
+  + sparkline, split card, drift/goals row/upcoming/insight/recent
+  cards); 6.3 transactions operator-tier (mono table, j/k/⌘↑/⌘↓//
+  keyboard nav, ⌘K palette with transaction search); 6.4
+  investments operator-tier (flat-default holdings, group-by toggle,
+  3-cell summary). Plus: streaming loading.tsx skeletons, framer-
+  motion stagger on /dashboard, editorial empty states, multi-select
+  + bulk re-categorize on /transactions (`categoryOverrideId` FK +
+  cmdk picker), visual refresh of /drift /goals /insights /recurring
+  (IA preserved; per-page IA rework deferred). 134 vitest tests.
 
 ### In progress
 - **Plaid Production access review** — submitted 2026-05-01 + Q9
@@ -243,6 +280,18 @@ handler's own 401 — body shape reveals which layer fired.
   paste fresh secret, update Vercel env, reconnect via `/settings`.
   `linkTokenCreate` doesn't pass `redirect_uri` — fine for non-OAuth
   banks, breaks Chase / Cap One until configured.
+- **Per-page IA reworks** for /drift, /insights, /goals, /recurring
+  — Phase 6 shipped a visual refresh; the underlying IA on these
+  surfaces is still legacy. Each is roughly phase-sized. /insights
+  is the highest-leverage candidate (narrative is the value prop;
+  current page is a single Card).
+- **Dark-mode visual sweep** — tokens defined in 6.1 and parity-
+  mapped in `:root` / `.dark`, but the dark variant has never been
+  walked through against the new editorial chrome.
+- **Mobile-first responsive audit** — current design works at small
+  widths via reflow, but no surface has been deliberately designed
+  for mobile. Sidebar collapse → Sheet drawer (vaul) is the obvious
+  starter.
 - **Phase 3-pt3** — per-goal coaching detail page (defer until real
   data flows)
 - **Phase 4-pt2** — investment what-if simulator (deferred from Phase
