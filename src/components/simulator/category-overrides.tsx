@@ -6,6 +6,7 @@ import {
   removeItem,
   updateItem,
 } from '@/lib/forecast/override-helpers';
+import { formatCurrency } from '@/lib/utils';
 import type { ScenarioOverrides } from '@/lib/forecast/types';
 
 type Props = {
@@ -24,34 +25,43 @@ export function CategoryOverrides({ value, onChange, knownCategories }: Props) {
     <div className="space-y-2">
       {items.map((item) => {
         const cat = knownCategories.find((c) => c.id === item.categoryId);
+        const annual = item.monthlyDelta * 12;
         return (
-          <div key={item.categoryId} className="flex items-center gap-2">
-            <span className="flex-1 text-foreground">{cat?.name ?? item.categoryId}</span>
-            <span className="text-muted-foreground">$</span>
-            <input
-              type="number"
-              value={item.monthlyDelta}
-              onChange={(e) =>
-                onChange(
-                  updateItem(
-                    items,
-                    (i) => i.categoryId === item.categoryId,
-                    { monthlyDelta: Number(e.target.value) },
-                  ),
-                )
-              }
-              className="w-24 bg-background border border-border rounded px-2 py-1 text-right text-foreground"
-            />
-            <span className="text-muted-foreground text-xs">/mo</span>
-            <button
-              onClick={() =>
-                onChange(removeItem(items, (i) => i.categoryId === item.categoryId))
-              }
-              className="p-1 text-muted-foreground hover:text-destructive"
-              aria-label="Remove"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
+          <div key={item.categoryId} className="space-y-0.5">
+            <div className="flex items-center gap-2">
+              <span className="flex-1 text-foreground">{cat?.name ?? item.categoryId}</span>
+              <span className="text-muted-foreground">$</span>
+              <input
+                type="number"
+                value={item.monthlyDelta === 0 ? '' : item.monthlyDelta}
+                placeholder="0"
+                onChange={(e) =>
+                  onChange(
+                    updateItem(
+                      items,
+                      (i) => i.categoryId === item.categoryId,
+                      { monthlyDelta: Number(e.target.value) },
+                    ),
+                  )
+                }
+                className="w-24 bg-background border border-border rounded px-2 py-1 text-right text-foreground"
+              />
+              <span className="text-muted-foreground text-xs">/mo</span>
+              <button
+                onClick={() =>
+                  onChange(removeItem(items, (i) => i.categoryId === item.categoryId))
+                }
+                className="p-1 text-muted-foreground hover:text-destructive"
+                aria-label="Remove"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            {annual !== 0 && (
+              <div className="text-[11px] text-muted-foreground pl-1">
+                {formatCurrency(annual, { signed: true })}/yr
+              </div>
+            )}
           </div>
         );
       })}

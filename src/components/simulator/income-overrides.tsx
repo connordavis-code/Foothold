@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCurrency } from '@/lib/utils';
 import type { ScenarioOverrides } from '@/lib/forecast/types';
 
 type Props = {
@@ -26,7 +27,8 @@ export function IncomeOverrides({ value, onChange, availableMonths }: Props) {
         <span className="text-muted-foreground">Monthly Δ $</span>
         <input
           type="number"
-          value={value.monthlyDelta}
+          value={value.monthlyDelta === 0 ? '' : value.monthlyDelta}
+          placeholder="0"
           onChange={(e) => onChange({ ...value, monthlyDelta: Number(e.target.value) })}
           className="flex-1 bg-background border border-border rounded px-2 py-1 text-right text-foreground"
         />
@@ -37,6 +39,11 @@ export function IncomeOverrides({ value, onChange, availableMonths }: Props) {
           remove
         </button>
       </div>
+      {value.monthlyDelta !== 0 && (
+        <div className="text-[11px] text-muted-foreground pl-1">
+          {formatCurrency(value.monthlyDelta * 12, { signed: true })}/yr
+        </div>
+      )}
       <div className="flex items-center gap-2 text-xs">
         <span className="text-muted-foreground">From</span>
         <select

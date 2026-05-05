@@ -2,7 +2,16 @@
 
 import { X } from 'lucide-react';
 import { addItem, removeItemAt, updateItemAt } from '@/lib/forecast/override-helpers';
+import { formatCurrency } from '@/lib/utils';
 import type { ForecastHistory, ScenarioOverrides } from '@/lib/forecast/types';
+
+// 52w/y, 26 biweeklies/y, 12 months/y. Used to annualize amounts for the
+// inline impact preview shown under each recurring row.
+const cadenceFreq: Record<'weekly' | 'biweekly' | 'monthly', number> = {
+  weekly: 52,
+  biweekly: 26,
+  monthly: 12,
+};
 
 type RecurringChange = NonNullable<ScenarioOverrides['recurringChanges']>[number];
 
@@ -46,6 +55,30 @@ export function RecurringOverrides({ value, onChange, baseStreams }: Props) {
         cadence: 'monthly',
       }),
     );
+  };
+
+  // Annualized cash impact in dollars; positive = good for cash, negative =
+  // bad. pause flips sign (pausing an outflow → cash IN). edit/add are
+  // already signed by direction. null = not enough info to estimate.
+  const impactPerYear = (item: RecurringChange): number | null => {
+    const cadence = item.cadence ?? 'monthly';
+    const freq = cadenceFreq[cadence];
+    const stream = item.streamId
+      ? baseStreams.find((s) => s.id === item.streamId)
+      : null;
+    if (item.action === 'pause' && stream) {
+      const sign = stream.direction === 'outflow' ? +1 : -1;
+      return sign * stream.amount * cadenceFreq[stream.cadence];
+    }
+    if (item.action === 'edit' && stream && item.amount !== undefined) {
+      const sign = stream.direction === 'inflow' ? +1 : -1;
+      return sign * (item.amount - stream.amount) * freq;
+    }
+    if (item.action === 'add' && item.amount !== undefined) {
+      const sign = item.direction === 'inflow' ? +1 : -1;
+      return sign * item.amount * freq;
+    }
+    return null;
   };
 
   return (
@@ -149,6 +182,16 @@ export function RecurringOverrides({ value, onChange, baseStreams }: Props) {
               </div>
             </>
           )}
+
+          {(() => {
+            const annual = impactPerYear(item);
+            if (annual === null || annual === 0) return null;
+            return (
+              <div className="text-[11px] text-muted-foreground pt-0.5">
+                {formatCurrency(annual, { signed: true })}/yr
+              </div>
+            );
+          })()}
         </div>
       ))}
 
