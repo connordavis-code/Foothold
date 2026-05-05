@@ -20,6 +20,12 @@ const DEFAULT_HORIZON = 12;
  * Override application order (see spec §5.2) matters for mental modeling
  * but does NOT cause mathematical conflicts — each step targets a
  * different part of the model.
+ *
+ * @param input.currentMonth — Caller-supplied (YYYY-MM). The engine never
+ *   reads system time; this preserves purity and determinism.
+ * @returns ProjectionResult where `endCash` may be negative — callers
+ *   MUST NOT sanitize. A scenario that projects you running out of cash
+ *   is exactly what the simulator is supposed to surface (see spec §5.3).
  */
 export function projectCash(input: ProjectCashInput): ProjectionResult {
   const { history, overrides, currentMonth } = input;
