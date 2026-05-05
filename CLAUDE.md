@@ -203,6 +203,14 @@ handler's own 401 — body shape reveals which layer fired.
   (`buildDigestSubject`, `isPublicApiPath`,
   `shouldLogWebhookVerificationFailure`) so tests don't need a DB or
   Next.js runtime. `npm test` runs in ~400ms.
+- **Phase 4-A — Predictive engine + persistence + sidebar grouping**
+  (2026-05-04) — pure `projectCash()` engine in `src/lib/forecast/`
+  composing baseline (recurring + trailing 3-month median) with 5
+  override appliers + goal projection in deterministic order. 67 new
+  vitest tests (94 total). New `scenario` + `forecast_narrative`
+  tables; scenario CRUD server actions with zod validation. Sidebar
+  reorganized into Today / Plan / Records groups; brand "Finance" →
+  "Foothold". `/simulator` page builds in Plan B.
 
 ### In progress
 - **Plaid Production access review** — submitted 2026-05-01 + Q9
@@ -211,6 +219,12 @@ handler's own 401 — body shape reveals which layer fired.
   webhook E2E — wipe before flipping `PLAID_ENV=production`.
 
 ### Next up
+- **Phase 4-B — Simulator UI + AI narration** — builds `/simulator`
+  page on top of Plan A's engine. Includes the override editor (7
+  collapsible sections), forecast chart (Recharts), goal diff cards,
+  AI coaching narrative via Anthropic Haiku 4.5 with caching. Spec:
+  `docs/superpowers/specs/2026-05-04-phase-4-predictive-layer-design.md`
+  (UI in §6 v3 balanced; AI in §7).
 - **Verify sender domain** — confirm `AUTH_EMAIL_FROM` in Vercel env
   is the custom domain (`noreply@usefoothold.com`) not the Resend
   sandbox sender (`onboarding@resend.dev`). The 14:00 UTC May 5
@@ -221,7 +235,8 @@ handler's own 401 — body shape reveals which layer fired.
   banks, breaks Chase / Cap One until configured.
 - **Phase 3-pt3** — per-goal coaching detail page (defer until real
   data flows)
-- **Phase 4** — predictive layer (forecasts, what-if simulator)
+- **Phase 4-pt2** — investment what-if simulator (deferred from Phase
+  4 by design; needs its own brainstorm focused on modeling depth).
 
 ---
 
