@@ -1,6 +1,7 @@
 import { ArrowRight, Pencil, Plus, Target } from 'lucide-react';
 import Link from 'next/link';
 import { auth } from '@/auth';
+import { DeleteGoalButton } from '@/components/goals/delete-goal-button';
 import {
   ProgressBar,
   spendCapTone,
@@ -10,7 +11,6 @@ import {
   type GoalWithProgress,
   getGoalsWithProgress,
 } from '@/lib/db/queries/goals';
-import { deleteGoal } from '@/lib/goals/actions';
 import { cn, formatCurrency, formatPercent } from '@/lib/utils';
 
 export default async function GoalsPage() {
@@ -50,7 +50,6 @@ export default async function GoalsPage() {
 }
 
 function GoalTile({ goal }: { goal: GoalWithProgress }) {
-  const deleteAction = deleteGoal.bind(null, goal.id);
   return (
     <article className="space-y-4 rounded-card border border-border bg-surface-elevated p-5 sm:p-6">
       <header className="flex items-start justify-between gap-3">
@@ -67,16 +66,7 @@ function GoalTile({ goal }: { goal: GoalWithProgress }) {
               <Pencil className="h-3.5 w-3.5" />
             </Link>
           </Button>
-          <form action={deleteAction}>
-            <Button
-              type="submit"
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground hover:text-destructive"
-            >
-              Delete
-            </Button>
-          </form>
+          <DeleteGoalButton goalId={goal.id} goalName={goal.name} />
         </div>
       </header>
 
