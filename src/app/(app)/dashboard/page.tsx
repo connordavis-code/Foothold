@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight, Mountain } from 'lucide-react';
 import { auth } from '@/auth';
 import { Button } from '@/components/ui/button';
 import { DriftFlagsCard } from '@/components/dashboard/drift-flags-card';
@@ -124,7 +124,7 @@ function EmptyState() {
     <div className="mx-auto max-w-2xl px-4 py-16 sm:px-8 sm:py-24">
       <div className="space-y-6 text-center">
         <span className="mx-auto grid h-14 w-14 place-items-center rounded-pill bg-gradient-hero text-white shadow-sm">
-          <Sparkles className="h-6 w-6" />
+          <Mountain className="h-6 w-6" />
         </span>
         <div className="space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight">

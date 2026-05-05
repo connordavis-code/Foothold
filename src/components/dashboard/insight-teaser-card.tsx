@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight, BookOpen } from 'lucide-react';
 import type { Insight } from '@/lib/db/schema';
 import { firstSentence } from '@/lib/utils/first-sentence';
 
@@ -22,7 +22,7 @@ export function InsightTeaserCard({ insight }: Props) {
     <section className="rounded-card border border-border bg-surface-elevated p-5 sm:p-6">
       <div className="flex items-start gap-4">
         <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-pill bg-accent text-foreground/80">
-          <Sparkles className="h-4 w-4" />
+          <BookOpen className="h-4 w-4" />
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-eyebrow">

@@ -1,4 +1,4 @@
-import { Sparkles } from 'lucide-react';
+import { Newspaper } from 'lucide-react';
 import { auth } from '@/auth';
 import {
   getInsightForWeek,
@@ -107,14 +107,14 @@ function EmptyState() {
   return (
     <div className="rounded-card border border-border bg-surface-elevated p-8 text-center sm:p-12">
       <span className="mx-auto grid h-14 w-14 place-items-center rounded-pill bg-gradient-hero text-white">
-        <Sparkles className="h-6 w-6" />
+        <Newspaper className="h-6 w-6" />
       </span>
       <h2 className="mt-5 text-lg font-semibold tracking-tight">
-        No insights yet
+        First read coming up
       </h2>
       <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-        Generate to see Claude's read on the last 7 days — spending, goal
-        pace, recurring outflows — alongside the underlying numbers.
+        Generate to see Claude&apos;s read on the last 7 days — spending,
+        goal pace, recurring outflows — alongside the underlying numbers.
       </p>
     </div>
   );
