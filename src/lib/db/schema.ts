@@ -470,6 +470,14 @@ export const errorLog = pgTable(
   }),
 );
 
+/**
+ * Named what-if scenarios for the cash forecast simulator (Phase 4).
+ *
+ * Each scenario is a persistent override bag — a JSON object that the
+ * forecast engine layers on top of the user's baseline projection.
+ * Baseline = absence of overrides (no `is_baseline` flag, intentional).
+ * The user can save and reload scenarios to compare decisions over time.
+ */
 export const scenarios = pgTable(
   'scenario',
   {
@@ -486,13 +494,23 @@ export const scenarios = pgTable(
     updatedAt: ts('updated_at').notNull().defaultNow(),
   },
   (t) => ({
-    userUpdatedIdx: index().on(t.userId, t.updatedAt.desc()),
+    userUpdatedIdx: index('scenario_user_updated_at_idx').on(t.userId, t.updatedAt.desc()),
   }),
 );
 
 export type Scenario = typeof scenarios.$inferSelect;
 export type ScenarioInsert = typeof scenarios.$inferInsert;
 
+/**
+ * AI-generated coaching narrative cache for forecast scenarios (Phase 4).
+ *
+ * `inputHash` is a SHA-256 of the prompt input (serialized overrides +
+ * a history fingerprint truncated to today's date). Re-rendering the same
+ * scenario on the same day → cache hit. Editing overrides or new
+ * transactions syncing → hash changes → cache miss → regenerate.
+ *
+ * Unique on (scenarioId, inputHash). Cascade-deletes with the scenario.
+ */
 export const forecastNarratives = pgTable(
   'forecast_narrative',
   {
@@ -510,11 +528,12 @@ export const forecastNarratives = pgTable(
     generatedAt: ts('generated_at').notNull().defaultNow(),
   },
   (t) => ({
-    scenarioHashIdx: uniqueIndex().on(t.scenarioId, t.inputHash),
+    scenarioHashIdx: uniqueIndex('forecast_narrative_scenario_hash_idx').on(t.scenarioId, t.inputHash),
   }),
 );
 
 export type ForecastNarrative = typeof forecastNarratives.$inferSelect;
+export type ForecastNarrativeInsert = typeof forecastNarratives.$inferInsert;
 
 // =============================================================================
 // Type exports — convenient for queries
