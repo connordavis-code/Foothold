@@ -21,10 +21,11 @@ export function LumpSumOverrides({ value, onChange, availableMonths }: Props) {
   const items = value ?? [];
 
   const addNew = () => {
+    // amount: 0 is the deliberate no-op default; the user fills it in.
     onChange(
       addItem(items, {
         id: newLumpId(),
-        label: 'Lump sum',
+        label: '',
         amount: 0,
         month: availableMonths[0] ?? '2026-01',
       }),
@@ -60,7 +61,11 @@ export function LumpSumOverrides({ value, onChange, availableMonths }: Props) {
             </select>
             <input
               type="number"
-              value={item.amount}
+              // Show placeholder when amount is 0 so an unfilled stub is
+              // visually distinct from a deliberate $0. lumpSums.amount has
+              // no zod sign constraint (it's signed) so we don't clamp here.
+              value={item.amount === 0 ? '' : item.amount}
+              placeholder="0"
               onChange={(e) =>
                 onChange(updateItem(items, (i) => i.id === item.id, { amount: Number(e.target.value) }))
               }

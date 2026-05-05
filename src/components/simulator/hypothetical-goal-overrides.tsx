@@ -45,7 +45,8 @@ export function HypotheticalGoalOverrides({ value, onChange }: Props) {
             <input
               type="number"
               min={0}
-              value={item.targetAmount}
+              value={item.targetAmount === 0 ? '' : item.targetAmount}
+              placeholder="0"
               onChange={(e) =>
                 onChange(updateItem(items, (i) => i.id === item.id, {
                   targetAmount: Math.max(0, Number(e.target.value)) || 0,
@@ -57,7 +58,12 @@ export function HypotheticalGoalOverrides({ value, onChange }: Props) {
             <input
               type="number"
               min={0}
-              value={item.monthlyContribution ?? 0}
+              value={
+                item.monthlyContribution === 0 || item.monthlyContribution === undefined
+                  ? ''
+                  : item.monthlyContribution
+              }
+              placeholder="0"
               onChange={(e) =>
                 onChange(updateItem(items, (i) => i.id === item.id, {
                   monthlyContribution: Math.max(0, Number(e.target.value)) || 0,
@@ -71,11 +77,15 @@ export function HypotheticalGoalOverrides({ value, onChange }: Props) {
       ))}
       <button
         onClick={() =>
+          // Stub a hypothetical with zeros so the projection is untouched
+          // until the user fills it in. zod requires targetAmount > 0 on save,
+          // so an unfilled stub will be flagged at save-time rather than
+          // silently distorting the forecast.
           onChange(addItem(items, {
             id: newGoalId(),
-            name: 'New goal',
-            targetAmount: 1000,
-            monthlyContribution: 100,
+            name: '',
+            targetAmount: 0,
+            monthlyContribution: 0,
           }))
         }
         className="w-full text-left text-muted-foreground hover:text-foreground bg-background border border-dashed border-border rounded px-2 py-1.5"

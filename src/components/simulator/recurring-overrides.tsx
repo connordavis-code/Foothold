@@ -34,11 +34,14 @@ export function RecurringOverrides({ value, onChange, baseStreams }: Props) {
     );
   };
   const addNew = () => {
+    // Default amount of 0 makes a freshly-added stub a no-op until the user
+    // sets it — better than silently injecting an arbitrary $100/mo into
+    // their projection if they forget to fill it in.
     onChange(
       addItem(items, {
         action: 'add',
-        label: 'New stream',
-        amount: 100,
+        label: '',
+        amount: 0,
         direction: 'outflow',
         cadence: 'monthly',
       }),
@@ -98,7 +101,8 @@ export function RecurringOverrides({ value, onChange, baseStreams }: Props) {
                 <input
                   type="number"
                   min={0}
-                  value={item.amount ?? 0}
+                  value={item.amount === 0 ? '' : (item.amount ?? '')}
+                  placeholder="0"
                   onChange={(e) =>
                     // Recurring streams use a `direction` column for sign;
                     // amounts are magnitudes (zod: nonnegative). Clamp to ≥0
