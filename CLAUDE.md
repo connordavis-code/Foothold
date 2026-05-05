@@ -13,14 +13,15 @@ recurring outflows, and goal progress with EOM projections.
 
 **Stack:** Next.js 14 (App Router) · TypeScript · Drizzle ORM · Supabase
 Postgres · Auth.js v5 (magic-link via Resend) · Plaid · Tailwind +
-shadcn/ui · Recharts. No test runner yet.
+shadcn/ui · Recharts · Vitest.
 
 ---
 
 ## Commands
 
 - `npm run dev` — local dev at http://localhost:3000
-- `npm run typecheck` / `lint` / `build`
+- `npm run typecheck` / `lint` / `build` / `test`
+- `npm run test:watch` — Vitest watch mode
 - `npm run db:push` — push schema to Supabase (uses `DIRECT_DATABASE_URL`)
 - `npm run db:studio` — Drizzle Studio
 
@@ -195,6 +196,13 @@ handler's own 401 — body shape reveals which layer fired.
   findings post-merge: webhook DoS amplification, digest contract bugs
   (subject ignored warnings; insight had no missed-Monday branch),
   plus 5 nits.
+- **Test infrastructure** (2026-05-04, commit `5adf667`) — Vitest 4
+  with `@/` path resolution; 27 tests covering 4 of the 7 ultrareview
+  findings as regressions plus baseline `formatCurrency`/`formatPercent`
+  smoke tests. Pure predicates extracted from route handlers
+  (`buildDigestSubject`, `isPublicApiPath`,
+  `shouldLogWebhookVerificationFailure`) so tests don't need a DB or
+  Next.js runtime. `npm test` runs in ~400ms.
 
 ### In progress
 - **Plaid Production access review** — submitted 2026-05-01 + Q9
@@ -203,11 +211,10 @@ handler's own 401 — body shape reveals which layer fired.
   webhook E2E — wipe before flipping `PLAID_ENV=production`.
 
 ### Next up
-- **Verify Phase 5 deploy health** — (a) Vercel tier (Pro needed for
-  4×-daily; first digest reported `Balance refresh: 1/4 ⚠` — could be
-  Hobby OR partial window). (b) Confirm `AUTH_EMAIL_FROM` in Vercel is
-  custom domain not sandbox sender. First natural digest 14:00 UTC
-  May 5 will tell.
+- **Verify sender domain** — confirm `AUTH_EMAIL_FROM` in Vercel env
+  is the custom domain (`noreply@usefoothold.com`) not the Resend
+  sandbox sender (`onboarding@resend.dev`). The 14:00 UTC May 5
+  digest's From header will tell.
 - **Reconnect once Plaid approved** — flip `PLAID_ENV=production`,
   paste fresh secret, update Vercel env, reconnect via `/settings`.
   `linkTokenCreate` doesn't pass `redirect_uri` — fine for non-OAuth
