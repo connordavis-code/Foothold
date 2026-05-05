@@ -1,4 +1,5 @@
 import { signOut } from '@/auth';
+import { PaletteTrigger } from '@/components/command-palette/palette-trigger';
 import { getSyncStatus } from '@/lib/db/queries/sync';
 import { PageTitle } from './page-title';
 import { SyncPill } from './sync-pill';
@@ -12,11 +13,12 @@ type Props = {
 /**
  * Sticky top bar. Composes:
  *  - Left: page title (resolved client-side from pathname)
+ *  - Center: ⌘K command-palette trigger (search-styled button)
  *  - Right: sync pill + user avatar dropdown
  *
  * Server component so the sync-status query runs on the request, not the
- * client. The middle (⌘K palette trigger) is reserved for Phase 6.2 — a
- * placeholder spacer keeps the layout stable when it lands.
+ * client. The palette itself is mounted globally by the layout's
+ * <CommandPaletteProvider>; the trigger here just opens it.
  */
 export async function TopBar({ userId, email }: Props) {
   const status = await getSyncStatus(userId);
@@ -31,13 +33,19 @@ export async function TopBar({ userId, email }: Props) {
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-background/85 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/70 md:px-6">
-      <PageTitle />
-      <div className="flex-1" aria-hidden />
-      <SyncPill
-        lastSyncedAt={status.lastSyncedAt?.toISOString() ?? null}
-        reauthCount={status.reauthCount}
-      />
-      <UserMenu email={email} signOutAction={handleSignOut} />
+      <div className="shrink-0">
+        <PageTitle />
+      </div>
+      <div className="flex flex-1 justify-center px-2">
+        <PaletteTrigger />
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <SyncPill
+          lastSyncedAt={status.lastSyncedAt?.toISOString() ?? null}
+          reauthCount={status.reauthCount}
+        />
+        <UserMenu email={email} signOutAction={handleSignOut} />
+      </div>
     </header>
   );
 }
