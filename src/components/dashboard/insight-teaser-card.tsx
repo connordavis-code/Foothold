@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowRight, Sparkles } from 'lucide-react';
 import type { Insight } from '@/lib/db/schema';
+import { firstSentence } from '@/lib/utils/first-sentence';
 
 type Props = {
   insight: Insight | null;
@@ -41,26 +42,4 @@ export function InsightTeaserCard({ insight }: Props) {
       </div>
     </section>
   );
-}
-
-/**
- * Pull the first sentence from the narrative. Uses a conservative
- * boundary (period+space, or first newline) — narrative is markdown but
- * we don't render formatting in the teaser, just the lede.
- */
-function firstSentence(narrative: string): string | null {
-  const trimmed = narrative.trim();
-  if (!trimmed) return null;
-  // Split on first `. ` or newline. The dot-space rule keeps "U.S." intact
-  // for now (rare in finance copy); newline rule catches markdown headers.
-  const periodIdx = trimmed.indexOf('. ');
-  const newlineIdx = trimmed.indexOf('\n');
-  let cut = -1;
-  if (periodIdx > 0 && (newlineIdx === -1 || periodIdx < newlineIdx)) {
-    cut = periodIdx + 1;
-  } else if (newlineIdx > 0) {
-    cut = newlineIdx;
-  }
-  if (cut === -1) return trimmed.slice(0, 200);
-  return trimmed.slice(0, cut);
 }
