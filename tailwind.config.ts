@@ -53,15 +53,34 @@ const config: Config = {
           DEFAULT: 'hsl(var(--negative))',
           foreground: 'hsl(var(--negative-foreground))',
         },
+        // Editorial surfaces — warm canvas / elevated card / sunken row
+        'surface-paper': 'hsl(var(--surface-paper))',
+        'surface-elevated': 'hsl(var(--surface-elevated))',
+        'surface-sunken': 'hsl(var(--surface-sunken))',
       },
       borderRadius: {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
+        card: 'var(--radius-card)',
+        pill: 'var(--radius-pill)',
+      },
+      backgroundImage: {
+        'gradient-hero': 'var(--gradient-hero)',
+      },
+      transitionTimingFunction: {
+        'out-quart': 'var(--ease-out-quart)',
+        'in-out-quart': 'var(--ease-in-out-quart)',
+      },
+      transitionDuration: {
+        fast: 'var(--motion-fast)',
+        base: 'var(--motion-base)',
+        slow: 'var(--motion-slow)',
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
         mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
+        serif: ['var(--font-serif)', 'ui-serif', 'Georgia', 'serif'],
       },
       keyframes: {
         'accordion-down': {

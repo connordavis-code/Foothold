@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter, JetBrains_Mono } from 'next/font/google';
+import { Inter, JetBrains_Mono, Source_Serif_4 } from 'next/font/google';
 import './globals.css';
 
 const inter = Inter({
@@ -14,8 +14,16 @@ const jetbrainsMono = JetBrains_Mono({
   display: 'swap',
 });
 
+// Editorial accent — used in narrative surfaces (insights, pull quotes).
+// Loaded globally so any component can opt in via `font-serif`.
+const sourceSerif = Source_Serif_4({
+  subsets: ['latin'],
+  variable: '--font-serif',
+  display: 'swap',
+});
+
 export const metadata: Metadata = {
-  title: 'Finance',
+  title: 'Foothold',
   description:
     'Personal finance — tracking, investments, goals, and recommendations.',
 };
@@ -28,7 +36,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased min-h-screen bg-background text-foreground`}
+        className={`${inter.variable} ${jetbrainsMono.variable} ${sourceSerif.variable} font-sans antialiased min-h-screen bg-background text-foreground`}
       >
         {children}
       </body>

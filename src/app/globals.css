@@ -30,6 +30,23 @@
     --positive-foreground: 0 0% 100%;
     --negative: 0 72% 51%;
     --negative-foreground: 0 0% 100%;
+
+    /* Editorial surface scale — warm canvas behind card-feed pages */
+    --surface-paper: 60 33% 97%;
+    --surface-elevated: 0 0% 100%;
+    --surface-sunken: 60 20% 94%;
+    --gradient-hero: linear-gradient(
+      135deg,
+      hsl(160 40% 18%) 0%,
+      hsl(160 30% 28%) 100%
+    );
+    --radius-card: 0.75rem;
+    --radius-pill: 9999px;
+    --motion-fast: 100ms;
+    --motion-base: 200ms;
+    --motion-slow: 400ms;
+    --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+    --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
   }
 
   .dark {
@@ -57,6 +74,15 @@
     --positive-foreground: 0 0% 100%;
     --negative: 0 70% 60%;
     --negative-foreground: 0 0% 100%;
+
+    --surface-paper: 224 30% 6%;
+    --surface-elevated: 224 30% 9%;
+    --surface-sunken: 224 25% 11%;
+    --gradient-hero: linear-gradient(
+      135deg,
+      hsl(160 30% 22%) 0%,
+      hsl(160 25% 14%) 100%
+    );
   }
 }
 
