@@ -15,10 +15,10 @@ function makeProjection(months: string[]): MonthlyProjection[] {
 }
 
 describe('applyCategoryDeltas', () => {
-  it('returns input unchanged when no deltas are provided', () => {
+  it('returns input unchanged (same reference) when no deltas are provided', () => {
     const proj = makeProjection(['2026-05', '2026-06']);
     const result = applyCategoryDeltas(proj, undefined);
-    expect(result).toEqual(proj);
+    expect(result).toBe(proj);
   });
 
   it('reduces a category outflow by the delta amount across all months by default', () => {
@@ -78,5 +78,36 @@ describe('applyCategoryDeltas', () => {
     expect(result[0].byCategory.dining).toBe(0);
     expect(result[0].outflows).toBe(0);
     expect(result[0].endCash).toBe(1000);
+  });
+
+  it('increases outflow and decreases endCash for a positive delta', () => {
+    const proj = makeProjection(['2026-05', '2026-06']);
+    const result = applyCategoryDeltas(proj, [
+      { categoryId: 'dining', monthlyDelta: 200 },
+    ]);
+    // Month 0: byCategory.dining 100 → 300, outflows 100 → 300, endCash 1000 + 0 - 300 = 700
+    expect(result[0].byCategory.dining).toBe(300);
+    expect(result[0].outflows).toBe(300);
+    expect(result[0].endCash).toBe(700);
+    // Month 1 chains: startCash = 700 (from month 0 endCash), endCash = 700 + 0 - 300 = 400
+    expect(result[1].startCash).toBe(700);
+    expect(result[1].endCash).toBe(400);
+  });
+
+  it('returns an empty array unchanged when projection is empty', () => {
+    const result = applyCategoryDeltas([], [
+      { categoryId: 'dining', monthlyDelta: -50 },
+    ]);
+    expect(result).toEqual([]);
+  });
+
+  it('applies multiple deltas on the same category cumulatively', () => {
+    const proj = makeProjection(['2026-05']);
+    const result = applyCategoryDeltas(proj, [
+      { categoryId: 'dining', monthlyDelta: 50 },   // 100 → 150
+      { categoryId: 'dining', monthlyDelta: -30 },  // 150 → 120
+    ]);
+    expect(result[0].byCategory.dining).toBe(120);
+    expect(result[0].outflows).toBe(120);
   });
 });
