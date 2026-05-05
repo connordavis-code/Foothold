@@ -129,6 +129,26 @@ describe('buildForecastPrompt', () => {
     expect(prompt).toContain('2029-03');
   });
 
+  it('resolves goalTargetEdits goalId to goal name from history', () => {
+    const overrides: ScenarioOverrides = {
+      goalTargetEdits: [
+        { goalId: 'ef', newMonthlyContribution: 700 },
+        { goalId: 'unknown-goal-id', newTargetAmount: 5_000 },
+      ],
+    };
+    const prompt = buildForecastPrompt({
+      history: baseHistory,
+      overrides,
+      baselineProjection: flat(['2026-05']),
+      scenarioProjection: flat(['2026-05']),
+      goalImpacts: [],
+    });
+    // known id → human name
+    expect(prompt).toContain('Emergency fund (contribution → $700/mo)');
+    // unknown id → falls back to raw id (still readable, doesn't crash)
+    expect(prompt).toContain('unknown-goal-id (target → $5,000)');
+  });
+
   it('omits SCENARIO OVERRIDES section when no overrides are active', () => {
     const prompt = buildForecastPrompt({
       history: baseHistory,

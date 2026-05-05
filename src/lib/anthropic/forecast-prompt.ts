@@ -120,11 +120,12 @@ function buildOverridesSection(
 
   if (overrides.goalTargetEdits?.length) {
     const items = overrides.goalTargetEdits.map((e) => {
+      const goal = history.goals.find((g) => g.id === e.goalId);
       const parts: string[] = [];
       if (e.newTargetAmount !== undefined) parts.push(`target → ${money(e.newTargetAmount)}`);
       if (e.newMonthlyContribution !== undefined)
         parts.push(`contribution → ${money(e.newMonthlyContribution)}/mo`);
-      return `${e.goalId} (${parts.join(', ')})`;
+      return `${goal?.name ?? e.goalId} (${parts.join(', ')})`;
     });
     lines.push(`- Goal edits: ${items.join(', ')}`);
   }
