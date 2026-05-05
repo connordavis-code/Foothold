@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { applyCategoryDeltas, applyIncomeDelta } from './apply-overrides';
-import type { MonthlyProjection } from './types';
+import { applyCategoryDeltas, applyIncomeDelta, applyRecurringChanges } from './apply-overrides';
+import type { MonthlyProjection, ForecastHistory } from './types';
 
 function makeProjection(months: string[]): MonthlyProjection[] {
   return months.map((month) => ({
@@ -109,6 +109,102 @@ describe('applyCategoryDeltas', () => {
     ]);
     expect(result[0].byCategory.dining).toBe(120);
     expect(result[0].outflows).toBe(120);
+  });
+});
+
+const baseStreams: ForecastHistory['recurringStreams'] = [
+  { id: 'rent', label: 'Rent', amount: 2000, direction: 'outflow', cadence: 'monthly', nextDate: '2026-05-01' },
+  { id: 'salary', label: 'Salary', amount: 5000, direction: 'inflow', cadence: 'monthly', nextDate: '2026-05-15' },
+];
+
+describe('applyRecurringChanges', () => {
+  it('returns input unchanged (same reference) when no changes', () => {
+    const proj = makeProjection(['2026-05']);
+    expect(applyRecurringChanges(proj, baseStreams, undefined)).toBe(proj);
+  });
+
+  it('pause action: removes a stream from all months', () => {
+    const proj: MonthlyProjection[] = [
+      { month: '2026-05', startCash: 1000, inflows: 5000, outflows: 2000, endCash: 4000, byCategory: {}, goalProgress: {} },
+    ];
+    const result = applyRecurringChanges(proj, baseStreams, [
+      { streamId: 'rent', action: 'pause' },
+    ]);
+    expect(result[0].outflows).toBe(0);
+    expect(result[0].endCash).toBe(6000);
+  });
+
+  it('edit action: modifies amount on a stream', () => {
+    const proj: MonthlyProjection[] = [
+      { month: '2026-05', startCash: 1000, inflows: 5000, outflows: 2000, endCash: 4000, byCategory: {}, goalProgress: {} },
+    ];
+    const result = applyRecurringChanges(proj, baseStreams, [
+      { streamId: 'rent', action: 'edit', amount: 1800 },
+    ]);
+    expect(result[0].outflows).toBe(1800);
+  });
+
+  it('add action: adds a hypothetical stream', () => {
+    const proj: MonthlyProjection[] = [
+      { month: '2026-05', startCash: 1000, inflows: 5000, outflows: 2000, endCash: 4000, byCategory: {}, goalProgress: {} },
+    ];
+    const result = applyRecurringChanges(proj, baseStreams, [
+      {
+        action: 'add',
+        label: 'Gym',
+        amount: 200,
+        direction: 'outflow',
+        cadence: 'monthly',
+      },
+    ]);
+    expect(result[0].outflows).toBe(2200);
+    expect(result[0].endCash).toBe(3800);
+  });
+
+  it('respects startMonth on pause/edit', () => {
+    const proj: MonthlyProjection[] = [
+      { month: '2026-05', startCash: 1000, inflows: 5000, outflows: 2000, endCash: 4000, byCategory: {}, goalProgress: {} },
+      { month: '2026-06', startCash: 4000, inflows: 5000, outflows: 2000, endCash: 7000, byCategory: {}, goalProgress: {} },
+    ];
+    const result = applyRecurringChanges(proj, baseStreams, [
+      { streamId: 'rent', action: 'pause', startMonth: '2026-06' },
+    ]);
+    expect(result[0].outflows).toBe(2000); // unchanged in May
+    expect(result[1].outflows).toBe(0);    // paused June
+  });
+
+  it('chains endCash forward when a pause spans multiple months', () => {
+    const proj: MonthlyProjection[] = [
+      { month: '2026-05', startCash: 1000, inflows: 5000, outflows: 2000, endCash: 4000, byCategory: {}, goalProgress: {} },
+      { month: '2026-06', startCash: 4000, inflows: 5000, outflows: 2000, endCash: 7000, byCategory: {}, goalProgress: {} },
+    ];
+    const result = applyRecurringChanges(proj, baseStreams, [
+      { streamId: 'rent', action: 'pause' },
+    ]);
+    // Month 0: outflows 0, endCash 1000 + 5000 - 0 = 6000
+    expect(result[0].endCash).toBe(6000);
+    // Month 1 chains: startCash 6000, outflows 0, endCash 6000 + 5000 - 0 = 11000
+    expect(result[1].startCash).toBe(6000);
+    expect(result[1].endCash).toBe(11000);
+  });
+
+  it('returns empty array unchanged when projection is empty', () => {
+    const result = applyRecurringChanges([], baseStreams, [
+      { streamId: 'rent', action: 'pause' },
+    ]);
+    expect(result).toEqual([]);
+  });
+
+  it('handles weekly/biweekly cadence with monthly equivalent', () => {
+    // baseline projection assumed monthly equivalents already computed.
+    // Adding a weekly $100 outflow should add ~433.3/mo.
+    const proj: MonthlyProjection[] = [
+      { month: '2026-05', startCash: 1000, inflows: 0, outflows: 0, endCash: 1000, byCategory: {}, goalProgress: {} },
+    ];
+    const result = applyRecurringChanges(proj, baseStreams, [
+      { action: 'add', label: 'Coffee', amount: 100, direction: 'outflow', cadence: 'weekly' },
+    ]);
+    expect(result[0].outflows).toBeCloseTo(433.3, 1);
   });
 });
 

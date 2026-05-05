@@ -1,4 +1,13 @@
-import type { MonthlyProjection, ScenarioOverrides } from './types';
+import type { ForecastHistory, MonthlyProjection, ScenarioOverrides } from './types';
+
+const monthlyEquivalent = (
+  amount: number,
+  cadence: 'weekly' | 'biweekly' | 'monthly',
+): number => {
+  if (cadence === 'weekly') return amount * 4.333;
+  if (cadence === 'biweekly') return amount * 2.167;
+  return amount;
+};
 
 /**
  * Apply category deltas. Positive delta = increase that category's outflow
@@ -73,6 +82,83 @@ export function applyIncomeDelta(
     const startCash = runningCash;
     const endCash = startCash + newInflows - month.outflows;
     result.push({ ...month, startCash, inflows: newInflows, endCash });
+    runningCash = endCash;
+  }
+
+  return result;
+}
+
+/**
+ * Apply pause / edit / add changes to recurring streams.
+ *
+ * Strategy: for each month, compute the (positive or negative) delta to
+ * inflows and outflows that the changes produce, then apply.
+ *   - pause: subtract the stream's monthly equivalent from its direction
+ *   - edit: subtract the original amount + add the new amount (both monthly equivalents)
+ *   - add: add the new stream's monthly equivalent
+ */
+export function applyRecurringChanges(
+  projection: MonthlyProjection[],
+  baseStreams: ForecastHistory['recurringStreams'],
+  changes: ScenarioOverrides['recurringChanges'],
+): MonthlyProjection[] {
+  if (!changes || changes.length === 0) return projection;
+
+  const baseById = new Map(baseStreams.map((s) => [s.id, s]));
+  const result: MonthlyProjection[] = [];
+  let runningCash = projection.length > 0 ? projection[0].startCash : 0;
+
+  for (const month of projection) {
+    let inflowDelta = 0;
+    let outflowDelta = 0;
+
+    for (const change of changes) {
+      const inRange =
+        (!change.startMonth || month.month >= change.startMonth) &&
+        (!change.endMonth || month.month <= change.endMonth);
+      if (!inRange) continue;
+
+      if (change.action === 'pause') {
+        const original = baseById.get(change.streamId ?? '');
+        if (!original) continue;
+        const orig = monthlyEquivalent(original.amount, original.cadence);
+        if (original.direction === 'outflow') outflowDelta -= orig;
+        else inflowDelta -= orig;
+      } else if (change.action === 'edit') {
+        const original = baseById.get(change.streamId ?? '');
+        if (!original) continue;
+        const orig = monthlyEquivalent(original.amount, original.cadence);
+        const newAmount = change.amount ?? original.amount;
+        const newCadence = change.cadence ?? original.cadence;
+        const newDirection = change.direction ?? original.direction;
+        const next = monthlyEquivalent(newAmount, newCadence);
+        // Remove original
+        if (original.direction === 'outflow') outflowDelta -= orig;
+        else inflowDelta -= orig;
+        // Add new
+        if (newDirection === 'outflow') outflowDelta += next;
+        else inflowDelta += next;
+      } else if (change.action === 'add') {
+        const next = monthlyEquivalent(
+          change.amount ?? 0,
+          change.cadence ?? 'monthly',
+        );
+        if (change.direction === 'outflow') outflowDelta += next;
+        else inflowDelta += next;
+      }
+    }
+
+    const newInflows = Math.max(0, month.inflows + inflowDelta);
+    const newOutflows = Math.max(0, month.outflows + outflowDelta);
+    const startCash = runningCash;
+    const endCash = startCash + newInflows - newOutflows;
+    result.push({
+      ...month,
+      startCash,
+      inflows: newInflows,
+      outflows: newOutflows,
+      endCash,
+    });
     runningCash = endCash;
   }
 
