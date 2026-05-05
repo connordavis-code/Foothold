@@ -160,4 +160,21 @@ describe('applyIncomeDelta', () => {
     const result = applyIncomeDelta([], { monthlyDelta: 500 });
     expect(result).toEqual([]);
   });
+
+  it('chains endCash correctly across a bounded range', () => {
+    const proj = makeProjection(['2026-05', '2026-06', '2026-07']);
+    const result = applyIncomeDelta(proj, {
+      monthlyDelta: 500,
+      startMonth: '2026-06',
+      endMonth: '2026-06',
+    });
+    // Month 0 (out of range): 1000 + 0 - 100 = 900
+    expect(result[0].endCash).toBe(900);
+    // Month 1 (in range): startCash 900, inflows 500, outflows 100 → 1300
+    expect(result[1].startCash).toBe(900);
+    expect(result[1].endCash).toBe(1300);
+    // Month 2 (out of range again): startCash 1300, inflows 0 → 1200
+    expect(result[2].startCash).toBe(1300);
+    expect(result[2].endCash).toBe(1200);
+  });
 });
