@@ -5,6 +5,7 @@ import {
   type PlaidWebhookEvent,
   verifyPlaidWebhook,
 } from '@/lib/plaid/webhook';
+import { shouldLogWebhookVerificationFailure } from '@/lib/plaid/webhook-flood-guard';
 
 // Force Node runtime: handlePlaidWebhook calls syncItem which uses the
 // postgres-js driver (Node TCP, not edge-safe).
@@ -25,11 +26,7 @@ export async function POST(request: NextRequest) {
 
   const ok = await verifyPlaidWebhook(rawBody, jwt);
   if (!ok) {
-    // Skip the DB write when no JWS header is present at all — that's
-    // the dominant anonymous-probe shape on a public endpoint, and
-    // logging each one would let any flood balloon error_log unbounded
-    // (route is exempt from the session gate; see middleware).
-    if (jwt) {
+    if (shouldLogWebhookVerificationFailure(jwt)) {
       await logError(
         'webhook.verification_failed',
         new Error('JWS verification failed'),

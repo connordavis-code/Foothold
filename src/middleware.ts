@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { isPublicApiPath } from '@/lib/middleware/public-paths';
 
 /**
  * Middleware: route protection only. Edge-safe — does not import Auth.js
@@ -41,12 +42,7 @@ export default function middleware(req: NextRequest) {
   const isLoggedIn = hasSessionCookie(req);
 
   const isApi = pathname.startsWith('/api');
-  // Match exact path or path-segment boundary, NOT bare prefix — otherwise
-  // a future `/api/cron-status` would silently inherit `/api/cron`'s public
-  // exemption (see CLAUDE.md "Don't add /api/* routes without exempting").
-  const isPublicApi = PUBLIC_API_PREFIXES.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`),
-  );
+  const isPublicApi = isPublicApiPath(pathname, PUBLIC_API_PREFIXES);
 
   const isAuthRoute =
     pathname === '/login' ||

@@ -1,6 +1,7 @@
 import { desc, gte } from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
 import { isAuthorizedCronRequest } from '@/lib/cron/auth';
+import { buildDigestSubject } from '@/lib/cron/digest-subject';
 import { db } from '@/lib/db';
 import { type ErrorLog, errorLog, users } from '@/lib/db/schema';
 import { env } from '@/lib/env';
@@ -69,24 +70,10 @@ export async function GET(request: NextRequest) {
   for (const user of userRows) {
     if (!user.email) continue;
     try {
-      // Subject line is the only part guaranteed to surface without an
-      // open — silence ≠ success means warnings (NOT SEEN, count short)
-      // must escape the body and ride the subject too.
-      const subjectParts: string[] = [];
-      if (errors.length > 0) {
-        subjectParts.push(
-          `${errors.length} error${errors.length === 1 ? '' : 's'}`,
-        );
-      }
-      if (warningCount > 0) {
-        subjectParts.push(
-          `${warningCount} warning${warningCount === 1 ? '' : 's'}`,
-        );
-      }
-      const subject =
-        subjectParts.length > 0
-          ? `Foothold digest — ${subjectParts.join(', ')}`
-          : 'Foothold digest — all clear';
+      const subject = buildDigestSubject({
+        errorCount: errors.length,
+        warningCount,
+      });
       const html = renderDigest(errors, runs, isMondayUtc);
 
       await sendEmail({
