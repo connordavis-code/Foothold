@@ -5,6 +5,8 @@ import type { Scenario } from '@/lib/db/schema';
 import { projectCash } from '@/lib/forecast/engine';
 import type { ForecastHistory, ScenarioOverrides } from '@/lib/forecast/types';
 import { ScenarioHeader } from '@/components/simulator/scenario-header';
+import { OverrideSection } from '@/components/simulator/override-section';
+import { CategoryOverrides } from '@/components/simulator/category-overrides';
 
 type Props = {
   history: ForecastHistory;
@@ -64,23 +66,43 @@ export function SimulatorClient({
         onSelect={handleSelectScenario}
       />
 
-      {/* Engine result debug — replaced in Wave 4 */}
-      <div className="bg-muted/40 border border-border rounded-lg p-4">
-        <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
-          Engine result (live)
+      <div className="grid grid-cols-[260px_1fr] gap-10">
+        {/* Left: override editor */}
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-3">
+            Overrides
+          </div>
+          <OverrideSection label="Categories" count={liveOverrides.categoryDeltas?.length ?? 0}>
+            <CategoryOverrides
+              value={liveOverrides.categoryDeltas}
+              onChange={(next) =>
+                setLiveOverrides((o) => ({ ...o, categoryDeltas: next }))
+              }
+              knownCategories={history.categories}
+            />
+          </OverrideSection>
+          {/* More sections in Tasks 8-13 */}
         </div>
-        <pre className="text-xs overflow-x-auto">
-          {JSON.stringify(
-            {
-              projectionMonths: engineResult.projection.length,
-              endCashMonth0: engineResult.projection[0]?.endCash,
-              goalImpacts: engineResult.goalImpacts,
-              isDirty,
-            },
-            null,
-            2,
-          )}
-        </pre>
+
+        {/* Right: debug for now (chart + cards in Wave 4) */}
+        <div>
+          <div className="bg-muted/40 border border-border rounded-lg p-4">
+            <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
+              Engine result (live)
+            </div>
+            <pre className="text-xs overflow-x-auto">
+              {JSON.stringify(
+                {
+                  projectionEndCash: engineResult.projection.map((m) => m.endCash),
+                  goalImpacts: engineResult.goalImpacts,
+                  liveOverrides,
+                },
+                null,
+                2,
+              )}
+            </pre>
+          </div>
+        </div>
       </div>
     </div>
   );
