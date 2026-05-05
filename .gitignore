@@ -46,3 +46,6 @@ next-env.d.ts
 
 # claude code local settings (per-machine, never commit)
 .claude/settings.local.json
+
+# superpowers brainstorm session artifacts (HTML mockups, ephemeral state)
+.superpowers/
