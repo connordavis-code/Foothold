@@ -1,51 +1,69 @@
 'use client';
 
-import { Sparkles } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
-import { Button } from '@/components/ui/button';
+import { ArrowLeft, Sparkles } from 'lucide-react';
 import { generateInsightAction } from '@/lib/insights/actions';
+import { Button } from '@/components/ui/button';
+import type { ButtonMode } from '@/lib/insights/button-mode';
 
-type Status =
-  | { kind: 'idle' }
-  | { kind: 'success' }
-  | { kind: 'error'; message: string };
+type Props = {
+  mode: ButtonMode;
+};
 
-export function GenerateButton({ hasExisting }: { hasExisting: boolean }) {
+export function GenerateButton({ mode }: Props) {
   const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const [status, setStatus] = useState<Status>({ kind: 'idle' });
 
-  function onClick() {
-    setStatus({ kind: 'idle' });
+  if (mode === 'back') {
+    return (
+      <Button asChild variant="outline" size="sm">
+        <Link href="/insights" className="inline-flex items-center gap-1.5">
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Back to current week
+        </Link>
+      </Button>
+    );
+  }
+
+  const onClick = () => {
+    setError(null);
     startTransition(async () => {
       try {
         await generateInsightAction();
-        setStatus({ kind: 'success' });
+        // Strip any ?week= so the user lands on the just-generated narrative.
+        router.push('/insights');
         router.refresh();
-      } catch (e) {
-        setStatus({
-          kind: 'error',
-          message: e instanceof Error ? e.message : 'Failed to generate',
-        });
+      } catch (err) {
+        // generateInsightForUser throws caller-friendly Error messages
+        // (see src/lib/insights/generate.ts).
+        setError(err instanceof Error ? err.message : 'Failed to generate');
       }
     });
-  }
+  };
 
   return (
-    <div className="flex flex-col items-end gap-1">
-      <Button onClick={onClick} disabled={isPending}>
-        <Sparkles
-          className={`h-4 w-4 ${isPending ? 'animate-pulse' : ''}`}
-        />
+    <div className="flex flex-col items-end gap-2">
+      <Button
+        type="button"
+        size="sm"
+        onClick={onClick}
+        disabled={isPending}
+        className="inline-flex items-center gap-1.5"
+      >
+        <Sparkles className="h-3.5 w-3.5" />
         {isPending
           ? 'Generating…'
-          : hasExisting
-            ? 'Regenerate'
-            : 'Generate insights'}
+          : mode === 'regenerate'
+          ? 'Regenerate'
+          : 'Generate insights'}
       </Button>
-      {status.kind === 'error' && (
-        <p className="text-xs text-destructive">{status.message}</p>
+      {error && (
+        <p className="max-w-xs text-right text-xs text-red-600 dark:text-red-400">
+          {error}
+        </p>
       )}
     </div>
   );
