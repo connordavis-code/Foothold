@@ -1,8 +1,13 @@
 'use server';
 
-import { and, desc, eq, ilike, or, sql } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
+import { revalidatePath } from 'next/cache';
 import { auth } from '@/auth';
 import { db } from '@/lib/db';
+import {
+  filterOwnedTransactions,
+  findOrCreateCategoryByName,
+} from '@/lib/db/queries/categories';
 import {
   financialAccounts,
   plaidItems,
@@ -71,4 +76,43 @@ export async function searchTransactionsAction(
     .limit(MAX_HITS);
 
   return rows.map((r) => ({ ...r, amount: Number(r.amount) }));
+}
+
+export type BulkRecategorizeResult = {
+  updated: number;
+};
+
+/**
+ * Bulk re-categorize the user's selected transactions. The category
+ * is identified by name — find-or-create on the categories table for
+ * this user. Pass `null` to clear an override (the row reverts to its
+ * raw Plaid PFC for display).
+ *
+ * Defense-in-depth: we filter the supplied id list down to ones the
+ * user actually owns before writing, so a forged id list from the
+ * client can't reach into someone else's data.
+ */
+export async function updateTransactionCategoriesAction(
+  txIds: string[],
+  categoryName: string | null,
+): Promise<BulkRecategorizeResult> {
+  const session = await auth();
+  if (!session?.user) throw new Error('Unauthorized');
+
+  if (txIds.length === 0) return { updated: 0 };
+
+  const owned = await filterOwnedTransactions(session.user.id, txIds);
+  if (owned.length === 0) return { updated: 0 };
+
+  const newCategoryId = categoryName
+    ? await findOrCreateCategoryByName(session.user.id, categoryName)
+    : null;
+
+  await db
+    .update(transactions)
+    .set({ categoryOverrideId: newCategoryId, updatedAt: new Date() })
+    .where(inArray(transactions.id, owned));
+
+  revalidatePath('/transactions');
+  return { updated: owned.length };
 }

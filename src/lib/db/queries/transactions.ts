@@ -11,6 +11,7 @@ import {
 } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
+  categories,
   financialAccounts,
   plaidItems,
   transactions,
@@ -40,6 +41,9 @@ export type TransactionListRow = {
   accountName: string;
   accountMask: string | null;
   accountType: string;
+  /** Set when the user has manually re-categorized this row. */
+  overrideCategoryId: string | null;
+  overrideCategoryName: string | null;
 };
 
 export type TransactionListResult = {
@@ -105,6 +109,8 @@ export async function getTransactions(
         accountName: financialAccounts.name,
         accountMask: financialAccounts.mask,
         accountType: financialAccounts.type,
+        overrideCategoryId: transactions.categoryOverrideId,
+        overrideCategoryName: categories.name,
       })
       .from(transactions)
       .innerJoin(
@@ -112,6 +118,7 @@ export async function getTransactions(
         eq(financialAccounts.id, transactions.accountId),
       )
       .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
+      .leftJoin(categories, eq(categories.id, transactions.categoryOverrideId))
       .where(where)
       .orderBy(desc(transactions.date), desc(transactions.createdAt))
       .limit(pageSize)
