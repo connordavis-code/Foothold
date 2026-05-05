@@ -7,7 +7,7 @@ import {
 } from '@/lib/db/schema';
 import type { InsightSupplements } from '@/lib/insights/types';
 import { getDriftAnalysis } from './drift';
-import type { GoalProgress, GoalWithProgress } from './goals';
+import type { GoalWithProgress } from './goals';
 import { getGoalsWithProgress } from './goals';
 import {
   frequencyToMonthlyMultiplier,
@@ -207,9 +207,6 @@ function paceForGoal(goal: Pick<GoalWithProgress, 'type' | 'targetDate' | 'progr
   return monthsRemainingByDate / progress.monthsToTarget;
 }
 
-// GoalProgress is imported for the discriminated-union narrowing above.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-type _GoalProgressCheck = GoalProgress;
 
 function monthsBetween(fromIso: string, toIso: string): number {
   const from = new Date(`${fromIso}T00:00:00Z`);
