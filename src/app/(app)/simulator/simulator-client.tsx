@@ -14,6 +14,7 @@ import { HypotheticalGoalOverrides } from '@/components/simulator/hypothetical-g
 import { GoalTargetOverrides } from '@/components/simulator/goal-target-overrides';
 import { SkipRecurringOverrides } from '@/components/simulator/skip-recurring-overrides';
 import { ForecastChart } from '@/components/simulator/forecast-chart';
+import { GoalDiffCards } from '@/components/simulator/goal-diff-cards';
 
 type Props = {
   history: ForecastHistory;
@@ -161,7 +162,7 @@ export function SimulatorClient({
               baseline={baselineResult.projection}
               scenario={engineResult.projection}
             />
-            {/* Goal diff cards in Task 15 */}
+            <GoalDiffCards goalImpacts={engineResult.goalImpacts} />
           </div>
         </div>
       </div>
