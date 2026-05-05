@@ -30,6 +30,27 @@ export default function InsightsLoading() {
           <Skeleton className="h-5 w-3/4" />
         </div>
       </article>
+
+      <section className="space-y-3">
+        <Skeleton className="h-3 w-28" />
+        <div className="grid gap-3 sm:grid-cols-2">
+          {[0, 1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="rounded-card border border-border bg-surface-elevated p-5 sm:p-6"
+            >
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="mt-3 h-7 w-32" />
+              <Skeleton className="mt-2 h-3 w-40" />
+              <div className="mt-4 space-y-2">
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-5/6" />
+                <Skeleton className="h-3 w-2/3" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
