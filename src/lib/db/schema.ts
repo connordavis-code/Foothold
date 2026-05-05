@@ -470,6 +470,52 @@ export const errorLog = pgTable(
   }),
 );
 
+export const scenarios = pgTable(
+  'scenario',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    description: text('description'),
+    overrides: jsonb('overrides').notNull().default({}),
+    createdAt: ts('created_at').notNull().defaultNow(),
+    updatedAt: ts('updated_at').notNull().defaultNow(),
+  },
+  (t) => ({
+    userUpdatedIdx: index().on(t.userId, t.updatedAt.desc()),
+  }),
+);
+
+export type Scenario = typeof scenarios.$inferSelect;
+export type ScenarioInsert = typeof scenarios.$inferInsert;
+
+export const forecastNarratives = pgTable(
+  'forecast_narrative',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    scenarioId: text('scenario_id')
+      .notNull()
+      .references(() => scenarios.id, { onDelete: 'cascade' }),
+    inputHash: text('input_hash').notNull(),
+    narrative: text('narrative').notNull(),
+    generatedAt: ts('generated_at').notNull().defaultNow(),
+  },
+  (t) => ({
+    scenarioHashIdx: uniqueIndex().on(t.scenarioId, t.inputHash),
+  }),
+);
+
+export type ForecastNarrative = typeof forecastNarratives.$inferSelect;
+
 // =============================================================================
 // Type exports — convenient for queries
 // =============================================================================
