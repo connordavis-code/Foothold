@@ -221,7 +221,16 @@ handler's own 401 — body shape reveals which layer fired.
   CRUD actions. Empty + first-time states. Responsive single-column
   collapse below md. 116 vitest tests (94 + 22 new for index-based
   override helpers). UI is a starting hypothesis — expected to be
-  refined in use. No AI narration yet — Plan B-2 next.
+  refined in use.
+- **Phase 4-B2 — AI coaching narrative** (2026-05-05) — `<NarrativePanel>`
+  on `/simulator` powered by Anthropic Haiku 4.5 via existing client.
+  Cache-first via `forecast_narrative` table (keyed on
+  `(scenarioId, sha256(overrides + history fingerprint))`). Two server
+  actions: `lookupForecastNarrative` (cache-only) and
+  `generateForecastNarrativeAction` (cache-first then LLM, stale-fallback
+  on failure). Pure prompt builder + history fingerprint with vitest
+  coverage (133 total, +17 new). Panel suppressed on baseline /
+  no-overrides / dirty unsaved state. Phase 4 milestone complete.
 
 ### In progress
 - **Plaid Production access review** — submitted 2026-05-01 + Q9
@@ -230,12 +239,6 @@ handler's own 401 — body shape reveals which layer fired.
   webhook E2E — wipe before flipping `PLAID_ENV=production`.
 
 ### Next up
-- **Phase 4-B2 — AI coaching narrative for simulator** — adds
-  AI-generated 3-5 sentence summary panel to `/simulator`. Anthropic
-  Haiku 4.5 via existing `src/lib/anthropic/client.ts`. Cache key =
-  SHA-256 of (overrides + history fingerprint). New `forecast_narrative`
-  table already exists from Plan A Task 1. Spec §7 covers prompt
-  shape, model, caching, failure handling.
 - **Verify sender domain** — confirm `AUTH_EMAIL_FROM` in Vercel env
   is the custom domain (`noreply@usefoothold.com`) not the Resend
   sandbox sender (`onboarding@resend.dev`). The 14:00 UTC May 5
