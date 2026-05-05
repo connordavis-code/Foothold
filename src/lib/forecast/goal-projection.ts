@@ -90,6 +90,9 @@ export function computeGoalImpacts(
       name: hypo.name,
       baselineETA: null,
       scenarioETA,
+      // Sentinel: hypotheticals have no baseline to shift from. UI must
+      // check baselineETA === null to identify hypotheticals; do NOT
+      // interpret 0 as "same ETA as baseline".
       shiftMonths: 0,
     });
   }
