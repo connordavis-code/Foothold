@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { CommandPalette } from '@/components/command-palette/command-palette';
 import { CommandPaletteProvider } from '@/components/command-palette/palette-context';
+import { CheatsheetDialog } from '@/components/keyboard/cheatsheet-dialog';
 import { AppSidebar } from '@/components/nav/app-sidebar';
 import { TopBar } from '@/components/nav/top-bar';
 import { Toaster } from '@/components/ui/sonner';
@@ -32,6 +33,7 @@ export default async function AppLayout({
         </div>
         <Toaster position="bottom-right" richColors closeButton />
         <CommandPalette />
+        <CheatsheetDialog />
       </div>
     </CommandPaletteProvider>
   );
