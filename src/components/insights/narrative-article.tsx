@@ -1,4 +1,5 @@
 import type { Insight } from '@/lib/db/schema';
+import { formatWeekRange } from '@/lib/utils/format-week-range';
 
 type Props = {
   insight: Insight;
@@ -18,12 +19,6 @@ function formatGeneratedAt(d: Date): string {
     day: 'numeric',
     year: 'numeric',
   });
-}
-
-function formatWeekRange(start: string, end: string): string {
-  const s = new Date(`${start}T00:00:00Z`);
-  const e = new Date(`${end}T00:00:00Z`);
-  return `${s.toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' })} – ${e.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}`;
 }
 
 export function NarrativeArticle({ insight, isCurrentWeek, showStaleChip }: Props) {

@@ -1,16 +1,11 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { formatWeekRange } from '@/lib/utils/format-week-range';
 
 type Props = {
   weekStart: string;
   weekEnd: string;
 };
-
-function formatRange(start: string, end: string): string {
-  const s = new Date(`${start}T00:00:00Z`);
-  const e = new Date(`${end}T00:00:00Z`);
-  return `${s.toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' })} – ${e.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}`;
-}
 
 export function PastWeekBanner({ weekStart, weekEnd }: Props) {
   return (
@@ -23,7 +18,7 @@ export function PastWeekBanner({ weekStart, weekEnd }: Props) {
         Back to current week
       </Link>
       <span className="text-muted-foreground">
-        Viewing {formatRange(weekStart, weekEnd)}
+        Viewing {formatWeekRange(weekStart, weekEnd)}
       </span>
     </div>
   );
