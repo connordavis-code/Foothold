@@ -74,6 +74,33 @@ export function SimulatorClient({
     setLiveOverrides((scn?.overrides as ScenarioOverrides | undefined) ?? {});
   };
 
+  const hasNoData =
+    history.currentCash === 0 &&
+    history.recurringStreams.length === 0 &&
+    Object.keys(history.categoryHistory).length === 0;
+
+  if (hasNoData) {
+    return (
+      <div className="px-6 py-8 max-w-6xl">
+        <ScenarioHeader
+          scenarios={scenarios}
+          selectedScenarioId={selectedScenarioId}
+          liveOverrides={liveOverrides}
+          isDirty={isDirty}
+          onSelect={handleSelectScenario}
+        />
+        <div className="bg-muted/40 border border-border rounded-lg p-8 text-center">
+          <h2 className="text-lg font-semibold text-foreground mb-2">No data yet</h2>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            The simulator forecasts forward from your synced transactions and
+            recurring streams. Once Plaid finishes its first sync (typically
+            within a few minutes of connecting), the forecast will fill in here.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="px-6 py-8 max-w-6xl">
       <ScenarioHeader
@@ -83,6 +110,13 @@ export function SimulatorClient({
         isDirty={isDirty}
         onSelect={handleSelectScenario}
       />
+
+      {scenarios.length === 0 && (
+        <p className="text-xs text-muted-foreground -mt-4 mb-6">
+          You're viewing the baseline forecast. Add overrides on the left and click
+          "Save as…" to keep a scenario for later.
+        </p>
+      )}
 
       <div className="grid grid-cols-[260px_1fr] gap-10">
         {/* Left: override editor */}
