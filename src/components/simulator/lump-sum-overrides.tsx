@@ -34,42 +34,46 @@ export function LumpSumOverrides({ value, onChange, availableMonths }: Props) {
   return (
     <div className="space-y-2">
       {items.map((item) => (
-        <div key={item.id} className="flex items-center gap-2">
+        // Stacked: label on its own row (full width), then month+amount+remove on
+        // a second row. Single-row layout overflowed the 260px override column.
+        <div key={item.id} className="bg-muted/30 rounded p-2 space-y-1.5">
           <input
             type="text"
             value={item.label}
             onChange={(e) =>
               onChange(updateItem(items, (i) => i.id === item.id, { label: e.target.value }))
             }
-            className="flex-1 bg-background border border-border rounded px-2 py-1 text-foreground"
+            className="w-full bg-background border border-border rounded px-2 py-1 text-foreground"
             placeholder="Label"
           />
-          <select
-            value={item.month}
-            onChange={(e) =>
-              onChange(updateItem(items, (i) => i.id === item.id, { month: e.target.value }))
-            }
-            className="bg-background border border-border rounded px-2 py-1 text-foreground"
-          >
-            {availableMonths.map((m) => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
-          <input
-            type="number"
-            value={item.amount}
-            onChange={(e) =>
-              onChange(updateItem(items, (i) => i.id === item.id, { amount: Number(e.target.value) }))
-            }
-            className="w-24 bg-background border border-border rounded px-2 py-1 text-right text-foreground"
-          />
-          <button
-            onClick={() => onChange(removeItem(items, (i) => i.id === item.id))}
-            className="p-1 text-muted-foreground hover:text-destructive"
-            aria-label="Remove"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <select
+              value={item.month}
+              onChange={(e) =>
+                onChange(updateItem(items, (i) => i.id === item.id, { month: e.target.value }))
+              }
+              className="flex-1 min-w-0 bg-background border border-border rounded px-2 py-1 text-foreground"
+            >
+              {availableMonths.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+            <input
+              type="number"
+              value={item.amount}
+              onChange={(e) =>
+                onChange(updateItem(items, (i) => i.id === item.id, { amount: Number(e.target.value) }))
+              }
+              className="w-20 bg-background border border-border rounded px-2 py-1 text-right text-foreground"
+            />
+            <button
+              onClick={() => onChange(removeItem(items, (i) => i.id === item.id))}
+              className="p-1 text-muted-foreground hover:text-destructive"
+              aria-label="Remove"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       ))}
       <button

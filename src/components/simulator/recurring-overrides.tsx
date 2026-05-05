@@ -79,7 +79,10 @@ export function RecurringOverrides({ value, onChange, baseStreams }: Props) {
           )}
 
           {(item.action === 'edit' || item.action === 'add') && (
-            <div className="flex gap-1.5">
+            // For 'add': label on its own row (full width), then amount + cadence
+            // + direction. Single-row layout cramped the selects in the 260px
+            // override column, making them effectively unclickable.
+            <>
               {item.action === 'add' && (
                 <input
                   type="text"
@@ -88,49 +91,51 @@ export function RecurringOverrides({ value, onChange, baseStreams }: Props) {
                     onChange(updateItemAt(items, i, { label: e.target.value }))
                   }
                   placeholder="Label"
-                  className="flex-1 bg-background border border-border rounded px-2 py-1 text-foreground"
+                  className="w-full bg-background border border-border rounded px-2 py-1 text-foreground"
                 />
               )}
-              <input
-                type="number"
-                value={item.amount ?? 0}
-                onChange={(e) =>
-                  onChange(updateItemAt(items, i, { amount: Number(e.target.value) }))
-                }
-                className="w-20 bg-background border border-border rounded px-2 py-1 text-right text-foreground"
-              />
-              <select
-                value={item.cadence ?? 'monthly'}
-                onChange={(e) =>
-                  onChange(
-                    updateItemAt(items, i, {
-                      cadence: e.target.value as 'weekly' | 'biweekly' | 'monthly',
-                    }),
-                  )
-                }
-                className="bg-background border border-border rounded px-2 py-1 text-foreground"
-              >
-                <option value="weekly">weekly</option>
-                <option value="biweekly">biweekly</option>
-                <option value="monthly">monthly</option>
-              </select>
-              {item.action === 'add' && (
+              <div className="flex gap-1.5">
+                <input
+                  type="number"
+                  value={item.amount ?? 0}
+                  onChange={(e) =>
+                    onChange(updateItemAt(items, i, { amount: Number(e.target.value) }))
+                  }
+                  className="w-20 bg-background border border-border rounded px-2 py-1 text-right text-foreground"
+                />
                 <select
-                  value={item.direction ?? 'outflow'}
+                  value={item.cadence ?? 'monthly'}
                   onChange={(e) =>
                     onChange(
                       updateItemAt(items, i, {
-                        direction: e.target.value as 'inflow' | 'outflow',
+                        cadence: e.target.value as 'weekly' | 'biweekly' | 'monthly',
                       }),
                     )
                   }
-                  className="bg-background border border-border rounded px-2 py-1 text-foreground"
+                  className="flex-1 min-w-0 bg-background border border-border rounded px-2 py-1 text-foreground"
                 >
-                  <option value="outflow">out</option>
-                  <option value="inflow">in</option>
+                  <option value="weekly">weekly</option>
+                  <option value="biweekly">biweekly</option>
+                  <option value="monthly">monthly</option>
                 </select>
-              )}
-            </div>
+                {item.action === 'add' && (
+                  <select
+                    value={item.direction ?? 'outflow'}
+                    onChange={(e) =>
+                      onChange(
+                        updateItemAt(items, i, {
+                          direction: e.target.value as 'inflow' | 'outflow',
+                        }),
+                      )
+                    }
+                    className="bg-background border border-border rounded px-2 py-1 text-foreground"
+                  >
+                    <option value="outflow">out</option>
+                    <option value="inflow">in</option>
+                  </select>
+                )}
+              </div>
+            </>
           )}
         </div>
       ))}
