@@ -88,7 +88,7 @@ export function ScenarioHeader({
   };
 
   return (
-    <header className="flex items-baseline justify-between mb-8 pb-4 border-b border-border">
+    <header className="flex items-baseline justify-between mb-6 md:mb-8 pb-4 border-b border-border">
       <div>
         <div className="text-2xl font-semibold tracking-tight text-foreground">
           Simulator

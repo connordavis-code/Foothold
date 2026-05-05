@@ -118,7 +118,7 @@ export function SimulatorClient({
         </p>
       )}
 
-      <div className="grid grid-cols-[260px_1fr] gap-10">
+      <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-6 md:gap-10">
         {/* Left: override editor */}
         <div>
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-3">
