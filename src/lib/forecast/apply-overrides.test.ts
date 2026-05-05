@@ -206,6 +206,34 @@ describe('applyRecurringChanges', () => {
     ]);
     expect(result[0].outflows).toBeCloseTo(433.3, 1);
   });
+
+  it('pause action on an inflow stream removes it from inflows', () => {
+    const proj: MonthlyProjection[] = [
+      { month: '2026-05', startCash: 1000, inflows: 5000, outflows: 2000, endCash: 4000, byCategory: {}, goalProgress: {} },
+    ];
+    const result = applyRecurringChanges(proj, baseStreams, [
+      { streamId: 'salary', action: 'pause' },
+    ]);
+    // Salary (5000 monthly inflow) removed → inflows 0
+    expect(result[0].inflows).toBe(0);
+    expect(result[0].outflows).toBe(2000);
+    expect(result[0].endCash).toBe(-1000); // 1000 + 0 - 2000; engine intentionally allows negative endCash
+  });
+
+  it('edit action that flips direction (outflow → inflow)', () => {
+    // Originally rent is a 2000 outflow. Edit to "rebate" inflow of 2000.
+    const proj: MonthlyProjection[] = [
+      { month: '2026-05', startCash: 1000, inflows: 5000, outflows: 2000, endCash: 4000, byCategory: {}, goalProgress: {} },
+    ];
+    const result = applyRecurringChanges(proj, baseStreams, [
+      { streamId: 'rent', action: 'edit', direction: 'inflow', amount: 2000 },
+    ]);
+    // Original 2000 removed from outflows → outflows 0
+    expect(result[0].outflows).toBe(0);
+    // New 2000 added to inflows → inflows 7000
+    expect(result[0].inflows).toBe(7000);
+    expect(result[0].endCash).toBe(8000); // 1000 + 7000 - 0
+  });
 });
 
 describe('applyIncomeDelta', () => {
