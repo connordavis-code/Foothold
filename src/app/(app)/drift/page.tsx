@@ -1,39 +1,15 @@
-import { TrendingUp } from 'lucide-react';
+import { Activity, ArrowRight, TrendingUp } from 'lucide-react';
+import Link from 'next/link';
 import { auth } from '@/auth';
 import { TrendChart } from '@/components/drift/trend-chart';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
 import {
   MIN_BASELINE,
   MIN_CURRENT,
   MIN_RATIO,
   getDriftAnalysis,
 } from '@/lib/db/queries/drift';
-import { formatCurrency } from '@/lib/utils';
-
-function humanizeCategory(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/_/g, ' ')
-    .replace(/^./, (c) => c.toUpperCase());
-}
-
-function formatRatio(r: number): string {
-  return `${r.toFixed(1)}×`;
-}
+import { cn, formatCurrency } from '@/lib/utils';
 
 export default async function DriftPage() {
   const session = await auth();
@@ -41,126 +17,126 @@ export default async function DriftPage() {
 
   const drift = await getDriftAnalysis(session.user.id);
 
+  if (drift.baselineSparse) {
+    return <SparseEmptyState />;
+  }
+
   return (
-    <div className="px-8 py-8 max-w-6xl mx-auto space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-3xl font-semibold tracking-tight">Drift</h1>
-        <p className="text-sm text-muted-foreground">
+    <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-8 sm:py-8">
+      <div className="space-y-1.5">
+        <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+          Today
+        </p>
+        <h1 className="text-xl font-semibold tracking-tight">Drift</h1>
+        <p className="max-w-2xl text-sm text-muted-foreground">
           Categories spending materially above their {drift.weeks}-week
-          baseline. Flagged when current week is at least{' '}
-          {MIN_RATIO}× the prior 4-week median, with a baseline of at
-          least {formatCurrency(MIN_BASELINE)} and current of at least{' '}
-          {formatCurrency(MIN_CURRENT)}.
+          baseline. Flagged when current week is at least {MIN_RATIO}× the
+          prior 4-week median (baseline ≥ {formatCurrency(MIN_BASELINE)},
+          current ≥ {formatCurrency(MIN_CURRENT)}).
         </p>
       </div>
 
-      {drift.baselineSparse ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Not enough history yet</CardTitle>
-            <CardDescription>
-              Drift detection needs at least 4 weeks of transaction data
-              to establish a baseline. Once Plaid has synced enough
-              history, categories with elevated spending will appear here.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+      {drift.currentlyElevated.length > 0 ? (
+        <section className="space-y-3">
+          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+            Elevated this week ·{' '}
+            {drift.currentlyElevated.length === 1
+              ? '1 category'
+              : `${drift.currentlyElevated.length} categories`}
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {drift.currentlyElevated.map((flag) => (
+              <ElevatedTile key={flag.category} flag={flag} />
+            ))}
+          </div>
+        </section>
       ) : (
-        <>
-          {drift.currentlyElevated.length > 0 ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>This week</CardTitle>
-                <CardDescription>
-                  {drift.currentlyElevated.length === 1
-                    ? '1 category is elevated.'
-                    : `${drift.currentlyElevated.length} categories are elevated.`}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {drift.currentlyElevated.map((flag) => (
-                    <ElevatedCard key={flag.category} flag={flag} />
+        <section className="rounded-card border border-border bg-surface-elevated p-5 sm:p-6">
+          <div className="flex items-center gap-3">
+            <span className="grid h-9 w-9 place-items-center rounded-pill bg-positive/10 text-positive">
+              <Activity className="h-4 w-4" />
+            </span>
+            <div>
+              <p className="text-sm font-medium">Nothing elevated this week</p>
+              <p className="text-xs text-muted-foreground">
+                Every category is within {MIN_RATIO}× of its 4-week median.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      <section className="space-y-3">
+        <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+          Weekly trend · top {drift.topCategories.length} categories
+        </p>
+        <div className="rounded-card border border-border bg-surface-elevated p-4 sm:p-5">
+          <TrendChart histories={drift.topCategories} />
+        </div>
+      </section>
+
+      {drift.flagHistory.length > 0 && (
+        <section className="space-y-3">
+          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+            Flag history · {drift.flagHistory.length}{' '}
+            {drift.flagHistory.length === 1 ? 'flag' : 'flags'}
+          </p>
+          <div className="overflow-hidden rounded-card border border-border bg-surface-elevated">
+            <div className="overflow-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10 bg-surface-elevated/95 backdrop-blur">
+                  <tr className="border-b border-border text-[10px] uppercase tracking-[0.08em] text-muted-foreground/80">
+                    <th className="px-3 py-2 text-left font-medium w-[120px]">
+                      Week ending
+                    </th>
+                    <th className="px-3 py-2 text-left font-medium">
+                      Category
+                    </th>
+                    <th className="px-3 py-2 text-right font-medium w-[120px]">
+                      Spent
+                    </th>
+                    <th className="px-3 py-2 text-right font-medium w-[120px]">
+                      Baseline
+                    </th>
+                    <th className="px-3 py-2 text-right font-medium w-[80px]">
+                      Ratio
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {drift.flagHistory.map((flag) => (
+                    <tr
+                      key={`${flag.weekEnd}-${flag.category}`}
+                      className="border-b border-border/60 transition-colors duration-fast ease-out-quart hover:bg-surface-sunken/60 last:border-b-0"
+                    >
+                      <td className="px-3 py-1.5 font-mono text-xs tabular-nums text-muted-foreground whitespace-nowrap">
+                        {flag.weekEnd}
+                      </td>
+                      <td className="px-3 py-1.5 font-medium">
+                        {humanizeCategory(flag.category)}
+                      </td>
+                      <td className="px-3 py-1.5 text-right font-mono tabular-nums whitespace-nowrap">
+                        {formatCurrency(flag.currentTotal)}
+                      </td>
+                      <td className="px-3 py-1.5 text-right font-mono text-xs tabular-nums text-muted-foreground whitespace-nowrap">
+                        {formatCurrency(flag.baselineWeekly)}
+                      </td>
+                      <td className="px-3 py-1.5 text-right font-mono tabular-nums font-medium whitespace-nowrap">
+                        {formatRatio(flag.ratio)}
+                      </td>
+                    </tr>
                   ))}
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle>Nothing elevated this week</CardTitle>
-                <CardDescription>
-                  Every category is within {MIN_RATIO}× of its 4-week
-                  median.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          )}
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Weekly spending by category</CardTitle>
-              <CardDescription>
-                Top categories over the last {drift.weeks} weeks.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <TrendChart histories={drift.topCategories} />
-            </CardContent>
-          </Card>
-
-          {drift.flagHistory.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Flag history</CardTitle>
-                <CardDescription>
-                  Every week in the visible window where a category
-                  tripped the threshold.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Week ending</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead className="text-right">Spent</TableHead>
-                      <TableHead className="text-right">Baseline</TableHead>
-                      <TableHead className="text-right">Ratio</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {drift.flagHistory.map((flag) => (
-                      <TableRow key={`${flag.weekEnd}-${flag.category}`}>
-                        <TableCell className="text-muted-foreground">
-                          {flag.weekEnd}
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {humanizeCategory(flag.category)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {formatCurrency(flag.currentTotal)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-muted-foreground">
-                          {formatCurrency(flag.baselineWeekly)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums font-medium">
-                          {formatRatio(flag.ratio)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          )}
-        </>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
       )}
     </div>
   );
 }
 
-function ElevatedCard({
+function ElevatedTile({
   flag,
 }: {
   flag: {
@@ -171,17 +147,17 @@ function ElevatedCard({
   };
 }) {
   return (
-    <div className="rounded-md border border-border bg-card px-4 py-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-medium">
+    <div className="rounded-card border border-amber-500/40 bg-amber-500/8 p-4 transition-colors duration-fast ease-out-quart hover:bg-amber-500/12 dark:border-amber-400/30 dark:bg-amber-400/8">
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="truncate text-sm font-medium">
           {humanizeCategory(flag.category)}
         </p>
-        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-pill bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
           <TrendingUp className="h-3 w-3" />
           {formatRatio(flag.ratio)}
         </span>
       </div>
-      <p className="mt-1 text-2xl font-semibold tabular-nums">
+      <p className="mt-2 font-mono text-2xl font-semibold tabular-nums">
         {formatCurrency(flag.currentTotal)}
       </p>
       <p className="text-xs text-muted-foreground">
@@ -189,4 +165,45 @@ function ElevatedCard({
       </p>
     </div>
   );
+}
+
+function SparseEmptyState() {
+  return (
+    <div className="mx-auto max-w-2xl px-4 py-16 sm:px-8 sm:py-24">
+      <div className="space-y-6 text-center">
+        <span className="mx-auto grid h-14 w-14 place-items-center rounded-pill bg-accent text-foreground/80">
+          <Activity className="h-6 w-6" />
+        </span>
+        <div className="space-y-2">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Not enough history yet
+          </h1>
+          <p className="mx-auto max-w-md text-sm text-muted-foreground">
+            Drift detection needs 4+ weeks of transaction data to establish
+            a baseline. Once Plaid has synced enough history, elevated
+            categories will surface here weekly.
+          </p>
+        </div>
+        <div className="flex justify-center">
+          <Button asChild variant="outline">
+            <Link href="/transactions">
+              View synced transactions
+              <ArrowRight className="ml-1.5 h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function humanizeCategory(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/_/g, ' ')
+    .replace(/^./, (c) => c.toUpperCase());
+}
+
+function formatRatio(r: number): string {
+  return `${r.toFixed(1)}×`;
 }

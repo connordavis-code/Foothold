@@ -1,4 +1,4 @@
-import { Pencil, Plus } from 'lucide-react';
+import { ArrowRight, Pencil, Plus, Target } from 'lucide-react';
 import Link from 'next/link';
 import { auth } from '@/auth';
 import {
@@ -7,18 +7,11 @@ import {
 } from '@/components/goals/progress-bar';
 import { Button } from '@/components/ui/button';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
   type GoalWithProgress,
   getGoalsWithProgress,
 } from '@/lib/db/queries/goals';
 import { deleteGoal } from '@/lib/goals/actions';
-import { formatCurrency, formatPercent } from '@/lib/utils';
+import { cn, formatCurrency, formatPercent } from '@/lib/utils';
 
 export default async function GoalsPage() {
   const session = await auth();
@@ -26,17 +19,20 @@ export default async function GoalsPage() {
 
   const goals = await getGoalsWithProgress(session.user.id);
 
+  if (goals.length === 0) {
+    return <EmptyState />;
+  }
+
   return (
-    <div className="px-8 py-8 max-w-5xl mx-auto space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-8 sm:py-8">
       <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-semibold tracking-tight">Goals</h1>
-          <p className="text-sm text-muted-foreground">
-            Savings targets and spending caps. Progress updates automatically
-            as your accounts sync.
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+            Plan
           </p>
+          <h1 className="text-xl font-semibold tracking-tight">Goals</h1>
         </div>
-        <Button asChild>
+        <Button asChild size="sm">
           <Link href="/goals/new">
             <Plus className="h-4 w-4" />
             New goal
@@ -44,83 +40,72 @@ export default async function GoalsPage() {
         </Button>
       </div>
 
-      {goals.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>No goals yet</CardTitle>
-            <CardDescription>
-              Create your first goal — start with an emergency fund target
-              or a monthly discretionary cap.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild>
-              <Link href="/goals/new">Create a goal</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {goals.map((g) => (
-            <GoalCard key={g.id} goal={g} />
-          ))}
-        </div>
-      )}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {goals.map((g) => (
+          <GoalTile key={g.id} goal={g} />
+        ))}
+      </div>
     </div>
   );
 }
 
-function GoalCard({ goal }: { goal: GoalWithProgress }) {
+function GoalTile({ goal }: { goal: GoalWithProgress }) {
   const deleteAction = deleteGoal.bind(null, goal.id);
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-start justify-between gap-4">
-        <div className="space-y-1">
-          <CardTitle>{goal.name}</CardTitle>
-          <CardDescription>
+    <article className="space-y-4 rounded-card border border-border bg-surface-elevated p-5 sm:p-6">
+      <header className="flex items-start justify-between gap-3">
+        <div className="space-y-1 min-w-0">
+          <h2 className="truncate text-base font-medium">{goal.name}</h2>
+          <p className="text-xs text-muted-foreground">
             {goal.type === 'savings' ? 'Savings target' : 'Monthly spend cap'}
             {goal.targetDate && ` · by ${formatDate(goal.targetDate)}`}
-          </CardDescription>
+          </p>
         </div>
-        <div className="flex gap-1 shrink-0">
-          <Button asChild variant="ghost" size="sm">
-            <Link href={`/goals/${goal.id}/edit`}>
+        <div className="flex shrink-0 gap-1">
+          <Button asChild variant="ghost" size="sm" className="h-8 w-8 p-0">
+            <Link href={`/goals/${goal.id}/edit`} aria-label="Edit goal">
               <Pencil className="h-3.5 w-3.5" />
             </Link>
           </Button>
           <form action={deleteAction}>
-            <Button type="submit" variant="ghost" size="sm">
+            <Button
+              type="submit"
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-destructive"
+            >
               Delete
             </Button>
           </form>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <ProgressBlock goal={goal} />
-        {goal.scopedAccountNames.length > 0 && (
-          <div>
-            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
-              {goal.type === 'savings' ? 'Accounts' : 'Tracked accounts'}
+      </header>
+
+      <ProgressBlock goal={goal} />
+
+      {goal.scopedAccountNames.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+            {goal.type === 'savings' ? 'Accounts' : 'Tracked accounts'}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {goal.scopedAccountNames.join(' · ')}
+          </p>
+        </div>
+      )}
+
+      {goal.type === 'spend_cap' &&
+        goal.categoryFilter &&
+        goal.categoryFilter.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+              Categories
             </p>
             <p className="text-xs text-muted-foreground">
-              {goal.scopedAccountNames.join(' · ')}
+              {goal.categoryFilter.map(humanize).join(' · ')}
             </p>
           </div>
         )}
-        {goal.type === 'spend_cap' &&
-          goal.categoryFilter &&
-          goal.categoryFilter.length > 0 && (
-            <div>
-              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
-                Categories
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {goal.categoryFilter.map(humanize).join(' · ')}
-              </p>
-            </div>
-          )}
-      </CardContent>
-    </Card>
+    </article>
   );
 }
 
@@ -130,10 +115,10 @@ function ProgressBlock({ goal }: { goal: GoalWithProgress }) {
     return (
       <div className="space-y-2">
         <div className="flex items-baseline justify-between">
-          <p className="text-2xl font-semibold tabular-nums">
+          <p className="font-mono text-2xl font-semibold tracking-[-0.015em] tabular-nums">
             {formatCurrency(p.current)}
           </p>
-          <p className="text-sm text-muted-foreground tabular-nums">
+          <p className="font-mono text-xs tabular-nums text-muted-foreground">
             of {formatCurrency(p.target)}
           </p>
         </div>
@@ -144,7 +129,7 @@ function ProgressBlock({ goal }: { goal: GoalWithProgress }) {
         <p className="text-xs text-muted-foreground">
           {formatPercent(p.fraction)}
           {p.remaining === 0 ? (
-            ' · Target hit 🎉'
+            ' · Target hit'
           ) : (
             <> · {formatCurrency(p.remaining)} to go</>
           )}
@@ -154,19 +139,18 @@ function ProgressBlock({ goal }: { goal: GoalWithProgress }) {
             {p.monthlyVelocity > 0 ? (
               <>
                 Adding{' '}
-                <span className="text-positive font-medium">
+                <span className="font-medium text-positive">
                   {formatCurrency(p.monthlyVelocity)}/mo
                 </span>{' '}
                 (90-day avg)
                 {p.projectedDate && (
-                  <> · projected to hit by {formatDate(p.projectedDate)}</>
+                  <> · projected by {formatDate(p.projectedDate)}</>
                 )}
               </>
             ) : p.monthlyVelocity < 0 ? (
               <span className="text-destructive">
-                Net{' '}
-                {formatCurrency(p.monthlyVelocity)}/mo (90-day avg) — not on
-                track
+                Net {formatCurrency(p.monthlyVelocity)}/mo (90-day avg) —
+                not on track
               </span>
             ) : (
               <>No net contribution detected over the last 90 days</>
@@ -183,13 +167,14 @@ function ProgressBlock({ goal }: { goal: GoalWithProgress }) {
     <div className="space-y-2">
       <div className="flex items-baseline justify-between">
         <p
-          className={`text-2xl font-semibold tabular-nums ${
-            overCap ? 'text-destructive' : ''
-          }`}
+          className={cn(
+            'font-mono text-2xl font-semibold tracking-[-0.015em] tabular-nums',
+            overCap && 'text-destructive',
+          )}
         >
           {formatCurrency(p.spent)}
         </p>
-        <p className="text-sm text-muted-foreground tabular-nums">
+        <p className="font-mono text-xs tabular-nums text-muted-foreground">
           of {formatCurrency(p.cap)} this month
         </p>
       </div>
@@ -204,17 +189,17 @@ function ProgressBlock({ goal }: { goal: GoalWithProgress }) {
       </p>
       <p className="text-xs text-muted-foreground">
         {projectedOver ? (
-          <span className="text-yellow-600">
-            On pace to spend{' '}
+          <span className="text-amber-600 dark:text-amber-400">
+            On pace for{' '}
             <span className="font-medium">
               {formatCurrency(p.projectedMonthly)}
             </span>{' '}
-            this month — over cap by{' '}
+            — over by{' '}
             {formatCurrency(p.projectedMonthly - p.cap)}
           </span>
         ) : overCap ? (
           <>
-            Projected total this month:{' '}
+            Projected total:{' '}
             <span className="font-medium">
               {formatCurrency(p.projectedMonthly)}
             </span>
@@ -229,6 +214,36 @@ function ProgressBlock({ goal }: { goal: GoalWithProgress }) {
           </>
         )}
       </p>
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="mx-auto max-w-2xl px-4 py-16 sm:px-8 sm:py-24">
+      <div className="space-y-6 text-center">
+        <span className="mx-auto grid h-14 w-14 place-items-center rounded-pill bg-accent text-foreground/80">
+          <Target className="h-6 w-6" />
+        </span>
+        <div className="space-y-2">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Set your first goal
+          </h1>
+          <p className="mx-auto max-w-md text-sm text-muted-foreground">
+            Two flavors: a savings target (an emergency fund, a down
+            payment) or a monthly spend cap (eating out, entertainment).
+            Progress updates automatically as accounts sync.
+          </p>
+        </div>
+        <div className="flex justify-center">
+          <Button asChild>
+            <Link href="/goals/new">
+              Create a goal
+              <ArrowRight className="ml-1.5 h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

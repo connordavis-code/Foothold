@@ -1,27 +1,13 @@
 import Link from 'next/link';
+import { ArrowRight, Repeat } from 'lucide-react';
 import { auth } from '@/auth';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   type RecurringStreamRow,
   getMonthlyRecurringOutflow,
   getRecurringStreams,
 } from '@/lib/db/queries/recurring';
-import { formatCurrency } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 
 export default async function RecurringPage() {
   const session = await auth();
@@ -33,90 +19,61 @@ export default async function RecurringPage() {
   ]);
 
   if (streams.length === 0) {
-    return (
-      <div className="px-8 py-8 max-w-7xl mx-auto">
-        <h1 className="text-3xl font-semibold tracking-tight mb-6">
-          Recurring
-        </h1>
-        <Card>
-          <CardHeader>
-            <CardTitle>No recurring activity detected yet</CardTitle>
-            <CardDescription>
-              Plaid needs at least 60-90 days of transaction history to
-              identify recurring streams. Once enough data has synced,
-              subscriptions, payroll, rent, and similar repeat patterns
-              will show up here.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild>
-              <Link href="/settings">Sync your accounts</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <EmptyState />;
   }
 
   const outflows = streams.filter((s) => s.direction === 'outflow');
   const inflows = streams.filter((s) => s.direction === 'inflow');
   const activeOutflows = outflows.filter((s) => s.isActive);
-  const monthlyInflow = inflows
-    .filter((s) => s.isActive)
-    .reduce((sum, s) => {
-      if (s.averageAmount == null) return sum;
-      // Inflow amounts come in negative from Plaid (money in). Flip to positive.
-      return sum + Math.abs(s.averageAmount) * monthlyMultiplier(s.frequency);
-    }, 0);
+  const activeInflows = inflows.filter((s) => s.isActive);
+  const monthlyInflow = activeInflows.reduce((sum, s) => {
+    if (s.averageAmount == null) return sum;
+    return sum + Math.abs(s.averageAmount) * monthlyMultiplier(s.frequency);
+  }, 0);
+
+  const net = monthlyInflow - monthlyOutflow;
 
   return (
-    <div className="px-8 py-8 max-w-7xl mx-auto space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-3xl font-semibold tracking-tight">Recurring</h1>
-        <p className="text-sm text-muted-foreground">
-          Subscriptions, bills, paychecks, and other repeating transactions
-          detected by Plaid.
+    <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-8 sm:py-8">
+      <div className="space-y-1.5">
+        <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+          Plan
         </p>
+        <h1 className="text-xl font-semibold tracking-tight">Recurring</h1>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard
+      <section className="grid grid-cols-1 divide-y divide-border rounded-card border border-border bg-surface-elevated md:grid-cols-3 md:divide-x md:divide-y-0">
+        <SummaryCell
           label="Monthly outflow"
           value={formatCurrency(monthlyOutflow)}
-          subline={`${activeOutflows.length} active ${activeOutflows.length === 1 ? 'subscription' : 'subscriptions'}`}
+          sub={`${activeOutflows.length} active ${activeOutflows.length === 1 ? 'subscription' : 'subscriptions'}`}
         />
-        <StatCard
+        <SummaryCell
           label="Monthly inflow"
           value={formatCurrency(monthlyInflow)}
-          subline={
-            inflows.filter((s) => s.isActive).length === 0
-              ? 'None detected'
-              : `${inflows.filter((s) => s.isActive).length} active ${inflows.filter((s) => s.isActive).length === 1 ? 'source' : 'sources'}`
+          sub={
+            activeInflows.length === 0
+              ? 'None detected yet'
+              : `${activeInflows.length} active ${activeInflows.length === 1 ? 'source' : 'sources'}`
           }
         />
-        <StatCard
+        <SummaryCell
           label="Net monthly"
-          value={formatCurrency(monthlyInflow - monthlyOutflow, {
-            signed: true,
-          })}
-          subline="Recurring inflows minus outflows"
-          valueClass={
-            monthlyInflow - monthlyOutflow >= 0
-              ? 'text-positive'
-              : 'text-destructive'
-          }
+          value={formatCurrency(net, { signed: true })}
+          sub="Inflows minus outflows"
+          valueClass={net >= 0 ? 'text-positive' : 'text-destructive'}
         />
-      </div>
+      </section>
 
       <StreamSection
-        title="Subscriptions & bills"
-        description="Money leaving your accounts on a regular schedule."
+        eyebrow="Subscriptions & bills"
+        sub="Money leaving your accounts on a regular schedule."
         rows={outflows}
       />
       {inflows.length > 0 && (
         <StreamSection
-          title="Income & deposits"
-          description="Money arriving on a regular schedule (payroll, refunds, etc.)."
+          eyebrow="Income & deposits"
+          sub="Money arriving on a regular schedule (payroll, refunds, etc.)."
           rows={inflows}
         />
       )}
@@ -124,158 +81,219 @@ export default async function RecurringPage() {
   );
 }
 
+function SummaryCell({
+  label,
+  value,
+  sub,
+  valueClass,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  valueClass?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5 p-5 sm:p-6">
+      <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+        {label}
+      </p>
+      <p
+        className={cn(
+          'font-mono text-2xl font-semibold tracking-[-0.015em] tabular-nums sm:text-3xl',
+          valueClass,
+        )}
+      >
+        {value}
+      </p>
+      <p className="text-xs text-muted-foreground">{sub}</p>
+    </div>
+  );
+}
+
 function StreamSection({
-  title,
-  description,
+  eyebrow,
+  sub,
   rows,
 }: {
-  title: string;
-  description: string;
+  eyebrow: string;
+  sub: string;
   rows: RecurringStreamRow[];
 }) {
   if (rows.length === 0) return null;
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Merchant</TableHead>
-              <TableHead>Frequency</TableHead>
-              <TableHead>Account</TableHead>
-              <TableHead>Last seen</TableHead>
-              <TableHead>Next expected</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((s) => (
-              <StreamRow key={s.id} s={s} />
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+    <section className="space-y-3">
+      <div>
+        <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+          {eyebrow} · {rows.length}
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">{sub}</p>
+      </div>
+      <div className="overflow-hidden rounded-card border border-border bg-surface-elevated">
+        <div className="overflow-auto">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 z-10 bg-surface-elevated/95 backdrop-blur">
+              <tr className="border-b border-border text-[10px] uppercase tracking-[0.08em] text-muted-foreground/80">
+                <th className="px-3 py-2 text-left font-medium">Merchant</th>
+                <th className="px-3 py-2 text-left font-medium w-[120px]">
+                  Frequency
+                </th>
+                <th className="px-3 py-2 text-left font-medium w-[180px]">
+                  Account
+                </th>
+                <th className="px-3 py-2 text-left font-medium w-[110px]">
+                  Last seen
+                </th>
+                <th className="px-3 py-2 text-left font-medium w-[110px]">
+                  Next
+                </th>
+                <th className="px-3 py-2 text-right font-medium w-[120px]">
+                  Amount
+                </th>
+                <th className="px-3 py-2 text-left font-medium w-[100px]">
+                  Status
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((s) => (
+                <StreamRow key={s.id} s={s} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
   );
 }
 
 function StreamRow({ s }: { s: RecurringStreamRow }) {
   const display =
-    s.averageAmount != null
-      ? s.direction === 'inflow'
-        ? Math.abs(s.averageAmount)
-        : s.averageAmount
-      : null;
+    s.averageAmount != null ? Math.abs(s.averageAmount) : null;
   return (
-    <TableRow className={!s.isActive ? 'opacity-60' : undefined}>
-      <TableCell className="max-w-0">
-        <p className="font-medium truncate">
-          {s.merchantName ?? s.description ?? '—'}
+    <tr
+      className={cn(
+        'border-b border-border/60 transition-colors duration-fast ease-out-quart hover:bg-surface-sunken/60 last:border-b-0',
+        !s.isActive && 'opacity-60',
+      )}
+    >
+      <td className="max-w-0 px-3 py-1.5">
+        <p className="truncate text-sm font-medium">
+          {pickLabel(s.merchantName, s.description, s.primaryCategory)}
         </p>
         {s.primaryCategory && (
-          <p className="text-xs text-muted-foreground">
+          <p className="truncate text-xs text-muted-foreground">
             {humanizeCategory(s.primaryCategory)}
           </p>
         )}
-      </TableCell>
-      <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
+      </td>
+      <td className="px-3 py-1.5 whitespace-nowrap text-xs text-muted-foreground">
         {humanizeFrequency(s.frequency)}
-      </TableCell>
-      <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
+      </td>
+      <td className="px-3 py-1.5 whitespace-nowrap text-xs text-muted-foreground">
         {s.accountName}
         {s.accountMask && (
           <span className="text-muted-foreground/70"> ····{s.accountMask}</span>
         )}
-      </TableCell>
-      <TableCell className="text-muted-foreground tabular-nums text-xs whitespace-nowrap">
+      </td>
+      <td className="px-3 py-1.5 font-mono text-xs tabular-nums text-muted-foreground whitespace-nowrap">
         {s.lastDate ? formatTxDate(s.lastDate) : '—'}
-      </TableCell>
-      <TableCell className="text-muted-foreground tabular-nums text-xs whitespace-nowrap">
+      </td>
+      <td className="px-3 py-1.5 font-mono text-xs tabular-nums text-muted-foreground whitespace-nowrap">
         {s.predictedNextDate ? formatTxDate(s.predictedNextDate) : '—'}
-      </TableCell>
-      <TableCell
-        className={`text-right tabular-nums font-medium whitespace-nowrap ${
-          s.direction === 'inflow' ? 'text-positive' : ''
-        }`}
+      </td>
+      <td
+        className={cn(
+          'px-3 py-1.5 text-right font-mono tabular-nums whitespace-nowrap',
+          s.direction === 'inflow' ? 'text-positive' : 'text-foreground',
+        )}
       >
-        {display != null
-          ? formatCurrency(s.direction === 'inflow' ? display : display, {
-              signed: false,
-            })
-          : '—'}
-      </TableCell>
-      <TableCell className="text-xs whitespace-nowrap">
+        {display != null ? formatCurrency(display) : '—'}
+      </td>
+      <td className="px-3 py-1.5 whitespace-nowrap text-xs">
         <StatusBadge status={s.status} active={s.isActive} />
-      </TableCell>
-    </TableRow>
+      </td>
+    </tr>
   );
 }
 
 function StatusBadge({ status, active }: { status: string; active: boolean }) {
   if (!active) {
     return (
-      <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">
+      <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
         Inactive
       </span>
     );
   }
   if (status === 'EARLY_DETECTION') {
     return (
-      <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">
+      <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
         Early
       </span>
     );
   }
   if (status === 'TOMBSTONED') {
     return (
-      <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">
+      <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
         Cancelled
       </span>
     );
   }
   return (
-    <span className="rounded-full bg-positive/10 px-2 py-0.5 text-positive">
+    <span className="rounded-md bg-positive/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-positive">
       Active
     </span>
   );
 }
 
-function StatCard({
-  label,
-  value,
-  subline,
-  valueClass,
-}: {
-  label: string;
-  value: string;
-  subline: string;
-  valueClass?: string;
-}) {
+function EmptyState() {
   return (
-    <Card>
-      <CardHeader>
-        <CardDescription>{label}</CardDescription>
-        <CardTitle className={`text-3xl tabular ${valueClass ?? ''}`}>
-          {value}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-xs text-muted-foreground">{subline}</p>
-      </CardContent>
-    </Card>
+    <div className="mx-auto max-w-2xl px-4 py-16 sm:px-8 sm:py-24">
+      <div className="space-y-6 text-center">
+        <span className="mx-auto grid h-14 w-14 place-items-center rounded-pill bg-accent text-foreground/80">
+          <Repeat className="h-6 w-6" />
+        </span>
+        <div className="space-y-2">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            No recurring activity yet
+          </h1>
+          <p className="mx-auto max-w-md text-sm text-muted-foreground">
+            Plaid needs 60–90 days of transaction history to identify
+            recurring streams. Subscriptions, payroll, and bills will
+            surface here once enough data has synced.
+          </p>
+        </div>
+        <div className="flex justify-center">
+          <Button asChild>
+            <Link href="/settings">
+              Connect more accounts
+              <ArrowRight className="ml-1.5 h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Plaid sandbox often returns empty merchantName + description; fall through
+// to humanized category so the row never reads as blank.
+function pickLabel(
+  merchantName: string | null,
+  description: string | null,
+  primaryCategory: string | null,
+): string {
+  return (
+    merchantName?.trim() ||
+    description?.trim() ||
+    (primaryCategory ? humanizeCategory(primaryCategory) : '') ||
+    'Recurring'
   );
 }
 
 function formatTxDate(d: string): string {
   return new Date(d).toLocaleDateString('en-US', {
     month: 'short',
-    day: 'numeric',
-    year: 'numeric',
+    day: '2-digit',
   });
 }
 
