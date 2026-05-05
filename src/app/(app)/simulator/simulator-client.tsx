@@ -9,6 +9,7 @@ import { OverrideSection } from '@/components/simulator/override-section';
 import { CategoryOverrides } from '@/components/simulator/category-overrides';
 import { LumpSumOverrides } from '@/components/simulator/lump-sum-overrides';
 import { RecurringOverrides } from '@/components/simulator/recurring-overrides';
+import { IncomeOverrides } from '@/components/simulator/income-overrides';
 
 type Props = {
   history: ForecastHistory;
@@ -106,7 +107,16 @@ export function SimulatorClient({
               baseStreams={history.recurringStreams}
             />
           </OverrideSection>
-          {/* More sections in Tasks 10-13 */}
+          <OverrideSection label="Income" count={liveOverrides.incomeDelta ? 1 : 0}>
+            <IncomeOverrides
+              value={liveOverrides.incomeDelta}
+              onChange={(next) =>
+                setLiveOverrides((o) => ({ ...o, incomeDelta: next }))
+              }
+              availableMonths={availableMonths}
+            />
+          </OverrideSection>
+          {/* More sections in Tasks 11-13 */}
         </div>
 
         {/* Right: debug for now (chart + cards in Wave 4) */}
