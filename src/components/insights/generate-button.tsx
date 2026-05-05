@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { ArrowLeft, Sparkles } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { generateInsightAction } from '@/lib/insights/actions';
 import { Button } from '@/components/ui/button';
 import type { ButtonMode } from '@/lib/insights/button-mode';
@@ -53,7 +54,7 @@ export function GenerateButton({ mode }: Props) {
         disabled={isPending}
         className="inline-flex items-center gap-1.5"
       >
-        <Sparkles className="h-3.5 w-3.5" />
+        <Sparkles className={cn('h-3.5 w-3.5', isPending && 'animate-pulse')} />
         {isPending
           ? 'Generating…'
           : mode === 'regenerate'
@@ -61,7 +62,7 @@ export function GenerateButton({ mode }: Props) {
           : 'Generate insights'}
       </Button>
       {error && (
-        <p className="max-w-xs text-right text-xs text-red-600 dark:text-red-400">
+        <p className="max-w-xs text-right text-xs text-destructive">
           {error}
         </p>
       )}
