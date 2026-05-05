@@ -49,3 +49,7 @@ next-env.d.ts
 
 # superpowers brainstorm session artifacts (HTML mockups, ephemeral state)
 .superpowers/
+
+# editor settings (per-machine, never commit)
+.vscode/
+*.code-workspace
