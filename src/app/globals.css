@@ -47,6 +47,16 @@
     --motion-slow: 400ms;
     --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
     --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
+
+    /* Chart palette — 3 brand-greens + 3 warm earth tones, all matte.
+     * Derived from the 160-hue gradient + 40-hue paper canvas families
+     * so multi-line charts read as Foothold, not as default Tailwind. */
+    --chart-1: 160 50% 30%;
+    --chart-2: 160 35% 50%;
+    --chart-3: 180 35% 40%;
+    --chart-4: 40 50% 50%;
+    --chart-5: 20 55% 55%;
+    --chart-6: 220 30% 55%;
   }
 
   .dark {
@@ -83,6 +93,15 @@
       hsl(160 30% 22%) 0%,
       hsl(160 25% 14%) 100%
     );
+
+    /* Chart palette — brightened for dark canvas, slightly desaturated
+     * to avoid neon-on-black. Hue values mirror :root. */
+    --chart-1: 160 50% 60%;
+    --chart-2: 160 35% 70%;
+    --chart-3: 180 35% 60%;
+    --chart-4: 40 50% 65%;
+    --chart-5: 20 55% 65%;
+    --chart-6: 220 30% 70%;
   }
 }
 

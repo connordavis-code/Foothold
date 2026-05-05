@@ -13,17 +13,18 @@ import {
 import type { CategoryHistory } from '@/lib/db/queries/drift';
 
 /**
- * Colors picked to read distinctly even in the legend swatches. Matches
- * shadcn's neutral aesthetic without competing with the destructive /
- * positive accent colors used elsewhere.
+ * Brand-tinted line palette — three greens (mirroring --gradient-hero)
+ * plus three warm earth tones (mirroring --surface-paper). Defined as
+ * CSS vars in globals.css so dark mode brightens automatically and the
+ * palette stays consistent across charts.
  */
 const COLORS = [
-  '#10b981',
-  '#0ea5e9',
-  '#f59e0b',
-  '#8b5cf6',
-  '#f43f5e',
-  '#14b8a6',
+  'hsl(var(--chart-1))',
+  'hsl(var(--chart-2))',
+  'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))',
+  'hsl(var(--chart-5))',
+  'hsl(var(--chart-6))',
 ];
 
 const TOP_N = 6;
@@ -114,9 +115,9 @@ export function TrendChart({ histories }: { histories: CategoryHistory[] }) {
               type="linear"
               dataKey={h.category}
               stroke={COLORS[i % COLORS.length]}
-              strokeWidth={2}
-              dot={{ r: 3, strokeWidth: 0, fill: COLORS[i % COLORS.length] }}
-              activeDot={{ r: 5 }}
+              strokeWidth={1.75}
+              dot={false}
+              activeDot={{ r: 4, strokeWidth: 0 }}
             />
           ))}
         </LineChart>
