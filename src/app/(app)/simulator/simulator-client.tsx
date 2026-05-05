@@ -13,6 +13,7 @@ import { IncomeOverrides } from '@/components/simulator/income-overrides';
 import { HypotheticalGoalOverrides } from '@/components/simulator/hypothetical-goal-overrides';
 import { GoalTargetOverrides } from '@/components/simulator/goal-target-overrides';
 import { SkipRecurringOverrides } from '@/components/simulator/skip-recurring-overrides';
+import { ForecastChart } from '@/components/simulator/forecast-chart';
 
 type Props = {
   history: ForecastHistory;
@@ -54,6 +55,11 @@ export function SimulatorClient({
   const engineResult = useMemo(
     () => projectCash({ history, overrides: liveOverrides, currentMonth }),
     [history, liveOverrides, currentMonth],
+  );
+
+  const baselineResult = useMemo(
+    () => projectCash({ history, overrides: {}, currentMonth }),
+    [history, currentMonth],
   );
 
   const availableMonths = useMemo(
@@ -148,23 +154,14 @@ export function SimulatorClient({
           </OverrideSection>
         </div>
 
-        {/* Right: debug for now (chart + cards in Wave 4) */}
+        {/* Right: forecast chart + goal diff cards */}
         <div>
-          <div className="bg-muted/40 border border-border rounded-lg p-4">
-            <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
-              Engine result (live)
-            </div>
-            <pre className="text-xs overflow-x-auto">
-              {JSON.stringify(
-                {
-                  projectionEndCash: engineResult.projection.map((m) => m.endCash),
-                  goalImpacts: engineResult.goalImpacts,
-                  liveOverrides,
-                },
-                null,
-                2,
-              )}
-            </pre>
+          <div className="space-y-8">
+            <ForecastChart
+              baseline={baselineResult.projection}
+              scenario={engineResult.projection}
+            />
+            {/* Goal diff cards in Task 15 */}
           </div>
         </div>
       </div>
