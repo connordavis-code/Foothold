@@ -7,6 +7,7 @@ import type { ForecastHistory, ScenarioOverrides } from '@/lib/forecast/types';
 import { ScenarioHeader } from '@/components/simulator/scenario-header';
 import { OverrideSection } from '@/components/simulator/override-section';
 import { CategoryOverrides } from '@/components/simulator/category-overrides';
+import { LumpSumOverrides } from '@/components/simulator/lump-sum-overrides';
 
 type Props = {
   history: ForecastHistory;
@@ -50,6 +51,11 @@ export function SimulatorClient({
     [history, liveOverrides, currentMonth],
   );
 
+  const availableMonths = useMemo(
+    () => engineResult.projection.map((m) => m.month),
+    [engineResult],
+  );
+
   const handleSelectScenario = (id: string | null) => {
     const scn = id ? scenarios.find((s) => s.id === id) : null;
     setSelectedScenarioId(id);
@@ -81,7 +87,16 @@ export function SimulatorClient({
               knownCategories={history.categories}
             />
           </OverrideSection>
-          {/* More sections in Tasks 8-13 */}
+          <OverrideSection label="Lump sums" count={liveOverrides.lumpSums?.length ?? 0}>
+            <LumpSumOverrides
+              value={liveOverrides.lumpSums}
+              onChange={(next) =>
+                setLiveOverrides((o) => ({ ...o, lumpSums: next }))
+              }
+              availableMonths={availableMonths}
+            />
+          </OverrideSection>
+          {/* More sections in Tasks 9-13 */}
         </div>
 
         {/* Right: debug for now (chart + cards in Wave 4) */}
