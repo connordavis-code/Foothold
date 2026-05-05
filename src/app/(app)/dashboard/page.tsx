@@ -1,13 +1,7 @@
 import Link from 'next/link';
+import { ArrowRight, Sparkles } from 'lucide-react';
 import { auth } from '@/auth';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { DriftFlagsCard } from '@/components/dashboard/drift-flags-card';
 import { GoalsRow } from '@/components/dashboard/goals-row';
 import { HeroCard } from '@/components/dashboard/hero-card';
@@ -15,6 +9,7 @@ import { InsightTeaserCard } from '@/components/dashboard/insight-teaser-card';
 import { RecentActivityCard } from '@/components/dashboard/recent-activity-card';
 import { SplitCard } from '@/components/dashboard/split-card';
 import { UpcomingRecurringCard } from '@/components/dashboard/upcoming-recurring-card';
+import { MotionStack } from '@/components/motion/motion-stack';
 import {
   getDashboardSummary,
   getNetWorthMonthlyDelta,
@@ -76,28 +71,30 @@ export default async function DashboardPage() {
   const eomProjected = projection.projection[0]?.endCash ?? liquidBalance;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5 px-4 py-6 sm:px-8 sm:py-10">
-      <HeroCard
-        netWorth={summary.netWorth}
-        monthlyDelta={monthlyDelta}
-        sparkline={sparkline}
-      />
+    <div className="mx-auto max-w-5xl px-4 py-6 sm:px-8 sm:py-10">
+      <MotionStack className="space-y-5">
+        <HeroCard
+          netWorth={summary.netWorth}
+          monthlyDelta={monthlyDelta}
+          sparkline={sparkline}
+        />
 
-      <SplitCard
-        liquidBalance={liquidBalance}
-        liquidAccountCount={liquidAccounts}
-        eomProjected={eomProjected}
-      />
+        <SplitCard
+          liquidBalance={liquidBalance}
+          liquidAccountCount={liquidAccounts}
+          eomProjected={eomProjected}
+        />
 
-      <DriftFlagsCard flags={drift.currentlyElevated} />
+        <DriftFlagsCard flags={drift.currentlyElevated} />
 
-      <GoalsRow goals={goals} />
+        <GoalsRow goals={goals} />
 
-      <UpcomingRecurringCard upcoming={upcomingRecurring} />
+        <UpcomingRecurringCard upcoming={upcomingRecurring} />
 
-      <InsightTeaserCard insight={latestInsight} />
+        <InsightTeaserCard insight={latestInsight} />
 
-      <RecentActivityCard transactions={recent} />
+        <RecentActivityCard transactions={recent} />
+      </MotionStack>
     </div>
   );
 }
@@ -124,21 +121,29 @@ async function countLiquidAccounts(userId: string): Promise<number> {
 
 function EmptyState() {
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-8">
-      <Card>
-        <CardHeader>
-          <CardTitle>Connect your first account</CardTitle>
-          <CardDescription>
-            Connect a bank or brokerage via Plaid to see your net worth,
-            transactions, and investments here.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button asChild>
-            <Link href="/settings">Go to Settings</Link>
+    <div className="mx-auto max-w-2xl px-4 py-16 sm:px-8 sm:py-24">
+      <div className="space-y-6 text-center">
+        <span className="mx-auto grid h-14 w-14 place-items-center rounded-pill bg-gradient-hero text-white shadow-sm">
+          <Sparkles className="h-6 w-6" />
+        </span>
+        <div className="space-y-2">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Welcome to Foothold
+          </h1>
+          <p className="mx-auto max-w-md text-sm text-muted-foreground">
+            Connect a bank or brokerage to see your net worth, recurring
+            charges, and weekly insights all in one place.
+          </p>
+        </div>
+        <div className="flex justify-center">
+          <Button asChild size="default">
+            <Link href="/settings">
+              Connect your first account
+              <ArrowRight className="ml-1.5 h-4 w-4" />
+            </Link>
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

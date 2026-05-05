@@ -1,14 +1,8 @@
 import Link from 'next/link';
+import { ArrowRight, Receipt } from 'lucide-react';
 import { auth } from '@/auth';
 import { OperatorShell } from '@/components/transactions/operator-shell';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import {
   getDistinctCategories,
   getTransactions,
@@ -49,20 +43,29 @@ export default async function TransactionsPage({
 
   if (accounts.length === 0) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>No accounts connected</CardTitle>
-            <CardDescription>
-              Connect a bank or brokerage to start syncing transactions.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+      <div className="mx-auto max-w-2xl px-4 py-16 sm:px-8 sm:py-24">
+        <div className="space-y-6 text-center">
+          <span className="mx-auto grid h-14 w-14 place-items-center rounded-pill bg-accent text-foreground/80">
+            <Receipt className="h-6 w-6" />
+          </span>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-semibold tracking-tight">
+              No transactions yet
+            </h1>
+            <p className="mx-auto max-w-md text-sm text-muted-foreground">
+              Connect a bank or credit card to start syncing transactions.
+              You'll see them flow in here as soon as Plaid hands them over.
+            </p>
+          </div>
+          <div className="flex justify-center">
             <Button asChild>
-              <Link href="/settings">Go to Settings</Link>
+              <Link href="/settings">
+                Connect an account
+                <ArrowRight className="ml-1.5 h-4 w-4" />
+              </Link>
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     );
   }

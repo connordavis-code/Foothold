@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { SearchX } from 'lucide-react';
 import type { TransactionListRow } from '@/lib/db/queries/transactions';
 import { cn, formatCurrency } from '@/lib/utils';
 
@@ -30,11 +32,7 @@ export function OperatorTable({ rows, selectedIndex }: Props) {
   }, [selectedIndex]);
 
   if (rows.length === 0) {
-    return (
-      <div className="rounded-card border border-border bg-surface-elevated px-6 py-16 text-center text-sm text-muted-foreground">
-        No transactions match these filters.
-      </div>
-    );
+    return <NoMatchEmpty />;
   }
 
   return (
@@ -64,6 +62,38 @@ export function OperatorTable({ rows, selectedIndex }: Props) {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function NoMatchEmpty() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const hasFilters = params.size > 0;
+
+  return (
+    <div className="flex flex-col items-center justify-center gap-4 rounded-card border border-border bg-surface-elevated px-6 py-16 text-center">
+      <span className="grid h-12 w-12 place-items-center rounded-pill bg-accent text-foreground/70">
+        <SearchX className="h-5 w-5" />
+      </span>
+      <div className="space-y-1">
+        <p className="text-base font-medium">No transactions match</p>
+        <p className="text-sm text-muted-foreground">
+          {hasFilters
+            ? 'Try widening the date range, switching the account, or clearing the search.'
+            : 'No transactions have synced yet — try Sync now from the top bar.'}
+        </p>
+      </div>
+      {hasFilters && (
+        <button
+          type="button"
+          onClick={() => router.push(pathname)}
+          className="text-xs font-medium text-foreground/80 underline-offset-4 hover:underline"
+        >
+          Clear all filters
+        </button>
+      )}
     </div>
   );
 }
