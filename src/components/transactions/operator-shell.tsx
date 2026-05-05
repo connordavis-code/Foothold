@@ -100,6 +100,20 @@ export function OperatorShell({
     lastClickedRef.current = null;
   }, []);
 
+  const toggleAllVisible = useCallback(() => {
+    setSelectedIds((prev) => {
+      const allChecked =
+        rows.length > 0 && rows.every((r) => prev.has(r.id));
+      // Indeterminate (some-but-not-all) → select-all is the most-expected
+      // interaction. Only the fully-checked state inverts to clear.
+      if (allChecked) {
+        lastClickedRef.current = null;
+        return new Set();
+      }
+      return new Set(rows.map((r) => r.id));
+    });
+  }, [rows]);
+
   useEffect(() => {
     function shouldIgnore(e: KeyboardEvent): boolean {
       const t = e.target as HTMLElement | null;
@@ -178,6 +192,7 @@ export function OperatorShell({
         selectedIndex={selectedIndex}
         selectedIds={selectedIds}
         onToggle={onToggle}
+        onToggleAllVisible={toggleAllVisible}
       />
       <OperatorPagination
         page={page}

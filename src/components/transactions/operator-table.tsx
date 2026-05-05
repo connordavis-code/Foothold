@@ -15,6 +15,7 @@ type Props = {
     index: number,
     opts: { range?: boolean },
   ) => void;
+  onToggleAllVisible: () => void;
 };
 
 /**
@@ -31,8 +32,12 @@ export function OperatorTable({
   selectedIndex,
   selectedIds,
   onToggle,
+  onToggleAllVisible,
 }: Props) {
   const rowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
+  const allChecked =
+    rows.length > 0 && rows.every((r) => selectedIds.has(r.id));
+  const someChecked = !allChecked && rows.some((r) => selectedIds.has(r.id));
 
   useEffect(() => {
     rowRefs.current = rowRefs.current.slice(0, rows.length);
@@ -54,7 +59,14 @@ export function OperatorTable({
         <table className="w-full text-sm">
           <thead className="sticky top-0 z-10 bg-surface-elevated/95 backdrop-blur">
             <tr className="border-b border-border text-[10px] uppercase tracking-[0.08em] text-muted-foreground/80">
-              <Th className="w-[36px] text-center" aria-label="Select" />
+              <Th className="w-[36px] text-center">
+                <SelectAllCheckbox
+                  allChecked={allChecked}
+                  someChecked={someChecked}
+                  disabled={rows.length === 0}
+                  onToggle={onToggleAllVisible}
+                />
+              </Th>
               <Th className="w-[110px] text-left">Date</Th>
               <Th className="text-left">Description</Th>
               <Th className="text-left">Category</Th>
@@ -100,6 +112,47 @@ function Th({
     >
       {children}
     </th>
+  );
+}
+
+function SelectAllCheckbox({
+  allChecked,
+  someChecked,
+  disabled,
+  onToggle,
+}: {
+  allChecked: boolean;
+  someChecked: boolean;
+  disabled: boolean;
+  onToggle: () => void;
+}) {
+  const ref = useRef<HTMLInputElement | null>(null);
+
+  // `indeterminate` is a DOM property only — React won't set it from props.
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = someChecked;
+  }, [someChecked]);
+
+  const state = allChecked
+    ? 'checked'
+    : someChecked
+      ? 'indeterminate'
+      : 'unchecked';
+  const label = allChecked
+    ? 'Deselect all visible rows'
+    : 'Select all visible rows';
+
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      checked={allChecked}
+      disabled={disabled}
+      data-state={state}
+      aria-label={label}
+      onChange={onToggle}
+      className="h-3.5 w-3.5 cursor-pointer rounded border-border text-foreground accent-foreground disabled:cursor-not-allowed disabled:opacity-40"
+    />
   );
 }
 
