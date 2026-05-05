@@ -1,13 +1,14 @@
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   financialAccounts,
   holdings,
+  investmentTransactions,
   plaidItems,
   securities,
 } from '@/lib/db/schema';
 
-export type HoldingRow = {
+export type FlatHolding = {
   id: string;
   ticker: string | null;
   securityName: string | null;
@@ -16,56 +17,32 @@ export type HoldingRow = {
   costBasis: number | null;
   institutionPrice: number | null;
   institutionValue: number | null;
-};
-
-export type AccountWithHoldings = {
-  id: string;
-  name: string;
-  subtype: string | null;
-  mask: string | null;
-  currentBalance: number | null;
-  totalValue: number;
-  totalCost: number;
-  /** Sum of (institution_value − cost_basis) for holdings where both are present. */
-  totalGainLoss: number;
-  /** Number of holdings for which we had a cost basis (so the GL number is meaningful). */
-  costedHoldingsCount: number;
-  holdings: HoldingRow[];
+  closePrice: number | null;
+  /** Per-holding day delta in dollars; null when prices unavailable. */
+  dayDelta: number | null;
+  accountId: string;
+  accountName: string;
+  accountMask: string | null;
 };
 
 /**
- * All holdings for the user, grouped by investment account. One JOINed
- * query, then bucketed in JS — simpler than nested SQL aggregations.
+ * Flat-across-accounts holdings list. Drives the dashboard's
+ * group-by-flat default — the question "where am I overexposed across
+ * everything?" lands faster from a flat list than from per-account
+ * cards. Account name + mask travel with each row so the operator can
+ * still see where each position lives.
  *
- * Accounts with no holdings (e.g., investment accounts that hold only
- * uncategorized cash sweeps) are still returned with an empty holdings
- * list and a totalValue derived from the account-level balance.
+ * Day delta uses securities.closePrice as the prior reference and
+ * holding.institutionPrice as the latest. When Plaid hasn't provided
+ * closePrice (sandbox / new ticker / etc.) the delta is null and the
+ * UI shows "—". When Plaid's two timestamps match (same-day update),
+ * the delta is naturally 0 — that's honest, not a bug.
  */
-export async function getHoldingsByAccount(
+export async function getHoldingsFlat(
   userId: string,
-): Promise<AccountWithHoldings[]> {
-  // Pull all investment-type accounts so accounts without holdings still
-  // appear (e.g., a brokerage holding only an uncategorized cash sweep).
-  const investmentAccounts = await db
-    .select({
-      id: financialAccounts.id,
-      name: financialAccounts.name,
-      subtype: financialAccounts.subtype,
-      mask: financialAccounts.mask,
-      currentBalance: financialAccounts.currentBalance,
-    })
-    .from(financialAccounts)
-    .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
-    .where(
-      and(eq(plaidItems.userId, userId), eq(financialAccounts.type, 'investment')),
-    )
-    .orderBy(asc(financialAccounts.name));
-
-  if (investmentAccounts.length === 0) return [];
-
+): Promise<FlatHolding[]> {
   const rows = await db
     .select({
-      accountId: holdings.accountId,
       holdingId: holdings.id,
       quantity: holdings.quantity,
       costBasis: holdings.costBasis,
@@ -74,6 +51,10 @@ export async function getHoldingsByAccount(
       ticker: securities.ticker,
       securityName: securities.name,
       securityType: securities.type,
+      closePrice: securities.closePrice,
+      accountId: financialAccounts.id,
+      accountName: financialAccounts.name,
+      accountMask: financialAccounts.mask,
     })
     .from(holdings)
     .innerJoin(
@@ -82,52 +63,178 @@ export async function getHoldingsByAccount(
     )
     .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
     .innerJoin(securities, eq(securities.id, holdings.securityId))
-    .where(eq(plaidItems.userId, userId))
+    .where(
+      and(
+        eq(plaidItems.userId, userId),
+        eq(financialAccounts.type, 'investment'),
+      ),
+    )
     .orderBy(desc(holdings.institutionValue));
 
-  const holdingsByAccount = new Map<string, HoldingRow[]>();
-  for (const r of rows) {
-    const list = holdingsByAccount.get(r.accountId) ?? [];
-    list.push({
+  return rows.map((r) => {
+    const quantity = Number(r.quantity);
+    const institutionPrice =
+      r.institutionPrice != null ? Number(r.institutionPrice) : null;
+    const closePrice = r.closePrice != null ? Number(r.closePrice) : null;
+    const dayDelta =
+      institutionPrice != null && closePrice != null
+        ? quantity * (institutionPrice - closePrice)
+        : null;
+
+    return {
       id: r.holdingId,
       ticker: r.ticker,
       securityName: r.securityName,
       securityType: r.securityType,
-      quantity: Number(r.quantity),
+      quantity,
       costBasis: r.costBasis != null ? Number(r.costBasis) : null,
-      institutionPrice:
-        r.institutionPrice != null ? Number(r.institutionPrice) : null,
+      institutionPrice,
       institutionValue:
         r.institutionValue != null ? Number(r.institutionValue) : null,
-    });
-    holdingsByAccount.set(r.accountId, list);
-  }
-
-  return investmentAccounts.map((acc) => {
-    const items = holdingsByAccount.get(acc.id) ?? [];
-    let totalValue = 0;
-    let totalCost = 0;
-    let totalGainLoss = 0;
-    let costedHoldingsCount = 0;
-
-    for (const h of items) {
-      if (h.institutionValue != null) totalValue += h.institutionValue;
-      if (h.costBasis != null && h.institutionValue != null) {
-        totalCost += h.costBasis;
-        totalGainLoss += h.institutionValue - h.costBasis;
-        costedHoldingsCount++;
-      }
-    }
-
-    return {
-      ...acc,
-      currentBalance:
-        acc.currentBalance != null ? Number(acc.currentBalance) : null,
-      totalValue,
-      totalCost,
-      totalGainLoss,
-      costedHoldingsCount,
-      holdings: items,
+      closePrice,
+      dayDelta,
+      accountId: r.accountId,
+      accountName: r.accountName,
+      accountMask: r.accountMask,
     };
   });
+}
+
+export type PortfolioSummary = {
+  totalValue: number;
+  totalCost: number;
+  unrealizedGainLoss: number;
+  unrealizedGainLossPct: number | null;
+  /** Sum of per-holding day deltas; null when no holding has a usable close price. */
+  dayDelta: number | null;
+  dayDeltaPct: number | null;
+  costedHoldingsCount: number;
+  accountCount: number;
+};
+
+/**
+ * One-call portfolio summary for the operator grid. Aggregates from
+ * the flat holdings list — single source of truth, same numbers the
+ * holdings table renders. Month-Δ and YTD-Δ deltas are deferred until
+ * a snapshot table exists; this phase ships total / day Δ / unrealized
+ * gain in three cells.
+ */
+export async function getPortfolioSummary(
+  userId: string,
+): Promise<PortfolioSummary> {
+  const [accountRows, flat] = await Promise.all([
+    db
+      .select({ id: financialAccounts.id })
+      .from(financialAccounts)
+      .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
+      .where(
+        and(
+          eq(plaidItems.userId, userId),
+          eq(financialAccounts.type, 'investment'),
+        ),
+      ),
+    getHoldingsFlat(userId),
+  ]);
+
+  let totalValue = 0;
+  let totalCost = 0;
+  let unrealizedGainLoss = 0;
+  let costedHoldingsCount = 0;
+  let dayDeltaSum = 0;
+  let dayPriorValueSum = 0;
+  let anyDayDelta = false;
+
+  for (const h of flat) {
+    if (h.institutionValue != null) totalValue += h.institutionValue;
+    if (h.costBasis != null && h.institutionValue != null) {
+      totalCost += h.costBasis;
+      unrealizedGainLoss += h.institutionValue - h.costBasis;
+      costedHoldingsCount++;
+    }
+    if (h.dayDelta != null && h.closePrice != null) {
+      dayDeltaSum += h.dayDelta;
+      dayPriorValueSum += h.quantity * h.closePrice;
+      anyDayDelta = true;
+    }
+  }
+
+  return {
+    totalValue,
+    totalCost,
+    unrealizedGainLoss,
+    unrealizedGainLossPct:
+      totalCost > 0 ? unrealizedGainLoss / totalCost : null,
+    dayDelta: anyDayDelta ? dayDeltaSum : null,
+    dayDeltaPct:
+      anyDayDelta && dayPriorValueSum > 0
+        ? dayDeltaSum / dayPriorValueSum
+        : null,
+    costedHoldingsCount,
+    accountCount: accountRows.length,
+  };
+}
+
+export type RecentInvestmentTxn = {
+  id: string;
+  date: string;
+  type: string | null;
+  subtype: string | null;
+  name: string | null;
+  ticker: string | null;
+  securityName: string | null;
+  quantity: number | null;
+  price: number | null;
+  amount: number;
+  fees: number | null;
+  accountName: string;
+  accountMask: string | null;
+};
+
+/**
+ * Recent buys / sells / dividends / fees for the secondary table on
+ * /investments. Mirrors the shape the operator transactions table
+ * uses so the dashboard's recent-activity card pattern stays
+ * consistent across surfaces.
+ */
+export async function getRecentInvestmentTransactions(
+  userId: string,
+  limit = 20,
+): Promise<RecentInvestmentTxn[]> {
+  const rows = await db
+    .select({
+      id: investmentTransactions.id,
+      date: investmentTransactions.date,
+      type: investmentTransactions.type,
+      subtype: investmentTransactions.subtype,
+      name: investmentTransactions.name,
+      quantity: investmentTransactions.quantity,
+      price: investmentTransactions.price,
+      amount: investmentTransactions.amount,
+      fees: investmentTransactions.fees,
+      ticker: securities.ticker,
+      securityName: securities.name,
+      accountName: financialAccounts.name,
+      accountMask: financialAccounts.mask,
+    })
+    .from(investmentTransactions)
+    .innerJoin(
+      financialAccounts,
+      eq(financialAccounts.id, investmentTransactions.accountId),
+    )
+    .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
+    .leftJoin(
+      securities,
+      eq(securities.id, investmentTransactions.securityId),
+    )
+    .where(eq(plaidItems.userId, userId))
+    .orderBy(desc(investmentTransactions.date), desc(investmentTransactions.createdAt))
+    .limit(limit);
+
+  return rows.map((r) => ({
+    ...r,
+    amount: Number(r.amount),
+    quantity: r.quantity != null ? Number(r.quantity) : null,
+    price: r.price != null ? Number(r.price) : null,
+    fees: r.fees != null ? Number(r.fees) : null,
+  }));
 }
