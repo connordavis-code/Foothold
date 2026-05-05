@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import type { Scenario } from '@/lib/db/schema';
 import { projectCash } from '@/lib/forecast/engine';
 import type { ForecastHistory, ScenarioOverrides } from '@/lib/forecast/types';
+import { ScenarioHeader } from '@/components/simulator/scenario-header';
 
 type Props = {
   history: ForecastHistory;
@@ -55,62 +56,31 @@ export function SimulatorClient({
 
   return (
     <div className="px-6 py-8 max-w-6xl">
-      <header className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight">Simulator</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {selectedScenario?.name ?? 'Baseline'} · {isDirty ? 'edited' : 'saved'}
-        </p>
-      </header>
+      <ScenarioHeader
+        scenarios={scenarios}
+        selectedScenarioId={selectedScenarioId}
+        liveOverrides={liveOverrides}
+        isDirty={isDirty}
+        onSelect={handleSelectScenario}
+      />
 
-      {/* Scaffold view — proves engine runs reactively. Real layout in Task 5+. */}
-      <div className="grid grid-cols-2 gap-6">
-        <div className="bg-muted/40 border border-border rounded-lg p-4">
-          <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
-            Scenarios
-          </div>
-          <ul className="space-y-1 text-sm">
-            <li>
-              <button
-                onClick={() => handleSelectScenario(null)}
-                className={selectedScenarioId === null ? 'font-semibold' : 'text-muted-foreground'}
-              >
-                (Baseline)
-              </button>
-            </li>
-            {scenarios.map((s) => (
-              <li key={s.id}>
-                <button
-                  onClick={() => handleSelectScenario(s.id)}
-                  className={selectedScenarioId === s.id ? 'font-semibold' : 'text-muted-foreground'}
-                >
-                  {s.name}
-                </button>
-              </li>
-            ))}
-          </ul>
+      {/* Engine result debug — replaced in Wave 4 */}
+      <div className="bg-muted/40 border border-border rounded-lg p-4">
+        <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
+          Engine result (live)
         </div>
-
-        <div className="bg-muted/40 border border-border rounded-lg p-4">
-          <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
-            Engine result (live)
-          </div>
-          <pre className="text-xs overflow-x-auto">
-            {JSON.stringify(
-              {
-                projectionMonths: engineResult.projection.length,
-                endCashMonth0: engineResult.projection[0]?.endCash,
-                goalImpacts: engineResult.goalImpacts.map((g) => ({
-                  name: g.name,
-                  scenarioETA: g.scenarioETA,
-                  shiftMonths: g.shiftMonths,
-                })),
-                isDirty,
-              },
-              null,
-              2,
-            )}
-          </pre>
-        </div>
+        <pre className="text-xs overflow-x-auto">
+          {JSON.stringify(
+            {
+              projectionMonths: engineResult.projection.length,
+              endCashMonth0: engineResult.projection[0]?.endCash,
+              goalImpacts: engineResult.goalImpacts,
+              isDirty,
+            },
+            null,
+            2,
+          )}
+        </pre>
       </div>
     </div>
   );
