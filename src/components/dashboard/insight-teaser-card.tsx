@@ -25,7 +25,7 @@ export function InsightTeaserCard({ insight }: Props) {
           <Sparkles className="h-4 w-4" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+          <p className="text-eyebrow">
             This week's insight
           </p>
           <p className="mt-1.5 text-base leading-snug text-foreground">

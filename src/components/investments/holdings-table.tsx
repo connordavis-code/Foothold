@@ -69,7 +69,7 @@ export function HoldingsTable({ holdings }: Props) {
   return (
     <div className="space-y-3">
       <div className="flex items-baseline justify-between gap-3">
-        <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+        <p className="text-eyebrow">
           Holdings · {holdings.length}
         </p>
         <GroupByToggle value={groupBy} onChange={setGroupBy} />

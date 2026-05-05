@@ -10,7 +10,7 @@ export function HeaderBlock({ mode, buttonMode }: Props) {
   return (
     <div className="flex items-start justify-between gap-4">
       <div className="space-y-1.5">
-        <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+        <p className="text-eyebrow">
           {mode === 'current' ? 'Today' : 'Archived'}
         </p>
         <h1 className="text-xl font-semibold tracking-tight">Insights</h1>

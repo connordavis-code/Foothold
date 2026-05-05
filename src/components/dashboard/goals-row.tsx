@@ -22,7 +22,7 @@ export function GoalsRow({ goals }: Props) {
     <section className="space-y-3">
       <header className="flex items-baseline justify-between gap-3 px-1">
         <div>
-          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+          <p className="text-eyebrow">
             Goals
           </p>
           <h2 className="mt-1 text-sm font-medium">

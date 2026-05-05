@@ -27,7 +27,7 @@ export default async function GoalsPage() {
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-8 sm:py-8">
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1.5">
-          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+          <p className="text-eyebrow">
             Plan
           </p>
           <h1 className="text-xl font-semibold tracking-tight">Goals</h1>
@@ -84,7 +84,7 @@ function GoalTile({ goal }: { goal: GoalWithProgress }) {
 
       {goal.scopedAccountNames.length > 0 && (
         <div className="space-y-1">
-          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+          <p className="text-eyebrow">
             {goal.type === 'savings' ? 'Accounts' : 'Tracked accounts'}
           </p>
           <p className="text-xs text-muted-foreground">
@@ -97,7 +97,7 @@ function GoalTile({ goal }: { goal: GoalWithProgress }) {
         goal.categoryFilter &&
         goal.categoryFilter.length > 0 && (
           <div className="space-y-1">
-            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+            <p className="text-eyebrow">
               Categories
             </p>
             <p className="text-xs text-muted-foreground">

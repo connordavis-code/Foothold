@@ -28,7 +28,7 @@ export default async function InvestmentsPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-8 sm:py-8">
       <div className="space-y-1.5">
-        <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+        <p className="text-eyebrow">
           Records
         </p>
         <h1 className="text-xl font-semibold tracking-tight">Investments</h1>

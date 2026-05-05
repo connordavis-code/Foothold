@@ -52,7 +52,7 @@ function Cell({
 }) {
   return (
     <div className="flex flex-col gap-1.5 p-5 sm:p-6">
-      <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+      <p className="text-eyebrow">
         {label}
       </p>
       <p className="font-mono text-2xl font-semibold tracking-[-0.015em] tabular-nums sm:text-3xl">
@@ -80,7 +80,7 @@ function DeltaCell({
 
   return (
     <div className="flex flex-col gap-1.5 p-5 sm:p-6">
-      <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+      <p className="text-eyebrow">
         {label}
       </p>
       <p

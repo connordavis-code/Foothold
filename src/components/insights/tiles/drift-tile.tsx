@@ -19,7 +19,7 @@ export function DriftTile({ data }: Props) {
   const top = data.elevated.slice(0, 3);
   return (
     <section className="rounded-card border border-border bg-surface-elevated p-5 sm:p-6">
-      <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+      <p className="text-eyebrow">
         Drift
       </p>
       <p className="mt-2 text-sm text-foreground">

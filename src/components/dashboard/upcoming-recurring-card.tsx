@@ -25,7 +25,7 @@ export function UpcomingRecurringCard({ upcoming, days = 7 }: Props) {
     <section className="rounded-card border border-border bg-surface-elevated p-5 sm:p-6">
       <header className="mb-4 flex items-baseline justify-between gap-3">
         <div>
-          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+          <p className="text-eyebrow">
             Recurring · next {days} days
           </p>
           <h2 className="mt-1 text-sm font-medium">

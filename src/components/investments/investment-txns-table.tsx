@@ -17,7 +17,7 @@ export function InvestmentTxnsTable({ transactions }: Props) {
 
   return (
     <section className="space-y-3">
-      <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+      <p className="text-eyebrow">
         Recent investment activity · {transactions.length}
       </p>
       <div className="overflow-hidden rounded-card border border-border bg-surface-elevated">

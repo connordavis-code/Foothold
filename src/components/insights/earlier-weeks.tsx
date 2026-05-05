@@ -16,7 +16,7 @@ export function EarlierWeeks({ entries, excludeWeekStart = null }: Props) {
 
   return (
     <section className="space-y-3">
-      <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+      <p className="text-eyebrow">
         Earlier weeks
       </p>
       <div className="divide-y divide-border rounded-card border border-border bg-surface-elevated">

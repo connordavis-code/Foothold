@@ -15,7 +15,7 @@ export function ReceiptsSection({ supplements }: Props) {
   const singleCol = tileGridIsSingleColumn(visible);
   return (
     <section className="space-y-3">
-      <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+      <p className="text-eyebrow">
         What Claude saw
       </p>
       <div

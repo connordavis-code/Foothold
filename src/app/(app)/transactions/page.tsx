@@ -76,7 +76,7 @@ export default async function TransactionsPage({
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-8">
       <div className="mb-5 flex items-baseline justify-between gap-3">
         <div>
-          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+          <p className="text-eyebrow">
             Records
           </p>
           <h1 className="mt-1 text-xl font-semibold tracking-tight">

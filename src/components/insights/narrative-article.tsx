@@ -26,7 +26,7 @@ export function NarrativeArticle({ insight, isCurrentWeek, showStaleChip }: Prop
     <article className="space-y-5 rounded-card border border-border bg-surface-elevated p-6 sm:p-8">
       <header className="flex items-baseline justify-between gap-3 border-b border-border pb-4">
         <div className="space-y-1">
-          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+          <p className="text-eyebrow">
             Week of
           </p>
           <p className="font-mono text-sm tabular-nums text-foreground">

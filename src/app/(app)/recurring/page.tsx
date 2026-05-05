@@ -36,7 +36,7 @@ export default async function RecurringPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-8 sm:py-8">
       <div className="space-y-1.5">
-        <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+        <p className="text-eyebrow">
           Plan
         </p>
         <h1 className="text-xl font-semibold tracking-tight">Recurring</h1>
@@ -94,7 +94,7 @@ function SummaryCell({
 }) {
   return (
     <div className="flex flex-col gap-1.5 p-5 sm:p-6">
-      <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+      <p className="text-eyebrow">
         {label}
       </p>
       <p
@@ -123,7 +123,7 @@ function StreamSection({
   return (
     <section className="space-y-3">
       <div>
-        <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+        <p className="text-eyebrow">
           {eyebrow} · {rows.length}
         </p>
         <p className="mt-1 text-sm text-muted-foreground">{sub}</p>

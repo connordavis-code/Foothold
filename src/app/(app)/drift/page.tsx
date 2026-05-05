@@ -24,7 +24,7 @@ export default async function DriftPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-8 sm:py-8">
       <div className="space-y-1.5">
-        <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+        <p className="text-eyebrow">
           Today
         </p>
         <h1 className="text-xl font-semibold tracking-tight">Drift</h1>
@@ -38,7 +38,7 @@ export default async function DriftPage() {
 
       {drift.currentlyElevated.length > 0 ? (
         <section className="space-y-3">
-          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+          <p className="text-eyebrow">
             Elevated this week ·{' '}
             {drift.currentlyElevated.length === 1
               ? '1 category'
@@ -67,7 +67,7 @@ export default async function DriftPage() {
       )}
 
       <section className="space-y-3">
-        <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+        <p className="text-eyebrow">
           Weekly trend · top {drift.topCategories.length} categories
         </p>
         <div className="rounded-card border border-border bg-surface-elevated p-4 sm:p-5">
@@ -77,7 +77,7 @@ export default async function DriftPage() {
 
       {drift.flagHistory.length > 0 && (
         <section className="space-y-3">
-          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+          <p className="text-eyebrow">
             Flag history · {drift.flagHistory.length}{' '}
             {drift.flagHistory.length === 1 ? 'flag' : 'flags'}
           </p>
