@@ -55,7 +55,10 @@ function streamMonthlyEquivalent(stream: {
  *   category overrides (transactions.categoryOverrideId) are ignored in this
  *   iteration — can be incorporated in a future pass.
  * - nonRecurringIncomeHistory: monthly totals of negative-amount transactions
- *   (Plaid: negative = money IN). Also includes recurring inflows since no FK.
+ *   (Plaid: negative = money IN) with total monthly recurring inflows subtracted.
+ *   Same approximation as per-category outflow subtraction (accounts for salary
+ *   etc. that would otherwise be double-counted in both recurring streams and
+ *   transaction buckets).
  * - goals: all active goals. currentSaved is derived from account balances for
  *   savings goals (same approach as goals.ts) and 0 for spend_cap goals.
  * - categories: metadata derived from observed PFC strings (in categoryHistory
@@ -191,6 +194,16 @@ export async function getForecastHistory(userId: string): Promise<ForecastHistor
     categoryHistory[cat] = categoryHistory[cat].map((v) => Math.max(0, v - monthlyEq));
   }
 
+  // --- Subtract total recurring monthly inflow from each month's bucket ---
+  // (Same approximation as the per-category outflow subtraction above —
+  // salary etc. would otherwise be double-counted.)
+  const recurringInflowMonthly = streamRows
+    .filter((s) => s.direction === 'inflow')
+    .reduce((sum, s) => sum + streamMonthlyEquivalent(s), 0);
+  const nonRecurringIncomeHistory = incomeBuckets.map((v) =>
+    Math.max(0, v - recurringInflowMonthly),
+  );
+
   // --- Build categories metadata from observed PFC keys ---
   // Keys come from categoryHistory and active outflow streams — NOT the
   // Foothold `categories` table. id = PFC string; name = human-readable label.
@@ -255,7 +268,7 @@ export async function getForecastHistory(userId: string): Promise<ForecastHistor
     currentCash,
     recurringStreams: mappedStreams,
     categoryHistory,
-    nonRecurringIncomeHistory: incomeBuckets,
+    nonRecurringIncomeHistory,
     goals: mappedGoals,
     categories: categoriesMetadata,
   };
