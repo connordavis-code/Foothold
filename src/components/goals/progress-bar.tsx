@@ -10,7 +10,7 @@ export function ProgressBar({
   const fillClass = {
     positive: 'bg-positive',
     negative: 'bg-destructive',
-    warning: 'bg-yellow-500',
+    warning: 'bg-amber-500',
     neutral: 'bg-foreground/70',
   }[tone];
   return (
