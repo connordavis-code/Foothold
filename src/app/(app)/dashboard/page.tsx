@@ -8,282 +8,123 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { GoalsStrip } from '@/components/goals/goals-strip';
+import { DriftFlagsCard } from '@/components/dashboard/drift-flags-card';
+import { GoalsRow } from '@/components/dashboard/goals-row';
+import { HeroCard } from '@/components/dashboard/hero-card';
+import { InsightTeaserCard } from '@/components/dashboard/insight-teaser-card';
+import { RecentActivityCard } from '@/components/dashboard/recent-activity-card';
+import { SplitCard } from '@/components/dashboard/split-card';
+import { UpcomingRecurringCard } from '@/components/dashboard/upcoming-recurring-card';
 import {
   getDashboardSummary,
+  getNetWorthMonthlyDelta,
+  getNetWorthSparkline,
   getRecentTransactions,
 } from '@/lib/db/queries/dashboard';
+import { getDriftAnalysis } from '@/lib/db/queries/drift';
+import { getForecastHistory } from '@/lib/db/queries/forecast';
 import { getGoalsWithProgress } from '@/lib/db/queries/goals';
-import {
-  getMonthlyRecurringOutflow,
-  getRecurringStreams,
-} from '@/lib/db/queries/recurring';
-import { formatCurrency } from '@/lib/utils';
+import { getLatestInsight } from '@/lib/db/queries/insights';
+import { getUpcomingRecurringOutflows } from '@/lib/db/queries/recurring';
+import { db } from '@/lib/db';
+import { financialAccounts, plaidItems } from '@/lib/db/schema';
+import { and, eq } from 'drizzle-orm';
+import { projectCash } from '@/lib/forecast/engine';
 
 export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user) return null;
+  const userId = session.user.id;
 
-  const [summary, recent, recurring, monthlyRecurring, goals] =
-    await Promise.all([
-      getDashboardSummary(session.user.id),
-      getRecentTransactions(session.user.id, 10),
-      getRecurringStreams(session.user.id),
-      getMonthlyRecurringOutflow(session.user.id),
-      getGoalsWithProgress(session.user.id),
-    ]);
-
-  const activeOutflows = recurring.filter(
-    (r) => r.direction === 'outflow' && r.isActive,
-  );
-  const topSubs = activeOutflows.slice(0, 5);
+  const [
+    summary,
+    monthlyDelta,
+    sparkline,
+    upcomingRecurring,
+    goals,
+    drift,
+    latestInsight,
+    recent,
+    liquidAccounts,
+    forecastHistory,
+  ] = await Promise.all([
+    getDashboardSummary(userId),
+    getNetWorthMonthlyDelta(userId),
+    getNetWorthSparkline(userId, 30),
+    getUpcomingRecurringOutflows(userId, 7),
+    getGoalsWithProgress(userId),
+    getDriftAnalysis(userId),
+    getLatestInsight(userId),
+    getRecentTransactions(userId, 5),
+    countLiquidAccounts(userId),
+    getForecastHistory(userId),
+  ]);
 
   if (!summary.hasAnyItem) {
     return <EmptyState />;
   }
 
+  const liquidBalance = summary.assets - summary.investments;
+
+  // EOM projected: feed the engine the current month with no overrides.
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const projection = projectCash({
+    history: forecastHistory,
+    overrides: {},
+    currentMonth,
+  });
+  const eomProjected = projection.projection[0]?.endCash ?? liquidBalance;
+
   return (
-    <div className="px-8 py-8 max-w-7xl mx-auto space-y-8">
-      <div className="space-y-1">
-        <p className="text-xs uppercase tracking-widest text-muted-foreground">
-          Dashboard
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight">
-          Welcome{session.user.name ? `, ${session.user.name}` : ''}
-        </h1>
-      </div>
+    <div className="mx-auto max-w-5xl space-y-5 px-4 py-6 sm:px-8 sm:py-10">
+      <HeroCard
+        netWorth={summary.netWorth}
+        monthlyDelta={monthlyDelta}
+        sparkline={sparkline}
+      />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Net worth"
-          value={formatCurrency(summary.netWorth)}
-          subline={`${formatCurrency(summary.assets)} assets · ${formatCurrency(summary.liabilities)} liabilities`}
-        />
-        <StatCard
-          label="This month spend"
-          value={formatCurrency(summary.monthSpend)}
-          subline={
-            summary.monthSpend === 0
-              ? 'No transactions this month'
-              : 'Excludes transfers and loan payments'
-          }
-        />
-        <StatCard
-          label="Investments"
-          value={formatCurrency(summary.investments)}
-          subline={
-            summary.investments === 0
-              ? 'No investment accounts'
-              : 'Account-level balances'
-          }
-        />
-        <StatCard
-          label="Recurring / month"
-          value={formatCurrency(monthlyRecurring)}
-          subline={
-            activeOutflows.length === 0
-              ? 'No subscriptions detected yet'
-              : `${activeOutflows.length} active ${activeOutflows.length === 1 ? 'subscription' : 'subscriptions'}`
-          }
-        />
-      </div>
+      <SplitCard
+        liquidBalance={liquidBalance}
+        liquidAccountCount={liquidAccounts}
+        eomProjected={eomProjected}
+      />
 
-      <GoalsStrip goals={goals} />
+      <DriftFlagsCard flags={drift.currentlyElevated} />
 
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4">
-          <div className="space-y-1.5">
-            <CardTitle>Recent transactions</CardTitle>
-            <CardDescription>
-              Last {recent.length}{' '}
-              {recent.length === 1 ? 'transaction' : 'transactions'} across
-              all your accounts.
-            </CardDescription>
-          </div>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/transactions">View all</Link>
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {recent.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No transactions synced yet.
-            </p>
-          ) : (
-            <ul className="divide-y divide-border">
-              {recent.map((t) => (
-                <TransactionRow key={t.id} t={t} />
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      <GoalsRow goals={goals} />
 
-      {topSubs.length > 0 && (
-        <Card>
-          <CardHeader className="flex flex-row items-start justify-between gap-4">
-            <div className="space-y-1.5">
-              <CardTitle>Top subscriptions</CardTitle>
-              <CardDescription>
-                Active recurring outflows detected from your transaction
-                history.
-              </CardDescription>
-            </div>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/recurring">View all</Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <ul className="divide-y divide-border">
-              {topSubs.map((s) => (
-                <SubscriptionRow key={s.id} s={s} />
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
+      <UpcomingRecurringCard upcoming={upcomingRecurring} />
+
+      <InsightTeaserCard insight={latestInsight} />
+
+      <RecentActivityCard transactions={recent} />
     </div>
   );
 }
 
-function SubscriptionRow({
-  s,
-}: {
-  s: Awaited<ReturnType<typeof getRecurringStreams>>[number];
-}) {
-  return (
-    <li className="flex items-center justify-between py-3">
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium truncate">
-          {s.merchantName ?? s.description ?? 'Unknown'}
-          {s.status === 'EARLY_DETECTION' && (
-            <span className="ml-2 text-xs text-muted-foreground font-normal">
-              early detection
-            </span>
-          )}
-        </p>
-        <p className="text-xs text-muted-foreground truncate">
-          {humanizeFrequency(s.frequency)}
-          {s.predictedNextDate &&
-            ` · next ${formatTxDate(s.predictedNextDate)}`}
-          {' · '}
-          {s.accountName}
-          {s.accountMask && ` ····${s.accountMask}`}
-        </p>
-      </div>
-      <p className="tabular text-sm font-medium tabular-nums shrink-0 ml-4">
-        {s.averageAmount != null ? formatCurrency(s.averageAmount) : '—'}
-      </p>
-    </li>
-  );
-}
-
-function humanizeFrequency(f: string): string {
-  switch (f) {
-    case 'WEEKLY':
-      return 'Weekly';
-    case 'BIWEEKLY':
-      return 'Every 2 weeks';
-    case 'SEMI_MONTHLY':
-      return 'Twice a month';
-    case 'MONTHLY':
-      return 'Monthly';
-    case 'ANNUALLY':
-      return 'Annually';
-    default:
-      return 'Recurring';
-  }
-}
-
-function StatCard({
-  label,
-  value,
-  subline,
-}: {
-  label: string;
-  value: string;
-  subline: string;
-}) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardDescription>{label}</CardDescription>
-        <CardTitle className="text-3xl tabular">{value}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-xs text-muted-foreground">{subline}</p>
-      </CardContent>
-    </Card>
-  );
-}
-
-function TransactionRow({
-  t,
-}: {
-  t: Awaited<ReturnType<typeof getRecentTransactions>>[number];
-}) {
-  // Plaid: positive amount = money out (debit). Flip the sign for display.
-  const display = -t.amount;
-  const isIncome = display > 0;
-
-  return (
-    <li className="flex items-center justify-between py-3">
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium truncate">
-          {t.merchantName ?? t.name}
-          {t.pending && (
-            <span className="ml-2 text-xs text-muted-foreground font-normal">
-              pending
-            </span>
-          )}
-        </p>
-        <p className="text-xs text-muted-foreground truncate">
-          {formatTxDate(t.date)}
-          {t.primaryCategory && ` · ${humanizeCategory(t.primaryCategory)}`}
-          {' · '}
-          {t.accountName}
-          {t.accountMask && ` ····${t.accountMask}`}
-        </p>
-      </div>
-      <p
-        className={`tabular text-sm font-medium tabular-nums shrink-0 ml-4 ${
-          isIncome ? 'text-positive' : 'text-foreground'
-        }`}
-      >
-        {formatCurrency(display, { signed: true })}
-      </p>
-    </li>
-  );
-}
-
-function formatTxDate(d: string | Date): string {
-  const date = typeof d === 'string' ? new Date(d) : d;
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
-/** Plaid PFC primary categories come back like 'FOOD_AND_DRINK'. Make readable. */
-function humanizeCategory(c: string): string {
-  return c
-    .toLowerCase()
-    .split('_')
-    .map((w) => w[0]?.toUpperCase() + w.slice(1))
-    .join(' ');
+/**
+ * Count of accounts that count as "liquid" — depository only. Used by
+ * the SplitCard's "across N accounts" subline. Pulled inline rather
+ * than added to getDashboardSummary because no other surface needs the
+ * count yet (avoids the slippery-slope of one-off summary fields).
+ */
+async function countLiquidAccounts(userId: string): Promise<number> {
+  const rows = await db
+    .select({ id: financialAccounts.id })
+    .from(financialAccounts)
+    .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
+    .where(
+      and(
+        eq(plaidItems.userId, userId),
+        eq(financialAccounts.type, 'depository'),
+      ),
+    );
+  return rows.length;
 }
 
 function EmptyState() {
   return (
-    <div className="px-8 py-8 max-w-7xl mx-auto">
-      <div className="space-y-1 mb-8">
-        <p className="text-xs uppercase tracking-widest text-muted-foreground">
-          Dashboard
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight">
-          Welcome
-        </h1>
-      </div>
+    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-8">
       <Card>
         <CardHeader>
           <CardTitle>Connect your first account</CardTitle>
