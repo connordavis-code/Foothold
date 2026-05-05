@@ -131,9 +131,10 @@ function median4(values: number[]): number {
 export async function getDriftAnalysis(
   userId: string,
   visibleWeeks: number = DEFAULT_HISTORY_WEEKS,
+  endAnchor?: string,
 ): Promise<DriftAnalysis> {
-  const endAnchor = yesterday();
-  const windows = buildWeekWindows(endAnchor, visibleWeeks);
+  const anchor = endAnchor ?? yesterday();
+  const windows = buildWeekWindows(anchor, visibleWeeks);
   const earliest = windows[0].weekStart;
   const latest = windows[windows.length - 1].weekEnd;
 
@@ -243,7 +244,7 @@ export async function getDriftAnalysis(
   );
 
   return {
-    weekEnd: endAnchor,
+    weekEnd: anchor,
     topCategories: histories,
     currentlyElevated,
     flagHistory,
