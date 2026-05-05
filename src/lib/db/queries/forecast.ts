@@ -1,7 +1,6 @@
-import { and, eq, gte, inArray } from 'drizzle-orm';
+import { and, eq, gte } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
-  categories,
   financialAccounts,
   goals,
   plaidItems,
@@ -12,21 +11,56 @@ import type { ForecastHistory } from '@/lib/forecast/types';
 
 const TRAILING_MONTHS = 3;
 
+/** Convert a Plaid PFC string to a human-readable label. */
+function prettifyPfc(pfc: string): string {
+  if (pfc === 'UNCATEGORIZED') return 'Uncategorized';
+  // FOOD_AND_DRINK → "Food and drink"
+  return pfc
+    .toLowerCase()
+    .replace(/_/g, ' ')
+    .replace(/^./, (c) => c.toUpperCase());
+}
+
+/**
+ * Approximate a recurring stream's monthly cost from Plaid's frequency string.
+ * Uses lastAmount preferentially (more recent); falls back to averageAmount.
+ */
+function streamMonthlyEquivalent(stream: {
+  averageAmount: string | null;
+  lastAmount: string | null;
+  frequency: string | null;
+}): number {
+  const amount = Math.abs(Number(stream.lastAmount ?? stream.averageAmount ?? 0));
+  switch ((stream.frequency ?? '').toUpperCase()) {
+    case 'WEEKLY':       return amount * 4.333;
+    case 'BIWEEKLY':     return amount * 2.167;
+    case 'SEMI_MONTHLY': return amount * 2;
+    case 'ANNUALLY':     return amount / 12;
+    case 'MONTHLY':
+    case 'UNKNOWN':
+    default:             return amount;
+  }
+}
+
 /**
  * Build a snapshot of the user's current state for the forecast engine.
  *
  * - currentCash: sum of current balances on liquid accounts (checking + savings).
  *   Investment accounts excluded — Phase 4-pt2 territory.
- * - categoryHistory: for each category the user has overridden in the last
- *   TRAILING_MONTHS, an array of monthly outflow totals (oldest first).
- *   NOTE: The transaction table has no recurringStreamId FK — we cannot
- *   exclude recurring transactions at query time. The engine should treat
- *   categoryHistory as "all non-investment spend" including recurrings; the
- *   median-based baseline step will smooth this out.
+ * - categoryHistory: keys are Plaid Personal Finance Category strings (e.g.
+ *   `FOOD_AND_DRINK`). Each value is an array of monthly outflow totals (oldest
+ *   first, length = TRAILING_MONTHS). Per-category recurring contributions are
+ *   subtracted from these buckets to avoid double-counting (approximation:
+ *   assumes the recurring stream's PFC matches its transaction PFC). User
+ *   category overrides (transactions.categoryOverrideId) are ignored in this
+ *   iteration — can be incorporated in a future pass.
  * - nonRecurringIncomeHistory: monthly totals of negative-amount transactions
  *   (Plaid: negative = money IN). Also includes recurring inflows since no FK.
  * - goals: all active goals. currentSaved is derived from account balances for
  *   savings goals (same approach as goals.ts) and 0 for spend_cap goals.
+ * - categories: metadata derived from observed PFC strings (in categoryHistory
+ *   or active outflow streams), NOT the Foothold `categories` table. Each entry
+ *   has `id` = PFC string and `name` = human-readable label.
  *
  * Returns empty arrays where data is missing — caller handles gracefully.
  *
@@ -34,7 +68,7 @@ const TRAILING_MONTHS = 3;
  * - financialAccounts scoped via plaidItems JOIN (no direct userId col)
  * - recurringStreams scoped via plaidItems JOIN; uses frequency/description/
  *   lastAmount/predictedNextDate instead of cadence/label/amount/nextDate
- * - transactions uses date (not occurredAt), categoryOverrideId (not categoryId)
+ * - transactions uses date (not occurredAt); categoryOverrideId ignored here
  * - goals uses monthlyAmount (not monthlyContribution); currentSaved computed
  */
 export async function getForecastHistory(userId: string): Promise<ForecastHistory> {
@@ -45,7 +79,7 @@ export async function getForecastHistory(userId: string): Promise<ForecastHistor
     .toISOString()
     .slice(0, 10);
 
-  const [accountRows, streamRows, txRows, goalRows, categoryRows] = await Promise.all([
+  const [accountRows, streamRows, txRows, goalRows] = await Promise.all([
     // Accounts: must join plaidItems for userId scope
     db
       .select({
@@ -69,6 +103,7 @@ export async function getForecastHistory(userId: string): Promise<ForecastHistor
         direction: recurringStreams.direction,
         frequency: recurringStreams.frequency,
         predictedNextDate: recurringStreams.predictedNextDate,
+        primaryCategory: recurringStreams.primaryCategory,
         status: recurringStreams.status,
         isActive: recurringStreams.isActive,
       })
@@ -85,7 +120,6 @@ export async function getForecastHistory(userId: string): Promise<ForecastHistor
     db
       .select({
         amount: transactions.amount,
-        categoryOverrideId: transactions.categoryOverrideId,
         primaryCategory: transactions.primaryCategory,
         date: transactions.date,
       })
@@ -104,12 +138,6 @@ export async function getForecastHistory(userId: string): Promise<ForecastHistor
       .select()
       .from(goals)
       .where(and(eq(goals.userId, userId), eq(goals.isActive, true))),
-
-    // User-defined categories
-    db
-      .select({ id: categories.id, name: categories.name })
-      .from(categories)
-      .where(eq(categories.userId, userId)),
   ]);
 
   // --- currentCash ---
@@ -138,9 +166,9 @@ export async function getForecastHistory(userId: string): Promise<ForecastHistor
 
     const amount = Number(tx.amount);
     if (amount > 0) {
-      // Outflow — bucket by user-overridden category, fall back to primaryCategory.
-      const catKey = tx.categoryOverrideId ?? tx.primaryCategory;
-      if (!catKey) continue;
+      // Outflow — bucket by Plaid PFC string for a consistent keyspace.
+      // categoryOverrideId is intentionally ignored here (deferred to a later iteration).
+      const catKey = tx.primaryCategory ?? 'UNCATEGORIZED';
       if (!categoryHistory[catKey]) {
         categoryHistory[catKey] = Array(TRAILING_MONTHS).fill(0);
       }
@@ -150,6 +178,32 @@ export async function getForecastHistory(userId: string): Promise<ForecastHistor
       incomeBuckets[idx] += -amount;
     }
   }
+
+  // --- Subtract per-category recurring contributions to avoid double-count ---
+  // Plaid doesn't link transactions to streams; we approximate via PFC.
+  // Floor at 0 to guard against the case where the only spend in a category
+  // IS the recurring stream and floating-point noise would go negative.
+  for (const stream of streamRows) {
+    if (stream.direction !== 'outflow') continue;
+    const cat = stream.primaryCategory ?? 'UNCATEGORIZED';
+    if (!categoryHistory[cat]) continue;
+    const monthlyEq = streamMonthlyEquivalent(stream);
+    categoryHistory[cat] = categoryHistory[cat].map((v) => Math.max(0, v - monthlyEq));
+  }
+
+  // --- Build categories metadata from observed PFC keys ---
+  // Keys come from categoryHistory and active outflow streams — NOT the
+  // Foothold `categories` table. id = PFC string; name = human-readable label.
+  const usedKeys = new Set<string>([
+    ...Object.keys(categoryHistory),
+    ...streamRows
+      .filter((s) => s.direction === 'outflow')
+      .map((s) => s.primaryCategory ?? 'UNCATEGORIZED'),
+  ]);
+  const categoriesMetadata = Array.from(usedKeys).map((key) => ({
+    id: key,
+    name: prettifyPfc(key),
+  }));
 
   // --- recurringStreams: map schema columns to ForecastHistory shape ---
   // frequency → cadence mapping (Plaid uses uppercase; engine expects lowercase).
@@ -203,6 +257,6 @@ export async function getForecastHistory(userId: string): Promise<ForecastHistor
     categoryHistory,
     nonRecurringIncomeHistory: incomeBuckets,
     goals: mappedGoals,
-    categories: categoryRows,
+    categories: categoriesMetadata,
   };
 }
