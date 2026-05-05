@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type MouseEvent } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { SearchX } from 'lucide-react';
 import type { TransactionListRow } from '@/lib/db/queries/transactions';
@@ -9,16 +9,29 @@ import { cn, formatCurrency } from '@/lib/utils';
 type Props = {
   rows: TransactionListRow[];
   selectedIndex: number;
+  selectedIds: Set<string>;
+  onToggle: (
+    id: string,
+    index: number,
+    opts: { range?: boolean },
+  ) => void;
 };
 
 /**
- * Operator-tier transactions table. JetBrains Mono on date + amount,
- * py-1.5 rows, sticky thead. The selected row (driven by j/k keys
- * upstream) gets an accent ring + scrolls into view. Hover and selected
- * states share the surface-sunken background — selected is just hover
- * locked in place.
+ * Operator-tier transactions table. Adds multi-select via a checkbox
+ * column — click to toggle one row, shift-click to extend a range
+ * from the last clicked row. Selection state lives in the shell so
+ * the BulkActionBar can read it; the table is presentational.
+ *
+ * Display layer prefers `overrideCategoryName` over the raw Plaid PFC
+ * when set, with a small italic styling as the visual cue.
  */
-export function OperatorTable({ rows, selectedIndex }: Props) {
+export function OperatorTable({
+  rows,
+  selectedIndex,
+  selectedIds,
+  onToggle,
+}: Props) {
   const rowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
 
   useEffect(() => {
@@ -41,6 +54,7 @@ export function OperatorTable({ rows, selectedIndex }: Props) {
         <table className="w-full text-sm">
           <thead className="sticky top-0 z-10 bg-surface-elevated/95 backdrop-blur">
             <tr className="border-b border-border text-[10px] uppercase tracking-[0.08em] text-muted-foreground/80">
+              <Th className="w-[36px] text-center" aria-label="Select" />
               <Th className="w-[110px] text-left">Date</Th>
               <Th className="text-left">Description</Th>
               <Th className="text-left">Category</Th>
@@ -53,7 +67,10 @@ export function OperatorTable({ rows, selectedIndex }: Props) {
               <Row
                 key={t.id}
                 t={t}
+                index={i}
                 isSelected={i === selectedIndex}
+                isChecked={selectedIds.has(t.id)}
+                onToggle={onToggle}
                 rowRef={(el) => {
                   rowRefs.current[i] = el;
                 }}
@@ -63,6 +80,26 @@ export function OperatorTable({ rows, selectedIndex }: Props) {
         </table>
       </div>
     </div>
+  );
+}
+
+function Th({
+  children,
+  className,
+  ...rest
+}: {
+  children?: React.ReactNode;
+  className?: string;
+  'aria-label'?: string;
+}) {
+  return (
+    <th
+      className={cn('px-3 py-2 font-medium', className)}
+      scope="col"
+      {...rest}
+    >
+      {children}
+    </th>
   );
 }
 
@@ -98,45 +135,69 @@ function NoMatchEmpty() {
   );
 }
 
-function Th({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <th
-      className={cn('px-3 py-2 font-medium', className)}
-      scope="col"
-    >
-      {children}
-    </th>
-  );
-}
-
 function Row({
   t,
+  index,
   isSelected,
+  isChecked,
+  onToggle,
   rowRef,
 }: {
   t: TransactionListRow;
+  index: number;
   isSelected: boolean;
+  isChecked: boolean;
+  onToggle: (
+    id: string,
+    index: number,
+    opts: { range?: boolean },
+  ) => void;
   rowRef: (el: HTMLTableRowElement | null) => void;
 }) {
   // Plaid sign convention: positive = money OUT. Flip for display.
   const display = -t.amount;
   const isIncome = display > 0;
+  const categoryLabel = t.overrideCategoryName
+    ? t.overrideCategoryName
+    : t.primaryCategory
+      ? humanize(t.primaryCategory)
+      : '—';
+  const isOverridden = !!t.overrideCategoryName;
+
+  function handleCheckboxClick(e: MouseEvent<HTMLInputElement>) {
+    onToggle(t.id, index, { range: e.shiftKey });
+  }
 
   return (
     <tr
       ref={rowRef}
       aria-selected={isSelected}
+      data-checked={isChecked}
       className={cn(
-        'border-b border-border/60 transition-colors duration-fast ease-out-quart last:border-b-0',
-        isSelected ? 'bg-surface-sunken' : 'hover:bg-surface-sunken/60',
+        'group border-b border-border/60 transition-colors duration-fast ease-out-quart last:border-b-0',
+        isChecked
+          ? 'bg-accent/40 hover:bg-accent/50'
+          : isSelected
+            ? 'bg-surface-sunken'
+            : 'hover:bg-surface-sunken/60',
       )}
     >
+      <td className="w-[36px] px-3 py-1.5 text-center">
+        <input
+          type="checkbox"
+          checked={isChecked}
+          aria-label={`Select transaction at ${t.merchantName ?? t.name}`}
+          onClick={handleCheckboxClick}
+          // onChange is required by React but the click event carries
+          // shiftKey; we let onClick own the actual toggle and stop
+          // onChange from double-firing.
+          onChange={() => undefined}
+          className={cn(
+            'h-3.5 w-3.5 cursor-pointer rounded border-border text-foreground accent-foreground',
+            'opacity-0 group-hover:opacity-100 group-data-[checked=true]:opacity-100 focus-visible:opacity-100',
+          )}
+        />
+      </td>
       <td className="px-3 py-1.5 font-mono text-xs tabular-nums text-muted-foreground whitespace-nowrap">
         {formatTxDate(t.date)}
       </td>
@@ -155,8 +216,21 @@ function Row({
           <p className="truncate text-xs text-muted-foreground">{t.name}</p>
         )}
       </td>
-      <td className="px-3 py-1.5 whitespace-nowrap text-xs text-muted-foreground">
-        {t.primaryCategory ? humanize(t.primaryCategory) : '—'}
+      <td className="px-3 py-1.5 whitespace-nowrap text-xs">
+        <span
+          className={cn(
+            isOverridden
+              ? 'italic text-foreground/80'
+              : 'text-muted-foreground',
+          )}
+          title={
+            isOverridden && t.primaryCategory
+              ? `Plaid: ${humanize(t.primaryCategory)}`
+              : undefined
+          }
+        >
+          {categoryLabel}
+        </span>
       </td>
       <td className="px-3 py-1.5 whitespace-nowrap text-xs text-muted-foreground">
         {t.accountName}
@@ -178,8 +252,6 @@ function Row({
 
 function formatTxDate(d: string | Date): string {
   const date = typeof d === 'string' ? new Date(d) : d;
-  // Compact mono format: "May 03". Year is implicit unless filtering
-  // back further; the filter row already shows "From" if needed.
   return date.toLocaleDateString('en-US', {
     month: 'short',
     day: '2-digit',

@@ -3,6 +3,7 @@ import { ArrowRight, Receipt } from 'lucide-react';
 import { auth } from '@/auth';
 import { OperatorShell } from '@/components/transactions/operator-shell';
 import { Button } from '@/components/ui/button';
+import { getCategoryOptions } from '@/lib/db/queries/categories';
 import {
   getDistinctCategories,
   getTransactions,
@@ -28,9 +29,10 @@ export default async function TransactionsPage({
 
   const page = Math.max(1, Number(searchParams.page) || 1);
 
-  const [accounts, categories, list] = await Promise.all([
+  const [accounts, categories, categoryOptions, list] = await Promise.all([
     getUserAccounts(session.user.id),
     getDistinctCategories(session.user.id),
+    getCategoryOptions(session.user.id),
     getTransactions(session.user.id, {
       page,
       accountId: searchParams.account,
@@ -91,6 +93,7 @@ export default async function TransactionsPage({
         rows={list.rows}
         accounts={accounts}
         categories={categories}
+        categoryOptions={categoryOptions}
         page={list.page}
         totalPages={list.totalPages}
         totalCount={list.totalCount}

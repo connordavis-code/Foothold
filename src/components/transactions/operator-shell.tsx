@@ -7,18 +7,21 @@ import {
   useState,
 } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import type { CategoryOption } from '@/lib/db/queries/categories';
 import {
   type AccountOption,
   type TransactionListRow,
 } from '@/lib/db/queries/transactions';
+import { BulkActionBar } from './bulk-action-bar';
 import { FilterRow, SEARCH_INPUT_ID } from './filter-row';
-import { OperatorTable } from './operator-table';
 import { OperatorPagination } from './operator-pagination';
+import { OperatorTable } from './operator-table';
 
 type Props = {
   rows: TransactionListRow[];
   accounts: AccountOption[];
   categories: string[];
+  categoryOptions: CategoryOption[];
   page: number;
   totalPages: number;
   totalCount: number;
@@ -27,17 +30,20 @@ type Props = {
 /**
  * Top-level client shell for /transactions. Owns:
  *
- *  - Selected row index (driven by j/k keyboard nav, scrolled into view)
+ *  - Selected row index for j/k keyboard nav (single-row highlight)
+ *  - Selected ids Set for multi-select (bulk re-categorize)
+ *  - Last-clicked index anchor for shift-click range select
  *  - Global keyboard handlers: j/k row, ⌘↑/⌘↓ page, "/" focus search
  *
- * Rendered children are independently styled (FilterRow, OperatorTable,
- * OperatorPagination) but share the keyboard surface here so j/k can't
- * fire while the search input has focus.
+ * Selection state is intentionally NOT persisted to URL — it's
+ * ephemeral and shouldn't be shareable. Filters belong in URL,
+ * selection doesn't.
  */
 export function OperatorShell({
   rows,
   accounts,
   categories,
+  categoryOptions,
   page,
   totalPages,
   totalCount,
@@ -46,11 +52,14 @@ export function OperatorShell({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [selectedIndex, setSelectedIndex] = useState(rows.length > 0 ? 0 : -1);
-  const tableRef = useRef<HTMLDivElement>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const lastClickedRef = useRef<number | null>(null);
 
   // Reset selection when the row set changes (filters / pagination).
   useEffect(() => {
     setSelectedIndex(rows.length > 0 ? 0 : -1);
+    setSelectedIds(new Set());
+    lastClickedRef.current = null;
   }, [rows]);
 
   const goToPage = useCallback(
@@ -63,11 +72,38 @@ export function OperatorShell({
     [pathname, router, searchParams],
   );
 
+  const onToggle = useCallback(
+    (id: string, index: number, opts: { range?: boolean }) => {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (opts.range && lastClickedRef.current != null) {
+          // Shift-click: extend range from last anchor to current.
+          // Direction-agnostic — we always select the inclusive span.
+          const lo = Math.min(lastClickedRef.current, index);
+          const hi = Math.max(lastClickedRef.current, index);
+          for (let i = lo; i <= hi; i++) {
+            next.add(rows[i].id);
+          }
+        } else {
+          if (next.has(id)) next.delete(id);
+          else next.add(id);
+        }
+        lastClickedRef.current = index;
+        return next;
+      });
+    },
+    [rows],
+  );
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+    lastClickedRef.current = null;
+  }, []);
+
   useEffect(() => {
     function shouldIgnore(e: KeyboardEvent): boolean {
       const t = e.target as HTMLElement | null;
       if (!t) return false;
-      // Don't trap j/k while typing in any input or contenteditable.
       const tag = t.tagName.toLowerCase();
       return (
         tag === 'input' ||
@@ -78,8 +114,6 @@ export function OperatorShell({
     }
 
     function onKey(e: KeyboardEvent) {
-      // ⌘↑ / ⌘↓ for page nav — work even from inputs (the operator
-      // pattern: keyboard always available for page-level moves).
       if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowDown') {
         if (page < totalPages) {
           e.preventDefault();
@@ -97,6 +131,11 @@ export function OperatorShell({
 
       if (shouldIgnore(e)) return;
 
+      if (e.key === 'Escape' && selectedIds.size > 0) {
+        e.preventDefault();
+        clearSelection();
+        return;
+      }
       if (e.key === '/') {
         e.preventDefault();
         document.getElementById(SEARCH_INPUT_ID)?.focus();
@@ -116,12 +155,30 @@ export function OperatorShell({
 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [goToPage, page, rows.length, totalPages]);
+  }, [
+    clearSelection,
+    goToPage,
+    page,
+    rows.length,
+    selectedIds.size,
+    totalPages,
+  ]);
 
   return (
-    <div className="space-y-4" ref={tableRef}>
+    <div className="space-y-4">
       <FilterRow accounts={accounts} categories={categories} />
-      <OperatorTable rows={rows} selectedIndex={selectedIndex} />
+      <BulkActionBar
+        selectedCount={selectedIds.size}
+        selectedIds={Array.from(selectedIds)}
+        onClear={clearSelection}
+        categoryOptions={categoryOptions}
+      />
+      <OperatorTable
+        rows={rows}
+        selectedIndex={selectedIndex}
+        selectedIds={selectedIds}
+        onToggle={onToggle}
+      />
       <OperatorPagination
         page={page}
         totalPages={totalPages}
