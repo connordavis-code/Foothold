@@ -47,3 +47,34 @@ export function applyCategoryDeltas(
 
   return result;
 }
+
+/**
+ * Apply income delta to inflows for affected months. Positive = income up,
+ * negative = income down. Floor at 0 (income can't be negative).
+ *
+ * Recomputes endCash chain forward.
+ */
+export function applyIncomeDelta(
+  projection: MonthlyProjection[],
+  delta: ScenarioOverrides['incomeDelta'],
+): MonthlyProjection[] {
+  if (!delta) return projection;
+
+  const result: MonthlyProjection[] = [];
+  let runningCash = projection.length > 0 ? projection[0].startCash : 0;
+
+  for (const month of projection) {
+    const inRange =
+      (!delta.startMonth || month.month >= delta.startMonth) &&
+      (!delta.endMonth || month.month <= delta.endMonth);
+    const newInflows = inRange
+      ? Math.max(0, month.inflows + delta.monthlyDelta)
+      : month.inflows;
+    const startCash = runningCash;
+    const endCash = startCash + newInflows - month.outflows;
+    result.push({ ...month, startCash, inflows: newInflows, endCash });
+    runningCash = endCash;
+  }
+
+  return result;
+}

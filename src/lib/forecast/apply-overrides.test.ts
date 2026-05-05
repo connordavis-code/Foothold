@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyCategoryDeltas } from './apply-overrides';
+import { applyCategoryDeltas, applyIncomeDelta } from './apply-overrides';
 import type { MonthlyProjection } from './types';
 
 function makeProjection(months: string[]): MonthlyProjection[] {
@@ -109,5 +109,55 @@ describe('applyCategoryDeltas', () => {
     ]);
     expect(result[0].byCategory.dining).toBe(120);
     expect(result[0].outflows).toBe(120);
+  });
+});
+
+describe('applyIncomeDelta', () => {
+  it('returns input unchanged when no income delta', () => {
+    const proj = makeProjection(['2026-05']);
+    expect(applyIncomeDelta(proj, undefined)).toBe(proj);
+  });
+
+  it('adds positive monthlyDelta to inflows for all months by default', () => {
+    const proj = makeProjection(['2026-05', '2026-06']);
+    const result = applyIncomeDelta(proj, { monthlyDelta: 500 });
+    expect(result[0].inflows).toBe(500);
+    // Month 0: 1000 + 500 - 100 = 1400
+    expect(result[0].endCash).toBe(1400);
+    expect(result[1].inflows).toBe(500);
+    // Month 1 chains: startCash 1400, endCash 1400 + 500 - 100 = 1800
+    expect(result[1].startCash).toBe(1400);
+    expect(result[1].endCash).toBe(1800);
+  });
+
+  it('subtracts negative monthlyDelta from inflows (income drop)', () => {
+    const proj = makeProjection(['2026-05']);
+    const withIncome = proj.map((m) => ({ ...m, inflows: 1000, endCash: 1900 }));
+    const result = applyIncomeDelta(withIncome, { monthlyDelta: -300 });
+    expect(result[0].inflows).toBe(700);
+    expect(result[0].endCash).toBe(1600); // 1000 + 700 - 100
+  });
+
+  it('respects startMonth/endMonth bounds', () => {
+    const proj = makeProjection(['2026-05', '2026-06', '2026-07']);
+    const result = applyIncomeDelta(proj, {
+      monthlyDelta: 500,
+      startMonth: '2026-06',
+      endMonth: '2026-06',
+    });
+    expect(result[0].inflows).toBe(0);
+    expect(result[1].inflows).toBe(500);
+    expect(result[2].inflows).toBe(0);
+  });
+
+  it('clamps inflows at 0 (income can never be negative)', () => {
+    const proj = makeProjection(['2026-05']);
+    const result = applyIncomeDelta(proj, { monthlyDelta: -10_000 });
+    expect(result[0].inflows).toBe(0);
+  });
+
+  it('returns an empty array unchanged for empty projection', () => {
+    const result = applyIncomeDelta([], { monthlyDelta: 500 });
+    expect(result).toEqual([]);
   });
 });
