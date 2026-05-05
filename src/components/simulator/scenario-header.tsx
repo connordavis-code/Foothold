@@ -9,6 +9,18 @@ import {
 } from '@/lib/forecast/scenario-actions';
 import type { Scenario } from '@/lib/db/schema';
 import type { ScenarioOverrides } from '@/lib/forecast/types';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 type Props = {
   scenarios: Scenario[];
@@ -42,6 +54,7 @@ export function ScenarioHeader({
   const [isPending, startTransition] = useTransition();
   const [toast, setToast] = useState<Toast | null>(null);
   const [nameDraft, setNameDraft] = useState<string | null>(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   const selected = scenarios.find((s) => s.id === selectedScenarioId) ?? null;
@@ -100,11 +113,16 @@ export function ScenarioHeader({
 
   const handleDelete = () => {
     if (!selected) return;
-    if (!window.confirm(`Delete scenario "${selected.name}"?`)) return;
+    setConfirmDeleteOpen(true);
+  };
+
+  const performDelete = () => {
+    if (!selected) return;
     startTransition(async () => {
       const result = await deleteScenario({ id: selected.id });
       if (result.ok) {
         setToast({ kind: 'success', message: 'Deleted.' });
+        setConfirmDeleteOpen(false);
         onSelect(null);
         router.refresh();
       } else {
@@ -241,6 +259,39 @@ export function ScenarioHeader({
           {toast.message}
         </div>
       )}
+
+      <AlertDialog
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete &ldquo;{selected?.name ?? ''}&rdquo;?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This scenario&apos;s overrides and any cached AI summary will
+              be removed. The baseline forecast and your real goals are
+              untouched.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                // Hold the dialog open through the transition;
+                // performDelete closes it on success.
+                e.preventDefault();
+                performDelete();
+              }}
+              disabled={isPending}
+              className={cn(buttonVariants({ variant: 'destructive' }))}
+            >
+              {isPending ? 'Deleting…' : 'Delete scenario'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </header>
   );
 }
