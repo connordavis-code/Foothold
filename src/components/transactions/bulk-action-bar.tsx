@@ -6,6 +6,7 @@ import { X } from 'lucide-react';
 import { toast } from 'sonner';
 import { updateTransactionCategoriesAction } from '@/lib/transactions/actions';
 import type { CategoryOption } from '@/lib/db/queries/categories';
+import type { TransactionListRow } from '@/lib/db/queries/transactions';
 import { CategoryPicker } from './category-picker';
 
 type Props = {
@@ -13,6 +14,7 @@ type Props = {
   selectedIds: string[];
   onClear: () => void;
   categoryOptions: CategoryOption[];
+  rows: TransactionListRow[];
 };
 
 /**
@@ -28,13 +30,41 @@ export function BulkActionBar({
   selectedIds,
   onClear,
   categoryOptions,
+  rows,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   if (selectedCount === 0) return null;
 
+  async function undoBulk(priorByName: Map<string | null, string[]>) {
+    try {
+      // Group restore: one round-trip per distinct prior category.
+      // Bounded by the number of categories represented in the
+      // selection (typically ≤5), not by row count.
+      for (const [name, ids] of priorByName) {
+        if (ids.length > 0) {
+          await updateTransactionCategoriesAction(ids, name);
+        }
+      }
+      toast.success('Undone.');
+      router.refresh();
+    } catch {
+      toast.error('Undo failed. The change is still applied.');
+    }
+  }
+
   function applyCategory(name: string | null) {
+    // Snapshot prior categories BEFORE the action fires — router.refresh()
+    // will replace `rows` with post-update data, and we need the originals
+    // for the undo restore. Capturing in closure keeps it race-free.
+    const priorById = new Map<string, string | null>();
+    for (const row of rows) {
+      if (selectedIds.includes(row.id)) {
+        priorById.set(row.id, row.overrideCategoryName);
+      }
+    }
+
     startTransition(async () => {
       try {
         const { updated } = await updateTransactionCategoriesAction(
@@ -45,10 +75,27 @@ export function BulkActionBar({
           toast.error('Nothing was updated. Try again?');
           return;
         }
+
+        // Group ids by prior category for the undo path.
+        const priorByName = new Map<string | null, string[]>();
+        for (const [id, prior] of priorById) {
+          const bucket = priorByName.get(prior) ?? [];
+          bucket.push(id);
+          priorByName.set(prior, bucket);
+        }
+
         toast.success(
           name
             ? `Re-categorized ${updated} ${updated === 1 ? 'transaction' : 'transactions'} as “${name}”.`
             : `Cleared category on ${updated} ${updated === 1 ? 'transaction' : 'transactions'}.`,
+          {
+            action: {
+              label: 'Undo',
+              onClick: () => {
+                void undoBulk(priorByName);
+              },
+            },
+          },
         );
         onClear();
         router.refresh();

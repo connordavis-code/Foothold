@@ -186,6 +186,7 @@ export function OperatorShell({
         selectedIds={Array.from(selectedIds)}
         onClear={clearSelection}
         categoryOptions={categoryOptions}
+        rows={rows}
       />
       <OperatorTable
         rows={rows}
