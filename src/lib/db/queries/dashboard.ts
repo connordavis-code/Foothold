@@ -150,3 +150,110 @@ export async function getRecentTransactions(
     amount: Number(r.amount),
   }));
 }
+
+/**
+ * Net-worth change since the first of the current calendar month.
+ *
+ * Math: a transaction with Plaid amount `a` reduces the holding account's
+ * balance by `a` (positive = money out). For asset accounts, that's a
+ * direct net-worth hit. For liability accounts, the balance owed goes UP
+ * by `a` — net worth subtracts that, so it goes DOWN by `a`. Both signs
+ * agree, so:
+ *
+ *   netWorth_now - netWorth_monthStart = -SUM(transaction.amount)
+ *
+ * across asset + liability transactions, excluding inter-account
+ * transfers and loan-payments (same exclusion list as the monthly-spend
+ * stat) and excluding investment-account txns (their value moves with
+ * security prices, not the txn amount).
+ *
+ * Returns 0 when there are no qualifying transactions — the UI treats 0
+ * as "no change yet this month" rather than hiding the metric.
+ */
+export async function getNetWorthMonthlyDelta(userId: string): Promise<number> {
+  const { start, end } = currentMonthRange();
+  const [row] = await db
+    .select({
+      total: sql<string>`COALESCE(SUM(${transactions.amount}::numeric), 0)`,
+    })
+    .from(transactions)
+    .innerJoin(
+      financialAccounts,
+      eq(financialAccounts.id, transactions.accountId),
+    )
+    .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
+    .where(
+      and(
+        eq(plaidItems.userId, userId),
+        gte(transactions.date, start),
+        lt(transactions.date, end),
+        notInArray(financialAccounts.type, ['investment']),
+        sql`COALESCE(${transactions.primaryCategory}, '') NOT IN ('TRANSFER_IN', 'TRANSFER_OUT', 'LOAN_PAYMENTS')`,
+      ),
+    );
+  return -Number(row?.total ?? 0);
+}
+
+export type SparklinePoint = { date: string; netWorth: number };
+
+/**
+ * Daily net-worth series for the last `days` days, ordered oldest→newest.
+ * Computed by walking transactions backwards from the current net worth:
+ * netWorth(d days ago) = netWorth(today) + sum(txn amounts where
+ * date > today - d). Same exclusions as monthly delta.
+ *
+ * Cheap (one query, all aggregation in JS) and good enough for a 30-pixel
+ * sparkline. Doesn't capture investment value drift — that needs a price
+ * history table that doesn't exist yet.
+ */
+export async function getNetWorthSparkline(
+  userId: string,
+  days = 30,
+): Promise<SparklinePoint[]> {
+  // Anchor on today's net worth, then unwind day by day.
+  const summary = await getDashboardSummary(userId);
+  const today = new Date();
+  const startDate = new Date(today);
+  startDate.setDate(today.getDate() - (days - 1));
+  const startStr = startDate.toISOString().slice(0, 10);
+
+  const rows = await db
+    .select({
+      date: transactions.date,
+      total: sql<string>`COALESCE(SUM(${transactions.amount}::numeric), 0)`,
+    })
+    .from(transactions)
+    .innerJoin(
+      financialAccounts,
+      eq(financialAccounts.id, transactions.accountId),
+    )
+    .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
+    .where(
+      and(
+        eq(plaidItems.userId, userId),
+        gte(transactions.date, startStr),
+        notInArray(financialAccounts.type, ['investment']),
+        sql`COALESCE(${transactions.primaryCategory}, '') NOT IN ('TRANSFER_IN', 'TRANSFER_OUT', 'LOAN_PAYMENTS')`,
+      ),
+    )
+    .groupBy(transactions.date);
+
+  const dailyDelta = new Map<string, number>();
+  for (const r of rows) dailyDelta.set(r.date, Number(r.total));
+
+  // Walk backwards: today's value = current netWorth. Each step into the
+  // past adds back that day's outflows (positive amounts) and removes
+  // that day's inflows (negative).
+  const series: SparklinePoint[] = [];
+  let runningNetWorth = summary.netWorth;
+  const yyyymmdd = (d: Date) => d.toISOString().slice(0, 10);
+
+  for (let i = 0; i < days; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const key = yyyymmdd(d);
+    series.push({ date: key, netWorth: runningNetWorth });
+    runningNetWorth += dailyDelta.get(key) ?? 0;
+  }
+  return series.reverse();
+}

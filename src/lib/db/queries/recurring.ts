@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, isNotNull, lte } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   financialAccounts,
@@ -102,6 +102,67 @@ export async function getMonthlyRecurringOutflow(
     const amount = Number(r.averageAmount);
     return sum + amount * frequencyToMonthlyMultiplier(r.frequency);
   }, 0);
+}
+
+export type UpcomingRecurringRow = {
+  id: string;
+  merchantName: string | null;
+  description: string | null;
+  averageAmount: number | null;
+  predictedNextDate: string;
+  frequency: string;
+  primaryCategory: string | null;
+};
+
+/**
+ * Active outflows whose `predicted_next_date` falls in the next N days.
+ * Drives the dashboard "Recurring this week" card — answers "what's
+ * about to hit my account?" rather than the passive monthly-total view.
+ *
+ * Plaid's prediction is best-effort; streams without a predicted date are
+ * filtered out. Sorted by date ascending so the soonest hit lands first.
+ */
+export async function getUpcomingRecurringOutflows(
+  userId: string,
+  days = 7,
+): Promise<UpcomingRecurringRow[]> {
+  const today = new Date();
+  const horizon = new Date(today);
+  horizon.setDate(today.getDate() + days);
+  const yyyymmdd = (d: Date) => d.toISOString().slice(0, 10);
+
+  const rows = await db
+    .select({
+      id: recurringStreams.id,
+      merchantName: recurringStreams.merchantName,
+      description: recurringStreams.description,
+      averageAmount: recurringStreams.averageAmount,
+      predictedNextDate: recurringStreams.predictedNextDate,
+      frequency: recurringStreams.frequency,
+      primaryCategory: recurringStreams.primaryCategory,
+    })
+    .from(recurringStreams)
+    .innerJoin(plaidItems, eq(plaidItems.id, recurringStreams.itemId))
+    .where(
+      and(
+        eq(plaidItems.userId, userId),
+        eq(recurringStreams.direction, 'outflow'),
+        eq(recurringStreams.isActive, true),
+        isNotNull(recurringStreams.predictedNextDate),
+        gte(recurringStreams.predictedNextDate, yyyymmdd(today)),
+        lte(recurringStreams.predictedNextDate, yyyymmdd(horizon)),
+      ),
+    )
+    .orderBy(asc(recurringStreams.predictedNextDate));
+
+  return rows
+    .filter((r): r is typeof r & { predictedNextDate: string } =>
+      r.predictedNextDate !== null,
+    )
+    .map((r) => ({
+      ...r,
+      averageAmount: r.averageAmount != null ? Number(r.averageAmount) : null,
+    }));
 }
 
 /** Convert a Plaid frequency to "how many of these per month". */
