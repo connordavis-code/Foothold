@@ -351,15 +351,40 @@ describe('applySkipRecurringInstances', () => {
     expect(result).toEqual([]);
   });
 
-  it('silently ignores unknown streamId (no matching stream in baseStreams)', () => {
+  it('silently ignores unknown streamId (returns same reference)', () => {
     const proj: MonthlyProjection[] = [
       { month: '2026-08', startCash: 5000, inflows: 0, outflows: 2000, endCash: 3000, byCategory: {}, goalProgress: {} },
     ];
     const result = applySkipRecurringInstances(proj, baseStreams, [
       { streamId: 'nonexistent', skipMonth: '2026-08' },
     ]);
-    expect(result[0].outflows).toBe(2000); // unchanged
-    expect(result[0].endCash).toBe(3000);
+    // Fast path: all-miss returns input reference, not a copy.
+    expect(result).toBe(proj);
+  });
+
+  it('returns same reference when no skip targets a month in the projection', () => {
+    const proj: MonthlyProjection[] = [
+      { month: '2026-08', startCash: 5000, inflows: 0, outflows: 2000, endCash: 3000, byCategory: {}, goalProgress: {} },
+    ];
+    const result = applySkipRecurringInstances(proj, baseStreams, [
+      { streamId: 'rent', skipMonth: '2030-01' }, // out of horizon
+    ]);
+    expect(result).toBe(proj);
+  });
+
+  it('skips a weekly recurring stream by its monthly equivalent (~$69.32 for $16/wk)', () => {
+    const weeklyStreams: ForecastHistory['recurringStreams'] = [
+      { id: 'netflix', label: 'Netflix', amount: 16, direction: 'outflow', cadence: 'weekly', nextDate: '2026-08-01' },
+    ];
+    const proj: MonthlyProjection[] = [
+      { month: '2026-08', startCash: 5000, inflows: 0, outflows: 100, endCash: 4900, byCategory: {}, goalProgress: {} },
+    ];
+    const result = applySkipRecurringInstances(proj, weeklyStreams, [
+      { streamId: 'netflix', skipMonth: '2026-08' },
+    ]);
+    // Weekly $16 × 4.333 = $69.328 monthly equivalent removed
+    expect(result[0].outflows).toBeCloseTo(100 - 69.328, 2);
+    expect(result[0].endCash).toBeCloseTo(5000 - (100 - 69.328), 2);
   });
 });
 
@@ -391,14 +416,15 @@ describe('applyLumpSums', () => {
     expect(result[0].endCash).toBe(200);
   });
 
-  it('ignores lump sums outside the projection range', () => {
+  it('ignores lump sums outside the projection range (returns same reference)', () => {
     const proj: MonthlyProjection[] = [
       { month: '2026-04', startCash: 1000, inflows: 0, outflows: 0, endCash: 1000, byCategory: {}, goalProgress: {} },
     ];
     const result = applyLumpSums(proj, [
       { id: 'far-future', label: 'Bonus', amount: 10000, month: '2030-01' },
     ]);
-    expect(result[0]).toEqual(proj[0]);
+    // Fast path: no matching month → input reference returned.
+    expect(result).toBe(proj);
   });
 
   it('chains endCash through subsequent months after a lump sum', () => {

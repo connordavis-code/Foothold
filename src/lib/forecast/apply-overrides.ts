@@ -179,6 +179,14 @@ export function applySkipRecurringInstances(
   if (!skips || skips.length === 0) return projection;
 
   const baseById = new Map(baseStreams.map((s) => [s.id, s]));
+
+  // Same-reference fast path when no skip targets a month in the projection
+  // (or all skips reference unknown streams). Keeps Task 10 composition cheap.
+  const hasMatch = projection.some((m) =>
+    skips.some((s) => s.skipMonth === m.month && baseById.has(s.streamId)),
+  );
+  if (!hasMatch) return projection;
+
   const result: MonthlyProjection[] = [];
   let runningCash = projection.length > 0 ? projection[0].startCash : 0;
 
@@ -223,6 +231,12 @@ export function applyLumpSums(
   lumpSums: ScenarioOverrides['lumpSums'],
 ): MonthlyProjection[] {
   if (!lumpSums || lumpSums.length === 0) return projection;
+
+  // Same-reference fast path when no lump sum targets a month in the projection.
+  const hasMatch = projection.some((m) =>
+    lumpSums.some((s) => s.month === m.month),
+  );
+  if (!hasMatch) return projection;
 
   const result: MonthlyProjection[] = [];
   let runningCash = projection.length > 0 ? projection[0].startCash : 0;
