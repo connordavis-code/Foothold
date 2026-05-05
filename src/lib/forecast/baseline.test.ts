@@ -98,4 +98,26 @@ describe('computeBaseline', () => {
     expect(result[2].startCash).toBe(4800);
     expect(result[2].endCash).toBe(4700);
   });
+
+  it('scales weekly recurring outflow streams by ~4.333×', () => {
+    const history: ForecastHistory = {
+      ...baseHistory,
+      recurringStreams: [
+        { id: 's1', label: 'Coffee', amount: 30, direction: 'outflow', cadence: 'weekly', nextDate: '2026-05-07' },
+      ],
+    };
+    const result = computeBaseline(history, '2026-05', 1);
+    expect(result[0].outflows).toBeCloseTo(30 * 4.333, 2);
+  });
+
+  it('scales biweekly recurring inflow streams by ~2.167×', () => {
+    const history: ForecastHistory = {
+      ...baseHistory,
+      recurringStreams: [
+        { id: 's1', label: 'Paycheck', amount: 1500, direction: 'inflow', cadence: 'biweekly', nextDate: '2026-05-15' },
+      ],
+    };
+    const result = computeBaseline(history, '2026-05', 1);
+    expect(result[0].inflows).toBeCloseTo(1500 * 2.167, 2);
+  });
 });

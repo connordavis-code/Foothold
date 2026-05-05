@@ -14,12 +14,18 @@ export function median(values: number[]): number {
     : sorted[mid];
 }
 
+// Plaid recurring cadence → monthly equivalent multipliers.
+// Weekly: 52 weeks / 12 months ≈ 4.333
+// Biweekly: 26 pay periods / 12 months ≈ 2.167
+const WEEKS_PER_MONTH = 4.333;
+const BIWEEKS_PER_MONTH = 2.167;
+
 /**
  * Compute the baseline projection (no overrides applied).
  *
  * For each future month within the horizon:
  *   - recurring streams projected as-known (monthly cadence assumed for v1;
- *     weekly/biweekly approximated as 4.33×/2.17× monthly equivalent)
+ *     weekly/biweekly approximated as 4.333×/2.167× monthly equivalent)
  *   - non-recurring outflows per category = trailing median
  *   - non-recurring income = trailing median
  *
@@ -45,9 +51,9 @@ export function computeBaseline(
   for (const stream of history.recurringStreams) {
     const monthlyEquivalent =
       stream.cadence === 'weekly'
-        ? stream.amount * 4.333
+        ? stream.amount * WEEKS_PER_MONTH
         : stream.cadence === 'biweekly'
-          ? stream.amount * 2.167
+          ? stream.amount * BIWEEKS_PER_MONTH
           : stream.amount;
     if (stream.direction === 'outflow') recurringMonthlyOutflow += monthlyEquivalent;
     else recurringMonthlyInflow += monthlyEquivalent;
@@ -73,7 +79,7 @@ export function computeBaseline(
       outflows,
       endCash,
       byCategory: { ...categoryBaseline },
-      goalProgress: {}, // populated by goal-projection step (Task 10)
+      goalProgress: {}, // populated by goal-projection step (Task 9)
     });
 
     runningCash = endCash;
