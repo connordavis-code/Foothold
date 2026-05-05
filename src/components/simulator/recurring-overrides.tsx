@@ -97,9 +97,17 @@ export function RecurringOverrides({ value, onChange, baseStreams }: Props) {
               <div className="flex gap-1.5">
                 <input
                   type="number"
+                  min={0}
                   value={item.amount ?? 0}
                   onChange={(e) =>
-                    onChange(updateItemAt(items, i, { amount: Number(e.target.value) }))
+                    // Recurring streams use a `direction` column for sign;
+                    // amounts are magnitudes (zod: nonnegative). Clamp to ≥0
+                    // so a stray minus key can't fail the save action later.
+                    onChange(
+                      updateItemAt(items, i, {
+                        amount: Math.max(0, Number(e.target.value)) || 0,
+                      }),
+                    )
                   }
                   className="w-20 bg-background border border-border rounded px-2 py-1 text-right text-foreground"
                 />

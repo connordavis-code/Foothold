@@ -41,10 +41,11 @@ export function GoalTargetOverrides({ value, onChange, realGoals }: Props) {
               <span className="text-muted-foreground">Target $</span>
               <input
                 type="number"
+                min={0}
                 value={item.newTargetAmount ?? goal?.targetAmount ?? 0}
                 onChange={(e) =>
                   onChange(updateItem(items, (i) => i.goalId === item.goalId, {
-                    newTargetAmount: Number(e.target.value),
+                    newTargetAmount: Math.max(0, Number(e.target.value)) || 0,
                   }))
                 }
                 className="w-24 bg-background border border-border rounded px-2 py-1 text-right text-foreground"
@@ -52,10 +53,11 @@ export function GoalTargetOverrides({ value, onChange, realGoals }: Props) {
               <span className="text-muted-foreground">@ $</span>
               <input
                 type="number"
+                min={0}
                 value={item.newMonthlyContribution ?? goal?.monthlyContribution ?? 0}
                 onChange={(e) =>
                   onChange(updateItem(items, (i) => i.goalId === item.goalId, {
-                    newMonthlyContribution: Number(e.target.value),
+                    newMonthlyContribution: Math.max(0, Number(e.target.value)) || 0,
                   }))
                 }
                 className="w-20 bg-background border border-border rounded px-2 py-1 text-right text-foreground"

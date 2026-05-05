@@ -14,6 +14,24 @@ import {
 
 type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
+// Zod's default issue message ("Number must be greater than or equal to 0")
+// strips the field path, leaving the user no clue *which* field failed.
+// Walk the issue's path and prepend a readable hint like
+// `recurringChanges[2].amount`.
+function formatZodIssue(issue: { path: (string | number)[]; message: string }): string {
+  const segments: string[] = [];
+  for (const part of issue.path) {
+    if (part === 'overrides') continue; // implicit, drop noise
+    if (typeof part === 'number') {
+      segments[segments.length - 1] = `${segments[segments.length - 1] ?? ''}[${part}]`;
+    } else {
+      segments.push(part);
+    }
+  }
+  const path = segments.join('.');
+  return path ? `${path}: ${issue.message}` : issue.message;
+}
+
 export async function createScenario(
   rawInput: unknown,
 ): Promise<ActionResult<{ id: string }>> {
@@ -22,7 +40,7 @@ export async function createScenario(
 
   const parsed = createScenarioInput.safeParse(rawInput);
   if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? 'Invalid input' };
+    return { ok: false, error: parsed.error.issues[0] ? formatZodIssue(parsed.error.issues[0]) : "Invalid input" };
   }
 
   try {
@@ -51,7 +69,7 @@ export async function updateScenario(
 
   const parsed = updateScenarioInput.safeParse(rawInput);
   if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? 'Invalid input' };
+    return { ok: false, error: parsed.error.issues[0] ? formatZodIssue(parsed.error.issues[0]) : "Invalid input" };
   }
 
   try {
@@ -85,7 +103,7 @@ export async function deleteScenario(
 
   const parsed = deleteScenarioInput.safeParse(rawInput);
   if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? 'Invalid input' };
+    return { ok: false, error: parsed.error.issues[0] ? formatZodIssue(parsed.error.issues[0]) : "Invalid input" };
   }
 
   try {

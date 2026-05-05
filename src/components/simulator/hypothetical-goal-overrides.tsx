@@ -44,10 +44,11 @@ export function HypotheticalGoalOverrides({ value, onChange }: Props) {
             <span className="text-muted-foreground">Target $</span>
             <input
               type="number"
+              min={0}
               value={item.targetAmount}
               onChange={(e) =>
                 onChange(updateItem(items, (i) => i.id === item.id, {
-                  targetAmount: Number(e.target.value),
+                  targetAmount: Math.max(0, Number(e.target.value)) || 0,
                 }))
               }
               className="w-24 bg-background border border-border rounded px-2 py-1 text-right text-foreground"
@@ -55,10 +56,11 @@ export function HypotheticalGoalOverrides({ value, onChange }: Props) {
             <span className="text-muted-foreground">@ $</span>
             <input
               type="number"
+              min={0}
               value={item.monthlyContribution ?? 0}
               onChange={(e) =>
                 onChange(updateItem(items, (i) => i.id === item.id, {
-                  monthlyContribution: Number(e.target.value),
+                  monthlyContribution: Math.max(0, Number(e.target.value)) || 0,
                 }))
               }
               className="w-20 bg-background border border-border rounded px-2 py-1 text-right text-foreground"
