@@ -211,6 +211,17 @@ handler's own 401 — body shape reveals which layer fired.
   tables; scenario CRUD server actions with zod validation. Sidebar
   reorganized into Today / Plan / Records groups; brand "Finance" →
   "Foothold". `/simulator` page builds in Plan B.
+- **Phase 4-B1 — Simulator UI shell** (2026-05-05) — `/simulator`
+  page on top of Plan A's engine. Override editor with 7 collapsible
+  sections (categories, lump sums, recurring changes, income,
+  hypothetical goals, goal target edits, skip recurring). Recharts
+  forecast chart with baseline + scenario overlay. Goal diff cards
+  with direction pills (sooner / later / hypo / unreachable).
+  Scenario header with selector + Save + Delete via existing scenario
+  CRUD actions. Empty + first-time states. Responsive single-column
+  collapse below md. 116 vitest tests (94 + 22 new for index-based
+  override helpers). UI is a starting hypothesis — expected to be
+  refined in use. No AI narration yet — Plan B-2 next.
 
 ### In progress
 - **Plaid Production access review** — submitted 2026-05-01 + Q9
@@ -219,12 +230,12 @@ handler's own 401 — body shape reveals which layer fired.
   webhook E2E — wipe before flipping `PLAID_ENV=production`.
 
 ### Next up
-- **Phase 4-B — Simulator UI + AI narration** — builds `/simulator`
-  page on top of Plan A's engine. Includes the override editor (7
-  collapsible sections), forecast chart (Recharts), goal diff cards,
-  AI coaching narrative via Anthropic Haiku 4.5 with caching. Spec:
-  `docs/superpowers/specs/2026-05-04-phase-4-predictive-layer-design.md`
-  (UI in §6 v3 balanced; AI in §7).
+- **Phase 4-B2 — AI coaching narrative for simulator** — adds
+  AI-generated 3-5 sentence summary panel to `/simulator`. Anthropic
+  Haiku 4.5 via existing `src/lib/anthropic/client.ts`. Cache key =
+  SHA-256 of (overrides + history fingerprint). New `forecast_narrative`
+  table already exists from Plan A Task 1. Spec §7 covers prompt
+  shape, model, caching, failure handling.
 - **Verify sender domain** — confirm `AUTH_EMAIL_FROM` in Vercel env
   is the custom domain (`noreply@usefoothold.com`) not the Resend
   sandbox sender (`onboarding@resend.dev`). The 14:00 UTC May 5
