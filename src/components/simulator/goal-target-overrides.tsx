@@ -1,0 +1,97 @@
+'use client';
+
+import { X } from 'lucide-react';
+import {
+  addItem,
+  removeItem,
+  updateItem,
+} from '@/lib/forecast/override-helpers';
+import type { ForecastHistory, ScenarioOverrides } from '@/lib/forecast/types';
+
+type Props = {
+  value: ScenarioOverrides['goalTargetEdits'];
+  onChange: (next: ScenarioOverrides['goalTargetEdits']) => void;
+  realGoals: ForecastHistory['goals'];
+};
+
+export function GoalTargetOverrides({ value, onChange, realGoals }: Props) {
+  const items = value ?? [];
+  const usedIds = new Set(items.map((i) => i.goalId));
+  const availableGoals = realGoals.filter((g) => !usedIds.has(g.id));
+
+  return (
+    <div className="space-y-2">
+      {items.map((item) => {
+        const goal = realGoals.find((g) => g.id === item.goalId);
+        return (
+          <div key={item.goalId} className="bg-muted/30 rounded p-2 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-foreground text-sm">
+                {goal?.name ?? '(unknown)'}
+              </span>
+              <button
+                onClick={() => onChange(removeItem(items, (i) => i.goalId === item.goalId))}
+                className="p-1 text-muted-foreground hover:text-destructive"
+                aria-label="Remove"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground">Target $</span>
+              <input
+                type="number"
+                value={item.newTargetAmount ?? goal?.targetAmount ?? 0}
+                onChange={(e) =>
+                  onChange(updateItem(items, (i) => i.goalId === item.goalId, {
+                    newTargetAmount: Number(e.target.value),
+                  }))
+                }
+                className="w-24 bg-background border border-border rounded px-2 py-1 text-right text-foreground"
+              />
+              <span className="text-muted-foreground">@ $</span>
+              <input
+                type="number"
+                value={item.newMonthlyContribution ?? goal?.monthlyContribution ?? 0}
+                onChange={(e) =>
+                  onChange(updateItem(items, (i) => i.goalId === item.goalId, {
+                    newMonthlyContribution: Number(e.target.value),
+                  }))
+                }
+                className="w-20 bg-background border border-border rounded px-2 py-1 text-right text-foreground"
+              />
+              <span className="text-muted-foreground">/mo</span>
+            </div>
+          </div>
+        );
+      })}
+
+      {availableGoals.length > 0 ? (
+        <select
+          value=""
+          onChange={(e) => {
+            const id = e.target.value;
+            if (!id) return;
+            onChange(addItem(items, { goalId: id }));
+          }}
+          className="w-full bg-background border border-dashed border-border rounded px-2 py-1.5 text-muted-foreground hover:text-foreground"
+        >
+          <option value="">+ edit a real goal</option>
+          {availableGoals.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.name}
+            </option>
+          ))}
+        </select>
+      ) : realGoals.length === 0 ? (
+        <div className="text-xs text-muted-foreground/60 italic">
+          No real goals to edit yet.
+        </div>
+      ) : (
+        <div className="text-xs text-muted-foreground/60 italic">
+          All real goals already have edits.
+        </div>
+      )}
+    </div>
+  );
+}

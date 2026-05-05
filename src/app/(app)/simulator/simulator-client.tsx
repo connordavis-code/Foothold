@@ -11,6 +11,7 @@ import { LumpSumOverrides } from '@/components/simulator/lump-sum-overrides';
 import { RecurringOverrides } from '@/components/simulator/recurring-overrides';
 import { IncomeOverrides } from '@/components/simulator/income-overrides';
 import { HypotheticalGoalOverrides } from '@/components/simulator/hypothetical-goal-overrides';
+import { GoalTargetOverrides } from '@/components/simulator/goal-target-overrides';
 
 type Props = {
   history: ForecastHistory;
@@ -125,7 +126,16 @@ export function SimulatorClient({
               }
             />
           </OverrideSection>
-          {/* More sections in Tasks 12-13 */}
+          <OverrideSection label="Existing goal edits" count={liveOverrides.goalTargetEdits?.length ?? 0}>
+            <GoalTargetOverrides
+              value={liveOverrides.goalTargetEdits}
+              onChange={(next) =>
+                setLiveOverrides((o) => ({ ...o, goalTargetEdits: next }))
+              }
+              realGoals={history.goals}
+            />
+          </OverrideSection>
+          {/* More sections in Task 13 */}
         </div>
 
         {/* Right: debug for now (chart + cards in Wave 4) */}
