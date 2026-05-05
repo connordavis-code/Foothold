@@ -8,6 +8,7 @@ import { ScenarioHeader } from '@/components/simulator/scenario-header';
 import { OverrideSection } from '@/components/simulator/override-section';
 import { CategoryOverrides } from '@/components/simulator/category-overrides';
 import { LumpSumOverrides } from '@/components/simulator/lump-sum-overrides';
+import { RecurringOverrides } from '@/components/simulator/recurring-overrides';
 
 type Props = {
   history: ForecastHistory;
@@ -96,7 +97,16 @@ export function SimulatorClient({
               availableMonths={availableMonths}
             />
           </OverrideSection>
-          {/* More sections in Tasks 9-13 */}
+          <OverrideSection label="Recurring" count={liveOverrides.recurringChanges?.length ?? 0}>
+            <RecurringOverrides
+              value={liveOverrides.recurringChanges}
+              onChange={(next) =>
+                setLiveOverrides((o) => ({ ...o, recurringChanges: next }))
+              }
+              baseStreams={history.recurringStreams}
+            />
+          </OverrideSection>
+          {/* More sections in Tasks 10-13 */}
         </div>
 
         {/* Right: debug for now (chart + cards in Wave 4) */}
