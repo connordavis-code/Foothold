@@ -7,13 +7,14 @@ import { SimulatorClient } from './simulator-client';
 export default async function SimulatorPage({
   searchParams,
 }: {
-  searchParams: { scenario?: string };
+  searchParams: Promise<{ scenario?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
 
   const userId = session.user.id;
-  const [history, scenarios] = await Promise.all([
+  const [params, history, scenarios] = await Promise.all([
+    searchParams,
     getForecastHistory(userId),
     listScenariosForUser(userId),
   ]);
@@ -21,7 +22,7 @@ export default async function SimulatorPage({
   const now = new Date();
   const currentMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
 
-  const requestedId = searchParams?.scenario;
+  const requestedId = params.scenario;
   const initialScenario =
     (requestedId && scenarios.find((s) => s.id === requestedId)) ||
     scenarios[0] ||
