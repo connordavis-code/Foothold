@@ -37,8 +37,23 @@ function streamMonthlyEquivalent(stream: {
     case 'SEMI_MONTHLY': return amount * 2;
     case 'ANNUALLY':     return amount / 12;
     case 'MONTHLY':
-    case 'UNKNOWN':
+    case 'UNKNOWN':      // treat unknown frequency as monthly — defensible default
     default:             return amount;
+  }
+}
+
+/**
+ * Map Plaid frequency string to ForecastHistory cadence.
+ * SEMI_MONTHLY and ANNUALLY have no direct cadence equivalent — map to monthly.
+ */
+function toCadence(freq: string | null): 'weekly' | 'biweekly' | 'monthly' {
+  switch ((freq ?? '').toUpperCase()) {
+    case 'WEEKLY':     return 'weekly';
+    case 'BIWEEKLY':   return 'biweekly';
+    case 'SEMI_MONTHLY':
+    case 'MONTHLY':
+    case 'ANNUALLY':
+    default:           return 'monthly';
   }
 }
 
@@ -89,7 +104,6 @@ export async function getForecastHistory(userId: string): Promise<ForecastHistor
         id: financialAccounts.id,
         currentBalance: financialAccounts.currentBalance,
         type: financialAccounts.type,
-        accountIds: financialAccounts.id, // alias for goal-matching below
       })
       .from(financialAccounts)
       .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
@@ -219,20 +233,6 @@ export async function getForecastHistory(userId: string): Promise<ForecastHistor
   }));
 
   // --- recurringStreams: map schema columns to ForecastHistory shape ---
-  // frequency → cadence mapping (Plaid uses uppercase; engine expects lowercase).
-  // SEMI_MONTHLY and ANNUALLY have no direct cadence equivalent — map to monthly
-  // and flag them so the engine can approximate; rare edge case.
-  function toCadence(freq: string | null): 'weekly' | 'biweekly' | 'monthly' {
-    switch ((freq ?? '').toUpperCase()) {
-      case 'WEEKLY':     return 'weekly';
-      case 'BIWEEKLY':   return 'biweekly';
-      case 'SEMI_MONTHLY':
-      case 'MONTHLY':
-      case 'ANNUALLY':
-      default:           return 'monthly';
-    }
-  }
-
   const mappedStreams = streamRows.map((s) => ({
     id: s.id,
     // Prefer merchantName for readability, fall back to description
