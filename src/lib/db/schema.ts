@@ -13,6 +13,7 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import type { AdapterAccount } from 'next-auth/adapters';
+import type { ScenarioOverrides } from '@/lib/forecast/types';
 
 /**
  * Convention for this file:
@@ -489,7 +490,7 @@ export const scenarios = pgTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     description: text('description'),
-    overrides: jsonb('overrides').notNull().default({}),
+    overrides: jsonb('overrides').$type<ScenarioOverrides>().notNull().default({}),
     createdAt: ts('created_at').notNull().defaultNow(),
     updatedAt: ts('updated_at').notNull().defaultNow(),
   },
