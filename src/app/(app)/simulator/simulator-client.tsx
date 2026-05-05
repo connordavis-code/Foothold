@@ -15,6 +15,7 @@ import { GoalTargetOverrides } from '@/components/simulator/goal-target-override
 import { SkipRecurringOverrides } from '@/components/simulator/skip-recurring-overrides';
 import { ForecastChart } from '@/components/simulator/forecast-chart';
 import { GoalDiffCards } from '@/components/simulator/goal-diff-cards';
+import { NarrativePanel } from '@/components/simulator/narrative-panel';
 
 type Props = {
   history: ForecastHistory;
@@ -67,6 +68,18 @@ export function SimulatorClient({
     () => engineResult.projection.map((m) => m.month),
     [engineResult],
   );
+
+  const hasOverrides = useMemo(() => {
+    return Boolean(
+      liveOverrides.categoryDeltas?.length ||
+        liveOverrides.lumpSums?.length ||
+        liveOverrides.recurringChanges?.length ||
+        liveOverrides.skipRecurringInstances?.length ||
+        liveOverrides.incomeDelta ||
+        liveOverrides.hypotheticalGoals?.length ||
+        liveOverrides.goalTargetEdits?.length,
+    );
+  }, [liveOverrides]);
 
   const handleSelectScenario = (id: string | null) => {
     const scn = id ? scenarios.find((s) => s.id === id) : null;
@@ -197,6 +210,12 @@ export function SimulatorClient({
               scenario={engineResult.projection}
             />
             <GoalDiffCards goalImpacts={engineResult.goalImpacts} />
+            <NarrativePanel
+              scenarioId={selectedScenarioId}
+              overrides={liveOverrides}
+              isDirty={isDirty}
+              hasOverrides={hasOverrides}
+            />
           </div>
         </div>
       </div>
