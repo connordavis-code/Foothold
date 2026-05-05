@@ -12,6 +12,7 @@ import { RecurringOverrides } from '@/components/simulator/recurring-overrides';
 import { IncomeOverrides } from '@/components/simulator/income-overrides';
 import { HypotheticalGoalOverrides } from '@/components/simulator/hypothetical-goal-overrides';
 import { GoalTargetOverrides } from '@/components/simulator/goal-target-overrides';
+import { SkipRecurringOverrides } from '@/components/simulator/skip-recurring-overrides';
 
 type Props = {
   history: ForecastHistory;
@@ -135,7 +136,16 @@ export function SimulatorClient({
               realGoals={history.goals}
             />
           </OverrideSection>
-          {/* More sections in Task 13 */}
+          <OverrideSection label="Skip recurring" count={liveOverrides.skipRecurringInstances?.length ?? 0}>
+            <SkipRecurringOverrides
+              value={liveOverrides.skipRecurringInstances}
+              onChange={(next) =>
+                setLiveOverrides((o) => ({ ...o, skipRecurringInstances: next }))
+              }
+              baseStreams={history.recurringStreams}
+              availableMonths={availableMonths}
+            />
+          </OverrideSection>
         </div>
 
         {/* Right: debug for now (chart + cards in Wave 4) */}
