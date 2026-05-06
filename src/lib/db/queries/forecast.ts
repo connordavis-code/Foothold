@@ -43,17 +43,27 @@ function streamMonthlyEquivalent(stream: {
 }
 
 /**
- * Map Plaid frequency string to ForecastHistory cadence.
- * SEMI_MONTHLY and ANNUALLY have no direct cadence equivalent — map to monthly.
+ * Map a Plaid frequency + per-occurrence amount to the engine's
+ * ForecastHistory shape. The engine cadence enum has no SEMI_MONTHLY or
+ * ANNUALLY slot — those collapse to 'monthly' AND the amount is rescaled
+ * to the true monthly equivalent so downstream baseline math is correct.
+ *
+ * Without rescaling, a $1500 SEMI_MONTHLY paycheck gets projected as
+ * $1500/mo (off by 50%) and a $1200 ANNUALLY domain renewal gets
+ * projected as $1200/mo (off by 12x).
  */
-function toCadence(freq: string | null): 'weekly' | 'biweekly' | 'monthly' {
+export function mapStreamCadenceAndAmount(
+  rawAmount: number,
+  freq: string | null,
+): { amount: number; cadence: 'weekly' | 'biweekly' | 'monthly' } {
   switch ((freq ?? '').toUpperCase()) {
-    case 'WEEKLY':     return 'weekly';
-    case 'BIWEEKLY':   return 'biweekly';
-    case 'SEMI_MONTHLY':
+    case 'WEEKLY':       return { amount: rawAmount, cadence: 'weekly' };
+    case 'BIWEEKLY':     return { amount: rawAmount, cadence: 'biweekly' };
+    case 'SEMI_MONTHLY': return { amount: rawAmount * 2, cadence: 'monthly' };
+    case 'ANNUALLY':     return { amount: rawAmount / 12, cadence: 'monthly' };
     case 'MONTHLY':
-    case 'ANNUALLY':
-    default:           return 'monthly';
+    case 'UNKNOWN':
+    default:             return { amount: rawAmount, cadence: 'monthly' };
   }
 }
 
@@ -233,17 +243,21 @@ export async function getForecastHistory(userId: string): Promise<ForecastHistor
   }));
 
   // --- recurringStreams: map schema columns to ForecastHistory shape ---
-  const mappedStreams = streamRows.map((s) => ({
-    id: s.id,
-    // Prefer merchantName for readability, fall back to description
-    label: s.merchantName ?? s.description ?? 'Unknown',
+  const mappedStreams = streamRows.map((s) => {
     // Prefer lastAmount (more recent), fall back to averageAmount
-    amount: Math.abs(Number(s.lastAmount ?? s.averageAmount ?? 0)),
-    direction: s.direction as 'inflow' | 'outflow',
-    cadence: toCadence(s.frequency),
-    // predictedNextDate is a date string 'YYYY-MM-DD' from Drizzle date column
-    nextDate: s.predictedNextDate ?? '',
-  }));
+    const rawAmount = Math.abs(Number(s.lastAmount ?? s.averageAmount ?? 0));
+    const { amount, cadence } = mapStreamCadenceAndAmount(rawAmount, s.frequency);
+    return {
+      id: s.id,
+      // Prefer merchantName for readability, fall back to description
+      label: s.merchantName ?? s.description ?? 'Unknown',
+      amount,
+      direction: s.direction as 'inflow' | 'outflow',
+      cadence,
+      // predictedNextDate is a date string 'YYYY-MM-DD' from Drizzle date column
+      nextDate: s.predictedNextDate ?? '',
+    };
+  });
 
   // --- goals: compute currentSaved from scoped account balances ---
   const mappedGoals = goalRows.map((g) => {
