@@ -40,8 +40,16 @@ export async function createLinkToken(): Promise<string> {
 /**
  * After the user finishes Plaid Link in the browser, the SDK hands us a
  * short-lived `public_token`. Exchange it for a long-lived `access_token`
- * (which we store) and persist a plaid_item row so we know about this
- * institution connection.
+ * (which we store, encrypted) and persist a plaid_item row.
+ *
+ * Does NOT run the initial sync inline — closes review W-04. The plaintext
+ * `access_token` lives in JS heap only for the few milliseconds of the
+ * encrypt-and-insert path; the caller (browser onSuccess) chains
+ * `syncItemAction(itemId)` to do the backfill, which re-decrypts from DB.
+ * The first-time-seen plaintext window collapses from ~30s to ~50ms.
+ *
+ * Returns the new item's id so the caller can chain into syncItemAction
+ * without another round-trip to look it up.
  */
 export async function exchangePublicToken(
   publicToken: string,
@@ -49,7 +57,7 @@ export async function exchangePublicToken(
     institution_id?: string | null;
     institution_name?: string | null;
   },
-): Promise<void> {
+): Promise<{ itemId: string }> {
   const session = await auth();
   if (!session?.user) {
     throw new Error('Unauthorized');
@@ -70,11 +78,7 @@ export async function exchangePublicToken(
     })
     .returning({ id: plaidItems.id });
 
-  // Run the initial backfill inline. On a sandbox item this is a few
-  // seconds; on a real institution with 24 months of history it can take
-  // up to ~30s. The Plaid Link UI is already closed, so the user is just
-  // staring at the connecting state on the button.
-  await syncItem(inserted.id);
+  return { itemId: inserted.id };
 }
 
 /**
