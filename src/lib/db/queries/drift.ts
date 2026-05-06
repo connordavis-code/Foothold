@@ -24,6 +24,11 @@ export const MIN_RATIO = 1.5;
 /** How many weeks of trailing history are visible in the trend chart. */
 export const DEFAULT_HISTORY_WEEKS = 8;
 
+/** Soft cap on the bar leaderboard. Beyond this and the surface
+ * starts to read as a forensic dump rather than a scan; the flag
+ * history table covers depth. */
+export const MAX_LEADERBOARD_ROWS = 8;
+
 /** How many additional weeks we pull to seed the baseline of the
  * oldest visible week. Median of 4 prior weeks → +4. */
 const BASELINE_LOOKBACK_WEEKS = 4;
@@ -52,6 +57,21 @@ export type DriftFlag = {
   ratio: number;
 };
 
+export type LeaderboardRow = {
+  category: string;
+  /** This week's spend in this category. */
+  currentTotal: number;
+  /** Median of the prior 4 weeks. */
+  baselineWeekly: number;
+  /** currentTotal / baselineWeekly. ≥1 = above typical, <1 = below. */
+  ratio: number;
+  /** True if this row also passes the flagging thresholds (ratio
+   * ≥ MIN_RATIO and current ≥ MIN_CURRENT). The leaderboard's floor
+   * is more inclusive than flagging — this flag lets the UI tint
+   * elevated rows with the amber accent established elsewhere. */
+  isElevated: boolean;
+};
+
 export type DriftAnalysis = {
   /** Anchor — the most recent visible week's end date. Yesterday in UTC. */
   weekEnd: string;
@@ -61,6 +81,9 @@ export type DriftAnalysis = {
   currentlyElevated: DriftFlag[];
   /** Flags from any of the visible weeks (newest first). */
   flagHistory: DriftFlag[];
+  /** Bar-leaderboard rows: cats with both current AND baseline ≥
+   * MIN_BASELINE, sorted by ratio desc, capped at MAX_LEADERBOARD_ROWS. */
+  leaderboard: LeaderboardRow[];
   /** Total visible weeks (8). */
   weeks: number;
   /** True if the user has fewer than 4 weeks of any spend → flagging meaningless. */
@@ -121,6 +144,53 @@ function median4(values: number[]): number {
   for (let i = 0; i < Math.min(4, values.length); i++) padded[i] = values[i];
   const sorted = [...padded].sort((a, b) => a - b);
   return (sorted[1] + sorted[2]) / 2;
+}
+
+/**
+ * Pure builder for the bar-leaderboard rows. Extracted so it's
+ * testable without a database — same pattern as Phase 6.6's pure-
+ * predicate extraction (buildDigestSubject, isPublicApiPath, etc.).
+ *
+ * Inclusion rule: cat shows up if BOTH current-week total AND prior-
+ * 4-week median are ≥ MIN_BASELINE. The "AND" rejects two noise
+ * shapes: cats that stopped (real baseline, no current) and cats
+ * that just started (current spend, no baseline → divide-by-zero
+ * fallback would be misleading).
+ *
+ * Sort: ratio desc — hottest at top. Cats that are flat (ratio ≈ 1)
+ * sort below hot; cats running cool (ratio < 1) sort to the bottom.
+ *
+ * Cap: top MAX_LEADERBOARD_ROWS by ratio. The flag history table
+ * covers depth; this surface is for scan, not forensics.
+ */
+export function buildLeaderboard(
+  perCategory: Map<string, number[]>,
+  currentWeekIdx: number,
+): LeaderboardRow[] {
+  const rows: LeaderboardRow[] = [];
+  for (const [category, weekly] of perCategory.entries()) {
+    const currentTotal = weekly[currentWeekIdx] ?? 0;
+    const priorFour = [
+      weekly[currentWeekIdx - 1] ?? 0,
+      weekly[currentWeekIdx - 2] ?? 0,
+      weekly[currentWeekIdx - 3] ?? 0,
+      weekly[currentWeekIdx - 4] ?? 0,
+    ];
+    const baselineWeekly = median4(priorFour);
+    if (currentTotal < MIN_BASELINE) continue;
+    if (baselineWeekly < MIN_BASELINE) continue;
+    const ratio = currentTotal / baselineWeekly;
+    rows.push({
+      category,
+      currentTotal,
+      baselineWeekly,
+      ratio,
+      isElevated:
+        currentTotal >= MIN_CURRENT && ratio >= MIN_RATIO,
+    });
+  }
+  rows.sort((a, b) => b.ratio - a.ratio);
+  return rows.slice(0, MAX_LEADERBOARD_ROWS);
 }
 
 /**
@@ -243,11 +313,14 @@ export async function getDriftAnalysis(
     (h) => h.weeks.every((w) => w.total === 0),
   );
 
+  const leaderboard = buildLeaderboard(perCategory, lastIdx);
+
   return {
     weekEnd: anchor,
     topCategories: histories,
     currentlyElevated,
     flagHistory,
+    leaderboard,
     weeks: visibleWeeks,
     baselineSparse,
   };
