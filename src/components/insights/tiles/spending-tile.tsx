@@ -1,17 +1,10 @@
+import { humanizeCategory } from '@/lib/format/category';
 import { formatCurrency } from '@/lib/utils';
 import type { InsightSupplements } from '@/lib/insights/types';
 
 type Props = {
   data: InsightSupplements['spending'];
 };
-
-function humanizeCategory(s: string): string {
-  return s
-    .toLowerCase()
-    .split('_')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
-}
 
 export function SpendingTile({ data }: Props) {
   const { totalThisWeek, deltaVsBaseline, topCategories } = data;

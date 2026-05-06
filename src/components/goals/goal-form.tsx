@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { Goal } from '@/lib/db/schema';
+import { humanizeCategory } from '@/lib/format/category';
 import { cn } from '@/lib/utils';
 
 const SELECT_CLASS = cn(
@@ -210,7 +211,7 @@ export function GoalForm({
                       defaultChecked={initialCategories.has(c)}
                       className="h-4 w-4"
                     />
-                    <span className="text-sm">{humanize(c)}</span>
+                    <span className="text-sm">{humanizeCategory(c)}</span>
                   </label>
                 </li>
               ))}
@@ -261,10 +262,3 @@ function TypeRadio({
   );
 }
 
-function humanize(c: string): string {
-  return c
-    .toLowerCase()
-    .split('_')
-    .map((w) => w[0]?.toUpperCase() + w.slice(1))
-    .join(' ');
-}

@@ -11,6 +11,7 @@ import {
   type GoalWithProgress,
   getGoalsWithProgress,
 } from '@/lib/db/queries/goals';
+import { humanizeCategory } from '@/lib/format/category';
 import { cn, formatCurrency, formatPercent } from '@/lib/utils';
 
 export default async function GoalsPage() {
@@ -91,7 +92,7 @@ function GoalTile({ goal }: { goal: GoalWithProgress }) {
               Categories
             </p>
             <p className="text-xs text-muted-foreground">
-              {goal.categoryFilter.map(humanize).join(' · ')}
+              {goal.categoryFilter.map(humanizeCategory).join(' · ')}
             </p>
           </div>
         )}
@@ -246,10 +247,3 @@ function formatDate(d: string): string {
   });
 }
 
-function humanize(c: string): string {
-  return c
-    .toLowerCase()
-    .split('_')
-    .map((w) => w[0]?.toUpperCase() + w.slice(1))
-    .join(' ');
-}

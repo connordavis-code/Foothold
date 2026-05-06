@@ -7,6 +7,7 @@ import {
   getMonthlyRecurringOutflow,
   getRecurringStreams,
 } from '@/lib/db/queries/recurring';
+import { humanizeCategory } from '@/lib/format/category';
 import { cn, formatCurrency } from '@/lib/utils';
 
 export default async function RecurringPage() {
@@ -295,14 +296,6 @@ function formatTxDate(d: string): string {
     month: 'short',
     day: '2-digit',
   });
-}
-
-function humanizeCategory(c: string): string {
-  return c
-    .toLowerCase()
-    .split('_')
-    .map((w) => w[0]?.toUpperCase() + w.slice(1))
-    .join(' ');
 }
 
 function humanizeFrequency(f: string): string {

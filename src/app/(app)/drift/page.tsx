@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { auth } from '@/auth';
 import { TrendChart } from '@/components/drift/trend-chart';
 import { Button } from '@/components/ui/button';
+import { humanizeCategory } from '@/lib/format/category';
 import {
   MIN_BASELINE,
   MIN_CURRENT,
@@ -195,13 +196,6 @@ function SparseEmptyState() {
       </div>
     </div>
   );
-}
-
-function humanizeCategory(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/_/g, ' ')
-    .replace(/^./, (c) => c.toUpperCase());
 }
 
 function formatRatio(r: number): string {

@@ -4,6 +4,7 @@ import { useEffect, useRef, type MouseEvent } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { SearchX } from 'lucide-react';
 import type { TransactionListRow } from '@/lib/db/queries/transactions';
+import { humanizeCategory } from '@/lib/format/category';
 import { cn, formatCurrency } from '@/lib/utils';
 
 type Props = {
@@ -213,7 +214,7 @@ function Row({
   const categoryLabel = t.overrideCategoryName
     ? t.overrideCategoryName
     : t.primaryCategory
-      ? humanize(t.primaryCategory)
+      ? humanizeCategory(t.primaryCategory)
       : '—';
   const isOverridden = !!t.overrideCategoryName;
 
@@ -278,7 +279,7 @@ function Row({
           )}
           title={
             isOverridden && t.primaryCategory
-              ? `Plaid: ${humanize(t.primaryCategory)}`
+              ? `Plaid: ${humanizeCategory(t.primaryCategory)}`
               : undefined
           }
         >
@@ -311,10 +312,3 @@ function formatTxDate(d: string | Date): string {
   });
 }
 
-function humanize(c: string): string {
-  return c
-    .toLowerCase()
-    .split('_')
-    .map((w) => w[0]?.toUpperCase() + w.slice(1))
-    .join(' ');
-}

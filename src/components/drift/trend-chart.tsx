@@ -10,6 +10,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { humanizeCategory } from '@/lib/format/category';
 import type { CategoryHistory } from '@/lib/db/queries/drift';
 
 /**
@@ -28,13 +29,6 @@ const COLORS = [
 ];
 
 const TOP_N = 6;
-
-function humanizeCategory(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/_/g, ' ')
-    .replace(/^./, (c) => c.toUpperCase());
-}
 
 function formatWeek(yyyymmdd: string): string {
   const d = new Date(`${yyyymmdd}T00:00:00Z`);

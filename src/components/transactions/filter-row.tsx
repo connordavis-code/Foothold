@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState, useTransition } from 'react';
 import type { AccountOption } from '@/lib/db/queries/transactions';
+import { humanizeCategory } from '@/lib/format/category';
 import { cn } from '@/lib/utils';
 
 export const SEARCH_INPUT_ID = 'tx-search';
@@ -110,7 +111,7 @@ export function FilterRow({
         <option value="">All categories</option>
         {categories.map((c) => (
           <option key={c} value={c}>
-            {humanize(c)}
+            {humanizeCategory(c)}
           </option>
         ))}
       </select>
@@ -150,10 +151,3 @@ export function FilterRow({
   );
 }
 
-function humanize(c: string): string {
-  return c
-    .toLowerCase()
-    .split('_')
-    .map((w) => w[0]?.toUpperCase() + w.slice(1))
-    .join(' ');
-}

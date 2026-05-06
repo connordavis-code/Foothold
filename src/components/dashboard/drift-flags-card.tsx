@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { AlertTriangle, ArrowRight } from 'lucide-react';
+import { humanizeCategory } from '@/lib/format/category';
 import type { DriftFlag } from '@/lib/db/queries/drift';
 
 type Props = {
@@ -17,7 +18,7 @@ export function DriftFlagsCard({ flags }: Props) {
 
   const heading =
     flags.length === 1
-      ? `${humanize(top.category)} is up ${formatRatio(top.ratio)} this week`
+      ? `${humanizeCategory(top.category)} is up ${formatRatio(top.ratio)} this week`
       : `${flags.length} categories are running hot this week`;
 
   return (
@@ -32,7 +33,7 @@ export function DriftFlagsCard({ flags }: Props) {
         <p className="text-sm font-medium text-foreground">{heading}</p>
         {flags.length > 1 ? (
           <p className="text-xs text-muted-foreground">
-            Highest: {humanize(top.category)} at {formatRatio(top.ratio)} of
+            Highest: {humanizeCategory(top.category)} at {formatRatio(top.ratio)} of
             its 4-week median.
           </p>
         ) : (
@@ -45,15 +46,6 @@ export function DriftFlagsCard({ flags }: Props) {
       <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-fast ease-out-quart group-hover:translate-x-0.5" />
     </Link>
   );
-}
-
-function humanize(pfc: string): string {
-  if (pfc === 'UNCATEGORIZED') return 'Uncategorized';
-  return pfc
-    .toLowerCase()
-    .split('_')
-    .map((w) => w[0]?.toUpperCase() + w.slice(1))
-    .join(' ');
 }
 
 function formatRatio(ratio: number): string {

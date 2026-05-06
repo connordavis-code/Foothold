@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import type { RecentTransaction } from '@/lib/db/queries/dashboard';
+import { humanizeCategory } from '@/lib/format/category';
 import { formatCurrency } from '@/lib/utils';
 
 type Props = {
@@ -89,10 +90,3 @@ function formatTxDate(d: string | Date): string {
   });
 }
 
-function humanizeCategory(c: string): string {
-  return c
-    .toLowerCase()
-    .split('_')
-    .map((w) => w[0]?.toUpperCase() + w.slice(1))
-    .join(' ');
-}

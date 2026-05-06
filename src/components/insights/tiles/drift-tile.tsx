@@ -1,19 +1,12 @@
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
+import { humanizeCategory } from '@/lib/format/category';
 import { formatCurrency } from '@/lib/utils';
 import type { InsightSupplements } from '@/lib/insights/types';
 
 type Props = {
   data: InsightSupplements['drift'];
 };
-
-function humanizeCategory(s: string): string {
-  return s
-    .toLowerCase()
-    .split('_')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
-}
 
 export function DriftTile({ data }: Props) {
   const top = data.elevated.slice(0, 3);

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowRight, CalendarClock } from 'lucide-react';
 import type { UpcomingRecurringRow } from '@/lib/db/queries/recurring';
+import { humanizeCategory } from '@/lib/format/category';
 import { formatCurrency } from '@/lib/utils';
 
 type Props = {
@@ -90,14 +91,6 @@ function pickLabel(r: {
   );
 }
 
-function humanizeCategory(c: string): string {
-  if (c === 'UNCATEGORIZED') return 'Uncategorized';
-  return c
-    .toLowerCase()
-    .split('_')
-    .map((w) => w[0]?.toUpperCase() + w.slice(1))
-    .join(' ');
-}
 
 function formatHitDate(yyyymmdd: string): string {
   const today = new Date().toISOString().slice(0, 10);
