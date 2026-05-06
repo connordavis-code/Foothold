@@ -46,30 +46,50 @@ export function UpcomingRecurringCard({ upcoming, days = 7 }: Props) {
 
       <ul className="space-y-1">
         {upcoming.map((r) => (
-          <li
-            key={r.id}
-            className="flex items-center justify-between gap-3 rounded-md px-2 py-2 hover:bg-surface-sunken"
-          >
-            <div className="flex min-w-0 items-center gap-3">
-              <CalendarClock className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">
-                  {pickLabel(r)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {formatHitDate(r.predictedNextDate)}
-                </p>
-              </div>
-            </div>
-            <p className="shrink-0 font-mono text-sm tabular-nums">
-              {r.averageAmount != null
-                ? formatCurrency(r.averageAmount)
-                : '—'}
-            </p>
-          </li>
+          <RecurringRow key={r.id} r={r} />
         ))}
       </ul>
     </section>
+  );
+}
+
+function RecurringRow({ r }: { r: UpcomingRecurringRow }) {
+  const drillHref = drilldownHref(r);
+  const inner = (
+    <>
+      <div className="flex min-w-0 items-center gap-3">
+        <CalendarClock className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium">{pickLabel(r)}</p>
+          <p className="text-xs text-muted-foreground">
+            {formatHitDate(r.predictedNextDate)}
+          </p>
+        </div>
+      </div>
+      <p className="shrink-0 font-mono text-sm tabular-nums">
+        {r.averageAmount != null ? formatCurrency(r.averageAmount) : '—'}
+      </p>
+    </>
+  );
+
+  if (drillHref) {
+    return (
+      <li>
+        <Link
+          href={drillHref}
+          className="flex items-center justify-between gap-3 rounded-md px-2 py-2 transition-colors duration-fast ease-out-quart hover:bg-surface-sunken active:bg-surface-sunken"
+        >
+          {inner}
+        </Link>
+      </li>
+    );
+  }
+  // Honest affordance: no merchant + no description → can't build a
+  // useful filter target, so don't lie with a hover state either.
+  return (
+    <li className="flex items-center justify-between gap-3 rounded-md px-2 py-2">
+      {inner}
+    </li>
   );
 }
 
@@ -89,6 +109,26 @@ function pickLabel(r: {
     (r.primaryCategory ? humanizeCategory(r.primaryCategory) : '') ||
     'Recurring charge'
   );
+}
+
+// Match the /recurring stream-row drill pattern: q= ILIKEs txn name +
+// merchantName, scoped to the last 180 days so we surface receipts
+// that actually correlate to the predicted hit. Falls through when
+// neither merchantName nor description is present — q=<category>
+// would surface every category-mate as noise.
+function drilldownHref(r: UpcomingRecurringRow): string | null {
+  const term = r.merchantName?.trim() || r.description?.trim();
+  if (!term) return null;
+  const params = new URLSearchParams();
+  params.set('q', term);
+  params.set('from', sixMonthsAgoIso());
+  return `/transactions?${params.toString()}`;
+}
+
+function sixMonthsAgoIso(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 180);
+  return d.toISOString().slice(0, 10);
 }
 
 
