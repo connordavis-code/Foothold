@@ -22,27 +22,6 @@ function prettifyPfc(pfc: string): string {
 }
 
 /**
- * Approximate a recurring stream's monthly cost from Plaid's frequency string.
- * Uses lastAmount preferentially (more recent); falls back to averageAmount.
- */
-function streamMonthlyEquivalent(stream: {
-  averageAmount: string | null;
-  lastAmount: string | null;
-  frequency: string | null;
-}): number {
-  const amount = Math.abs(Number(stream.lastAmount ?? stream.averageAmount ?? 0));
-  switch ((stream.frequency ?? '').toUpperCase()) {
-    case 'WEEKLY':       return amount * 4.333;
-    case 'BIWEEKLY':     return amount * 2.167;
-    case 'SEMI_MONTHLY': return amount * 2;
-    case 'ANNUALLY':     return amount / 12;
-    case 'MONTHLY':
-    case 'UNKNOWN':      // treat unknown frequency as monthly — defensible default
-    default:             return amount;
-  }
-}
-
-/**
  * Map a Plaid frequency + per-occurrence amount to the engine's
  * ForecastHistory shape. The engine cadence enum has no SEMI_MONTHLY or
  * ANNUALLY slot — those collapse to 'monthly' AND the amount is rescaled
@@ -74,16 +53,18 @@ export function mapStreamCadenceAndAmount(
  *   Investment accounts excluded — Phase 4-pt2 territory.
  * - categoryHistory: keys are Plaid Personal Finance Category strings (e.g.
  *   `FOOD_AND_DRINK`). Each value is an array of monthly outflow totals (oldest
- *   first, length = TRAILING_MONTHS). Per-category recurring contributions are
- *   subtracted from these buckets to avoid double-counting (approximation:
- *   assumes the recurring stream's PFC matches its transaction PFC). User
- *   category overrides (transactions.categoryOverrideId) are ignored in this
- *   iteration — can be incorporated in a future pass.
- * - nonRecurringIncomeHistory: monthly totals of negative-amount transactions
- *   (Plaid: negative = money IN) with total monthly recurring inflows subtracted.
- *   Same approximation as per-category outflow subtraction (accounts for salary
- *   etc. that would otherwise be double-counted in both recurring streams and
- *   transaction buckets).
+ *   first, length = TRAILING_MONTHS). RAW totals — recurring transactions ARE
+ *   included in their PFC bucket. The engine sums PFC categories as the full
+ *   monthly outflow; recurring streams flow through `recurringStreams` for
+ *   override appliers (pause/edit/skip) but are NOT separately added to baseline
+ *   outflows. Closes review finding C-01: prior code subtracted recurring per
+ *   PFC then re-added at the engine, but the per-month subtraction had a
+ *   lifecycle off-by-one and a floor-at-0 information loss. User category
+ *   overrides (transactions.categoryOverrideId) are still ignored here — can
+ *   be incorporated in a future pass.
+ * - incomeHistory: monthly totals of negative-amount transactions (Plaid:
+ *   negative = money IN). RAW — recurring inflows are NOT subtracted. Same
+ *   architectural posture as categoryHistory.
  * - goals: all active goals. currentSaved is derived from account balances for
  *   savings goals (same approach as goals.ts) and 0 for spend_cap goals.
  * - categories: metadata derived from observed PFC strings (in categoryHistory
@@ -176,11 +157,13 @@ export async function getForecastHistory(userId: string): Promise<ForecastHistor
   // Build a map of accountId → currentBalance for savings-goal lookup.
   const balanceById = new Map(accountRows.map((a) => [a.id, Number(a.currentBalance ?? 0)]));
 
-  // --- categoryHistory & nonRecurringIncomeHistory ---
+  // --- categoryHistory & incomeHistory (raw PFC totals) ---
   // monthsAgo index: 1 = last full month, TRAILING_MONTHS = oldest included month.
   // We map to array index 0 = oldest, TRAILING_MONTHS-1 = most recent.
+  // No recurring subtraction — Architecture B per docs/superpowers/specs/
+  // 2026-05-05-c01-forecast-recurring-subtraction-design.md.
   const categoryHistory: Record<string, number[]> = {};
-  const incomeBuckets: number[] = Array(TRAILING_MONTHS).fill(0);
+  const incomeHistory: number[] = Array(TRAILING_MONTHS).fill(0);
 
   for (const tx of txRows) {
     const txDate = new Date(tx.date);
@@ -202,31 +185,9 @@ export async function getForecastHistory(userId: string): Promise<ForecastHistor
       categoryHistory[catKey][idx] += amount;
     } else {
       // Inflow (Plaid: negative = money in)
-      incomeBuckets[idx] += -amount;
+      incomeHistory[idx] += -amount;
     }
   }
-
-  // --- Subtract per-category recurring contributions to avoid double-count ---
-  // Plaid doesn't link transactions to streams; we approximate via PFC.
-  // Floor at 0 to guard against the case where the only spend in a category
-  // IS the recurring stream and floating-point noise would go negative.
-  for (const stream of streamRows) {
-    if (stream.direction !== 'outflow') continue;
-    const cat = stream.primaryCategory ?? 'UNCATEGORIZED';
-    if (!categoryHistory[cat]) continue;
-    const monthlyEq = streamMonthlyEquivalent(stream);
-    categoryHistory[cat] = categoryHistory[cat].map((v) => Math.max(0, v - monthlyEq));
-  }
-
-  // --- Subtract total recurring monthly inflow from each month's bucket ---
-  // (Same approximation as the per-category outflow subtraction above —
-  // salary etc. would otherwise be double-counted.)
-  const recurringInflowMonthly = streamRows
-    .filter((s) => s.direction === 'inflow')
-    .reduce((sum, s) => sum + streamMonthlyEquivalent(s), 0);
-  const nonRecurringIncomeHistory = incomeBuckets.map((v) =>
-    Math.max(0, v - recurringInflowMonthly),
-  );
 
   // --- Build categories metadata from observed PFC keys ---
   // Keys come from categoryHistory and active outflow streams — NOT the
@@ -282,7 +243,7 @@ export async function getForecastHistory(userId: string): Promise<ForecastHistor
     currentCash,
     recurringStreams: mappedStreams,
     categoryHistory,
-    nonRecurringIncomeHistory,
+    incomeHistory,
     goals: mappedGoals,
     categories: categoriesMetadata,
   };

@@ -14,20 +14,20 @@ export function median(values: number[]): number {
     : sorted[mid];
 }
 
-// Plaid recurring cadence → monthly equivalent multipliers.
-// Weekly: 52 weeks / 12 months ≈ 4.333
-// Biweekly: 26 pay periods / 12 months ≈ 2.167
-const WEEKS_PER_MONTH = 4.333;
-const BIWEEKS_PER_MONTH = 2.167;
-
 /**
  * Compute the baseline projection (no overrides applied).
  *
+ * Architecture B (closes review C-01): the baseline reads RAW PFC totals from
+ * categoryHistory and RAW income from incomeHistory. Recurring streams flow
+ * through `history.recurringStreams` for override appliers (pause/edit/skip)
+ * but are NOT separately added here — Plaid already classifies recurring
+ * transactions under their PFC, so summing PFC categories gives the full
+ * monthly outflow without double-counting. Spec:
+ * docs/superpowers/specs/2026-05-05-c01-forecast-recurring-subtraction-design.md
+ *
  * For each future month within the horizon:
- *   - recurring streams projected as-known (monthly cadence assumed for v1;
- *     weekly/biweekly approximated as 4.333×/2.167× monthly equivalent)
- *   - non-recurring outflows per category = trailing median
- *   - non-recurring income = trailing median
+ *   - per-category outflows = median of trailing monthly PFC totals
+ *   - inflows = median of trailing monthly income totals
  *
  * @param history input snapshot from getForecastHistory
  * @param currentMonth YYYY-MM — engine never reads Date.now()
@@ -43,21 +43,7 @@ export function computeBaseline(
   for (const [categoryId, monthly] of Object.entries(history.categoryHistory)) {
     categoryBaseline[categoryId] = median(monthly);
   }
-  const incomeBaseline = median(history.nonRecurringIncomeHistory);
-
-  // Pre-compute recurring totals per direction.
-  let recurringMonthlyOutflow = 0;
-  let recurringMonthlyInflow = 0;
-  for (const stream of history.recurringStreams) {
-    const monthlyEquivalent =
-      stream.cadence === 'weekly'
-        ? stream.amount * WEEKS_PER_MONTH
-        : stream.cadence === 'biweekly'
-          ? stream.amount * BIWEEKS_PER_MONTH
-          : stream.amount;
-    if (stream.direction === 'outflow') recurringMonthlyOutflow += monthlyEquivalent;
-    else recurringMonthlyInflow += monthlyEquivalent;
-  }
+  const incomeBaseline = median(history.incomeHistory);
 
   const projection: MonthlyProjection[] = [];
   let runningCash = history.currentCash;
@@ -66,10 +52,8 @@ export function computeBaseline(
     const month = addMonths(currentMonth, i + 1); // skip current month; project forward
     const startCash = runningCash;
 
-    const inflows = recurringMonthlyInflow + incomeBaseline;
-    const outflows =
-      recurringMonthlyOutflow +
-      Object.values(categoryBaseline).reduce((s, v) => s + v, 0);
+    const inflows = incomeBaseline;
+    const outflows = Object.values(categoryBaseline).reduce((s, v) => s + v, 0);
     const endCash = startCash + inflows - outflows;
 
     projection.push({

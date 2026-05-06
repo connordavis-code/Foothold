@@ -11,7 +11,7 @@ const baseHistory: ForecastHistory = {
   currentCash: 13_400,
   recurringStreams: [],
   categoryHistory: {},
-  nonRecurringIncomeHistory: [],
+  incomeHistory: [],
   goals: [
     { id: 'ef', name: 'Emergency fund', targetAmount: 10_000, targetDate: null, monthlyContribution: 500, currentSaved: 4_200 },
   ],

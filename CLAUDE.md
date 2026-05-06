@@ -108,6 +108,19 @@ uses raw Plaid PFC (`getDistinctCategories` reads
 `transactions.primaryCategory`). Filtering by an override-applied
 category doesn't surface those rows yet — follow-on if needed.
 
+### Forecast engine consumes raw PFC totals
+`computeBaseline` projects outflows as `sum(median(PFC trailing 3mo))`,
+not `recurring + non-recurring residual`. Plaid already classifies
+recurring transactions under their PFC, so summing PFC categories
+gives the full monthly outflow without double-counting. The
+recurring/non-recurring split is recovered when needed (override
+appliers — pause/edit/skip — and the AI prompt) by computing from
+`history.recurringStreams` directly. Closes review C-01: dropping
+the query-layer subtraction in `getForecastHistory` removed a
+lifecycle off-by-one and a `Math.max(0, …)` information-loss path
+that under-projected category spend. Spec at
+`docs/superpowers/specs/2026-05-05-c01-forecast-recurring-subtraction-design.md`.
+
 ---
 
 ## Lessons learned

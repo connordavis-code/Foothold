@@ -2,18 +2,30 @@ import { describe, expect, it } from 'vitest';
 import { projectCash } from './engine';
 import type { ForecastHistory, ProjectCashInput } from './types';
 
+// Architecture B (closes C-01): categoryHistory carries RAW PFC totals
+// including recurring contributions, and incomeHistory carries RAW income
+// including recurring inflows. Recurring streams are kept in the fixture
+// because override appliers (pause/edit/skip) use that data, but they are
+// no longer separately added to baseline math.
 const baseHistory: ForecastHistory = {
   currentCash: 10_000,
   recurringStreams: [
     { id: 'salary', label: 'Salary', amount: 5000, direction: 'inflow', cadence: 'monthly', nextDate: '2026-05-15' },
     { id: 'rent', label: 'Rent', amount: 2000, direction: 'outflow', cadence: 'monthly', nextDate: '2026-05-01' },
   ],
-  categoryHistory: { dining: [400, 400, 400], groceries: [600, 600, 600] },
-  nonRecurringIncomeHistory: [0, 0, 0],
+  // rent is in PFC; dining + groceries are non-recurring categories.
+  categoryHistory: {
+    rent: [2000, 2000, 2000],
+    dining: [400, 400, 400],
+    groceries: [600, 600, 600],
+  },
+  // salary in income; no other inflow.
+  incomeHistory: [5000, 5000, 5000],
   goals: [
     { id: 'ef', name: 'Emergency fund', targetAmount: 10_000, targetDate: null, monthlyContribution: 500, currentSaved: 4000 },
   ],
   categories: [
+    { id: 'rent', name: 'Rent' },
     { id: 'dining', name: 'Dining' },
     { id: 'groceries', name: 'Groceries' },
   ],
@@ -89,7 +101,7 @@ describe('projectCash — integration', () => {
         currentCash: 0,
         recurringStreams: [],
         categoryHistory: {},
-        nonRecurringIncomeHistory: [],
+        incomeHistory: [],
         goals: [],
         categories: [],
       },

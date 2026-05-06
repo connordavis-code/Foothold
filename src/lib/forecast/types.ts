@@ -80,11 +80,14 @@ export type ForecastHistory = {
     nextDate: string;          // YYYY-MM-DD; first future occurrence
   }>;
 
-  /** Per-category trailing monthly outflow totals. Last N months only (e.g. 3). */
+  /** Per-category trailing monthly outflow totals (RAW PFC sums — recurring
+   *  transactions are NOT subtracted out; the engine consumes these directly).
+   *  Last N months only (e.g. 3). */
   categoryHistory: Record<string, number[]>; // categoryId → [t-3, t-2, t-1]
 
-  /** Trailing total non-recurring income per month (last N months). */
-  nonRecurringIncomeHistory: number[];
+  /** Trailing total income per month (raw — includes recurring inflows like
+   *  salary). Last N months. */
+  incomeHistory: number[];
 
   /** Existing real goals. */
   goals: Array<{
