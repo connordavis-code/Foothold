@@ -51,10 +51,11 @@ export function HikeAlertRow({ stream }: Props) {
 }
 
 function drilldownHref(stream: RecurringStreamRow): string | null {
-  const merchant = stream.merchantName?.trim();
-  if (!merchant) return null;
+  // See stream-row.tsx for the fallback rationale.
+  const term = stream.merchantName?.trim() || stream.description?.trim();
+  if (!term) return null;
   const params = new URLSearchParams();
-  params.set('q', merchant);
+  params.set('q', term);
   params.set('from', sixMonthsAgoIso());
   return `/transactions?${params.toString()}`;
 }

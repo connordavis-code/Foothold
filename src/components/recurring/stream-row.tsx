@@ -83,10 +83,15 @@ function CancelledRow({ stream }: { stream: RecurringStreamRow }) {
 }
 
 function drilldownHref(stream: RecurringStreamRow): string | null {
-  const merchant = stream.merchantName?.trim();
-  if (!merchant) return null;
+  // Plaid sandbox often leaves merchantName empty but populates description
+  // with the raw memo ("AMZN Mktp", "PAYPAL XYZ"). q= ILIKEs name +
+  // merchantName, so a description search usually still finds the receipts.
+  // Fall through to no-drill rather than category — q=<category> would
+  // surface every category-mate as noise.
+  const term = stream.merchantName?.trim() || stream.description?.trim();
+  if (!term) return null;
   const params = new URLSearchParams();
-  params.set('q', merchant);
+  params.set('q', term);
   params.set('from', sixMonthsAgoIso());
   return `/transactions?${params.toString()}`;
 }
