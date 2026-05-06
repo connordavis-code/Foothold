@@ -142,13 +142,24 @@ function ElevatedTile({
 }: {
   flag: {
     category: string;
+    weekStart: string;
+    weekEnd: string;
     currentTotal: number;
     baselineWeekly: number;
     ratio: number;
   };
 }) {
+  // Drill-target contract verified against /transactions filter-row:
+  // category / from / to are the canonical search-param names.
+  const drillHref =
+    `/transactions?category=${encodeURIComponent(flag.category)}` +
+    `&from=${flag.weekStart}&to=${flag.weekEnd}`;
+
   return (
-    <div className="rounded-card border border-amber-500/40 bg-amber-500/8 p-4 transition-colors duration-fast ease-out-quart hover:bg-amber-500/12 dark:border-amber-400/30 dark:bg-amber-400/8">
+    <Link
+      href={drillHref}
+      className="group block rounded-card border border-amber-500/40 bg-amber-500/8 p-4 transition-colors duration-fast ease-out-quart hover:bg-amber-500/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 dark:border-amber-400/30 dark:bg-amber-400/8"
+    >
       <div className="flex items-baseline justify-between gap-2">
         <p className="truncate text-sm font-medium">
           {humanizeCategory(flag.category)}
@@ -164,7 +175,7 @@ function ElevatedTile({
       <p className="text-xs text-muted-foreground">
         vs {formatCurrency(flag.baselineWeekly)} typical
       </p>
-    </div>
+    </Link>
   );
 }
 
