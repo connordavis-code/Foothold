@@ -175,7 +175,22 @@ function groupRows(rows: FlatHolding[], groupBy: GroupBy): Group[] {
     list.push(r);
     map.set(key, list);
   }
-  return Array.from(map.entries()).map(([label, rows]) => ({ label, rows }));
+  // Order groups by aggregate market value desc — independent of the
+  // within-group sortField. Prior behavior fell back to Map insertion
+  // order, which is "whichever group contains the first row in the
+  // sorted list" — close to value-desc by accident, wrong as soon as a
+  // small group's top holding outranks a giant group's top holding.
+  return Array.from(map.entries())
+    .map(([label, groupRows]) => ({
+      label,
+      rows: groupRows,
+      aggregate: groupRows.reduce(
+        (sum, r) => sum + (r.institutionValue ?? 0),
+        0,
+      ),
+    }))
+    .sort((a, b) => b.aggregate - a.aggregate)
+    .map(({ label, rows: groupRows }) => ({ label, rows: groupRows }));
 }
 
 function RowGroup({
