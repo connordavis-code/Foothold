@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter, JetBrains_Mono, Source_Serif_4 } from 'next/font/google';
 import { ThemeProvider } from '@/components/theme-provider';
 import './globals.css';
@@ -27,6 +27,14 @@ export const metadata: Metadata = {
   title: 'Foothold',
   description:
     'Personal finance — tracking, investments, goals, and recommendations.',
+};
+
+// viewport-fit=cover lets safe-area-inset-* env vars resolve on iPhone,
+// so the bottom-tab bar can clear the home indicator.
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({

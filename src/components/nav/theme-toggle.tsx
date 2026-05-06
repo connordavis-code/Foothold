@@ -33,8 +33,8 @@ export function ThemeToggle() {
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          size="sm"
-          className="h-9 w-9 rounded-pill p-0 hover:bg-accent/60"
+          size="icon"
+          className="rounded-pill hover:bg-accent/60"
           aria-label="Toggle theme"
         >
           <Icon className="h-4 w-4" />

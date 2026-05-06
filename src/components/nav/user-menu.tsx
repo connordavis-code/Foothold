@@ -28,8 +28,8 @@ export function UserMenu({ email, signOutAction }: Props) {
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          size="sm"
-          className="h-9 w-9 rounded-pill p-0 hover:bg-accent/60"
+          size="icon"
+          className="rounded-pill hover:bg-accent/60"
           aria-label="Account menu"
         >
           <Avatar email={email} />
@@ -70,7 +70,7 @@ export function UserMenu({ email, signOutAction }: Props) {
 function Avatar({ email }: { email: string }) {
   const initial = email[0]?.toUpperCase() ?? '?';
   return (
-    <span className="flex h-8 w-8 items-center justify-center rounded-pill bg-accent text-xs font-medium text-foreground">
+    <span className="flex h-9 w-9 items-center justify-center rounded-pill bg-accent text-xs font-medium text-foreground">
       {initial.match(/[A-Z]/) ? initial : <User className="h-4 w-4" />}
     </span>
   );
