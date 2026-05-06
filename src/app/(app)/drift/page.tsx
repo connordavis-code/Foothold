@@ -2,9 +2,11 @@ import { Activity, ArrowRight, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { auth } from '@/auth';
 import { Leaderboard } from '@/components/drift/leaderboard';
+import { MobileList } from '@/components/operator/mobile-list';
 import { Button } from '@/components/ui/button';
 import { humanizeCategory } from '@/lib/format/category';
 import {
+  type DriftFlag,
   MIN_BASELINE,
   MIN_CURRENT,
   MIN_RATIO,
@@ -80,7 +82,20 @@ export default async function DriftPage() {
             Flag history · {drift.flagHistory.length}{' '}
             {drift.flagHistory.length === 1 ? 'flag' : 'flags'}
           </p>
-          <div className="overflow-hidden rounded-card border border-border bg-surface-elevated">
+          <MobileList<DriftFlag>
+            rows={drift.flagHistory}
+            config={{
+              rowKey: (f) => `${f.weekEnd}-${f.category}`,
+              dateField: (f) => f.weekEnd,
+              topLine: (f) => humanizeCategory(f.category),
+              secondLine: (f) =>
+                `vs ${formatCurrency(f.baselineWeekly)} baseline · ${formatRatio(f.ratio)}`,
+              rightCell: (f) => formatCurrency(f.currentTotal),
+              rowHref: (f) =>
+                `/transactions?category=${encodeURIComponent(f.category)}&from=${f.weekStart}&to=${f.weekEnd}`,
+            }}
+          />
+          <div className="hidden overflow-hidden rounded-card border border-border bg-surface-elevated md:block">
             <div className="overflow-auto">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10 bg-surface-elevated/95 backdrop-blur">

@@ -9,6 +9,11 @@ import {
   findOrCreateCategoryByName,
 } from '@/lib/db/queries/categories';
 import {
+  type TransactionFilters,
+  type TransactionListRow,
+  getTransactions,
+} from '@/lib/db/queries/transactions';
+import {
   financialAccounts,
   plaidItems,
   transactions,
@@ -119,4 +124,36 @@ export async function updateTransactionCategoriesAction(
 
   revalidatePath('/transactions');
   return { updated: owned.length };
+}
+
+export type LoadMoreResult = {
+  rows: TransactionListRow[];
+  hasMore: boolean;
+};
+
+/**
+ * Mobile infinite-scroll loader. Returns the next page of transaction
+ * rows under the same filter contract the page renders with — the
+ * sentinel observer in <MobileTransactionsShell> calls this when it
+ * scrolls into view.
+ *
+ * Filter shape mirrors TransactionFilters minus userId (auth handles
+ * scoping). `hasMore` is computed against the full count so the
+ * client can stop observing once the tail is reached.
+ */
+export async function loadMoreTransactionsAction(
+  filters: Omit<TransactionFilters, 'page'>,
+  page: number,
+): Promise<LoadMoreResult> {
+  const session = await auth();
+  if (!session?.user) throw new Error('Unauthorized');
+
+  const result = await getTransactions(session.user.id, {
+    ...filters,
+    page,
+  });
+  return {
+    rows: result.rows,
+    hasMore: result.page < result.totalPages,
+  };
 }

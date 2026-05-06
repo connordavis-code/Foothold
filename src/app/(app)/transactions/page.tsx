@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowRight, Receipt } from 'lucide-react';
 import { auth } from '@/auth';
+import { MobileTransactionsShell } from '@/components/transactions/mobile-transactions-shell';
 import { OperatorShell } from '@/components/transactions/operator-shell';
 import { Button } from '@/components/ui/button';
 import { getCategoryOptions } from '@/lib/db/queries/categories';
@@ -83,20 +84,39 @@ export default async function TransactionsPage({
             Transactions
           </h1>
         </div>
-        <p className="text-xs tabular-nums text-muted-foreground">
+        <p className="hidden text-xs tabular-nums text-muted-foreground md:block">
           {list.totalCount.toLocaleString()}{' '}
           {list.totalCount === 1 ? 'transaction' : 'transactions'}
         </p>
       </div>
 
-      <OperatorShell
-        rows={list.rows}
+      <div className="hidden md:block">
+        <OperatorShell
+          rows={list.rows}
+          accounts={accounts}
+          categories={categories}
+          categoryOptions={categoryOptions}
+          page={list.page}
+          totalPages={list.totalPages}
+          totalCount={list.totalCount}
+        />
+      </div>
+
+      <MobileTransactionsShell
+        initialRows={list.rows}
         accounts={accounts}
         categories={categories}
         categoryOptions={categoryOptions}
-        page={list.page}
+        initialPage={list.page}
         totalPages={list.totalPages}
         totalCount={list.totalCount}
+        filters={{
+          accountId: searchParams.account,
+          category: searchParams.category,
+          dateFrom: searchParams.from,
+          dateTo: searchParams.to,
+          search: searchParams.q,
+        }}
       />
     </div>
   );

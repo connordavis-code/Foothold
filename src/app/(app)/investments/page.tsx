@@ -3,6 +3,7 @@ import { ArrowRight, TrendingUp } from 'lucide-react';
 import { auth } from '@/auth';
 import { HoldingsTable } from '@/components/investments/holdings-table';
 import { InvestmentTxnsTable } from '@/components/investments/investment-txns-table';
+import { MobileInvestments } from '@/components/investments/mobile-investments';
 import { PortfolioSummary } from '@/components/investments/portfolio-summary';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,9 +37,14 @@ export default async function InvestmentsPage() {
 
       <PortfolioSummary summary={summary} />
 
-      <HoldingsTable holdings={holdings} />
+      <div className="hidden md:block">
+        <HoldingsTable holdings={holdings} />
+      </div>
+      <div className="hidden md:block">
+        <InvestmentTxnsTable transactions={txns} />
+      </div>
 
-      <InvestmentTxnsTable transactions={txns} />
+      <MobileInvestments holdings={holdings} transactions={txns} />
     </div>
   );
 }
