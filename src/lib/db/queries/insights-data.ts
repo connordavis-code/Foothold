@@ -222,10 +222,15 @@ export async function collectSnapshot(
     }))
     .sort((a, b) => (b.monthlyAmount ?? 0) - (a.monthlyAmount ?? 0));
 
+  // Tightened in W-fix C-02: a user with any active outflow stream or
+  // any goal would previously trip isEmpty=false even with zero spending
+  // and zero recurring hits this week, so Anthropic got asked to write a
+  // weekly recap from an empty input set. The narrowest contract is:
+  // empty if there's no real this-week activity (no transactions, no
+  // recurring stream that hit). Goals on their own aren't summarizable.
   const isEmpty =
     byCategoryThisWeek.length === 0 &&
-    goalSnapshots.length === 0 &&
-    recurring.length === 0;
+    !recurring.some((r) => r.hitThisWeek);
 
   return {
     weekStart,
