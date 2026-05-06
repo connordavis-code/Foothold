@@ -1,7 +1,7 @@
 import { Activity, ArrowRight, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { auth } from '@/auth';
-import { TrendChart } from '@/components/drift/trend-chart';
+import { Leaderboard } from '@/components/drift/leaderboard';
 import { Button } from '@/components/ui/button';
 import { humanizeCategory } from '@/lib/format/category';
 import {
@@ -10,7 +10,7 @@ import {
   MIN_RATIO,
   getDriftAnalysis,
 } from '@/lib/db/queries/drift';
-import { cn, formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 
 export default async function DriftPage() {
   const session = await auth();
@@ -68,11 +68,9 @@ export default async function DriftPage() {
       )}
 
       <section className="space-y-3">
-        <p className="text-eyebrow">
-          Weekly trend · top {drift.topCategories.length} categories
-        </p>
-        <div className="rounded-card border border-border bg-surface-elevated p-4 sm:p-5">
-          <TrendChart histories={drift.topCategories} />
+        <p className="text-eyebrow">This week vs baseline</p>
+        <div className="rounded-card border border-border bg-surface-elevated p-5 sm:p-6">
+          <Leaderboard rows={drift.leaderboard} />
         </div>
       </section>
 
