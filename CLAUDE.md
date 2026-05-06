@@ -320,7 +320,25 @@ inside the client component. Fixed in `d955dd4` for `<NavLink>`.
   (over / behind / on-pace / hit) + `severityKey` (bucketed
   100/50/25/20). Page collapsed -188/+5 lines.
 
-Test count: 238 vitest as of /goals IA rework.
+**`/recurring` IA rework** (2026-05-06; spec at
+`docs/superpowers/specs/2026-05-05-recurring-ia-rework-design.md`)
+- Single sticky-header table → layered four-section overview:
+  conditional Hike alerts (lastAmount > 1.15 × averageAmount AND
+  ≥ $2/mo monthly-equivalent floor), then Plaid-PFC-clustered
+  category sections sorted by total `$/mo` desc with "Other" pinned
+  bottom, then Inflows section, then Recently cancelled (TOMBSTONED
+  + last hit within 90 days). Stretched-`<Link>` drilldown on both
+  outflow and inflow rows when merchantName is non-empty, via
+  `/transactions?q=<merchant>&from=<6mo>` (`q=` ILIKEs both
+  `transactions.name` AND `merchantName` per
+  `src/lib/db/queries/transactions.ts`). Monthly remains the
+  headline unit per user direction — operator cashflow lives in
+  months; the rework's value is reorganization, not unit reframe.
+  Pure predicates in `src/lib/recurring/analysis.ts`: `hikeRatio`,
+  `isHikeAlert` (15% + $2/mo floor), `monthlyCost`, `groupByCategory`.
+  Page collapsed -217/+15 lines.
+
+Test count: 266 vitest as of /recurring IA rework.
 
 ### In progress
 - **Plaid Production access review** — submitted 2026-05-01 + Q9
@@ -333,15 +351,19 @@ Test count: 238 vitest as of /goals IA rework.
   paste fresh secret, update Vercel env, reconnect via `/settings`.
   `linkTokenCreate` doesn't pass `redirect_uri` — fine for non-OAuth
   banks, breaks Chase / Cap One until configured.
-- **Per-page IA rework** for /recurring — Phase 6 shipped a visual
-  refresh; /insights, /drift, and /goals got their IA reworks
-  (2026-05-05). /recurring is the only remaining surface — daily-use
-  companion to /transactions, "what's quietly draining me?" is its
-  PRODUCT.md question. Phase-sized; use the `impeccable shape →
-  craft` loop that worked on /drift and /goals.
-- **Dark-mode visual sweep** — tokens defined in 6.1 and parity-
-  mapped in `:root` / `.dark`, but the dark variant has never been
-  walked through against the new editorial chrome.
+- **Wire next-themes + dark-mode visual sweep** — `next-themes`
+  (^0.4.6) is in package.json and `darkMode: ['class']` is set in
+  `tailwind.config.ts`, but `<ThemeProvider>` is NOT in
+  `src/app/layout.tsx` and no toggle exists; the `.dark` token
+  variant in `globals.css` is parity-mapped but unreachable through
+  normal UI (DevTools `documentElement.classList.add('dark')` is
+  the only current path). Phase: wire ThemeProvider in root layout
+  (`attribute="class" defaultTheme="system" enableSystem`), add a
+  `<ThemeToggle>` in the top-bar, then walk through every surface
+  in dark mode and fix what breaks. /recurring (2026-05-06) shipped
+  without dark-mode UAT for this reason — inherits the same tokens
+  as every other surface, so dark breakage there implies dark
+  breakage everywhere, which this phase will catch.
 - **Mobile-first responsive audit** — current design works at small
   widths via reflow, but no surface has been deliberately designed
   for mobile. Sidebar collapse → Sheet drawer (vaul) is the obvious
