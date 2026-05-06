@@ -21,7 +21,13 @@ export function StreamRow({ stream, variant }: Props) {
   const showHikeGlyph = variant === 'outflow' && isHikeAlert(stream);
 
   return (
-    <li className="relative px-5 py-3 sm:px-6">
+    <li
+      className={cn(
+        'relative px-5 py-3 sm:px-6',
+        drillHref &&
+          'transition-colors duration-fast ease-out-quart hover:bg-surface-sunken/60',
+      )}
+    >
       {drillHref && (
         <Link
           href={drillHref}

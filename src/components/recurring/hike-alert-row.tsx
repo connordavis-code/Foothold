@@ -5,7 +5,7 @@ import {
 } from '@/lib/db/queries/recurring';
 import { humanizeCategory } from '@/lib/format/category';
 import { hikeRatio } from '@/lib/recurring/analysis';
-import { formatCurrency, formatPercent } from '@/lib/utils';
+import { cn, formatCurrency, formatPercent } from '@/lib/utils';
 
 type Props = {
   stream: RecurringStreamRow;
@@ -24,7 +24,13 @@ export function HikeAlertRow({ stream }: Props) {
     frequencyToMonthlyMultiplier(stream.frequency);
 
   return (
-    <li className="relative px-5 py-3 sm:px-6">
+    <li
+      className={cn(
+        'relative px-5 py-3 sm:px-6',
+        drillHref &&
+          'transition-colors duration-fast ease-out-quart hover:bg-surface-sunken/60',
+      )}
+    >
       {drillHref && (
         <Link
           href={drillHref}
