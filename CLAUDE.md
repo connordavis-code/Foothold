@@ -308,7 +308,25 @@ inside the client component. Fixed in `d955dd4` for `<NavLink>`.
   (Newspaper + "First read coming up"), `<InsightTeaserCard>`
   (BookOpen), `/dashboard` empty (Mountain — literal Foothold
   mark). 175 vitest tests; typecheck clean. Browser walkthrough
-  pending.
+  confirmed clean.
+
+- **Phase 6.7 — UI quality follow-on** (2026-05-05) — top-two
+  deferred TODOs from the 6.6 impeccable critique. (1) Global `?`
+  cheatsheet dialog: editorial Dialog, Global / /transactions /
+  /simulator sections, key-pill labels, `shouldIgnore` predicate
+  copied from `operator-shell.tsx` so `?` in inputs is untouched.
+  Bindings live in `keyboard/bindings.ts` as a single const for
+  future tooltip reuse. (2) `/transactions` operator gaps: tri-state
+  select-all-visible header checkbox (indeterminate set via DOM
+  property since React has no prop for it; click-on-indeterminate →
+  select all, per locked decision); sonner-with-undo on bulk
+  re-categorize, snapshotting per-row prior `overrideCategoryName`
+  before the action fires (router.refresh would otherwise overwrite
+  the source) and grouping the restore by prior category for
+  N-bounded round-trips. Cross-page select-all out of scope. Spec at
+  `docs/superpowers/specs/2026-05-05-phase-6.7-handoff.md`. 175
+  vitest tests (no regressions); typecheck clean; browser
+  walkthrough confirmed.
 
 ### In progress
 - **Plaid Production access review** — submitted 2026-05-01 + Q9
