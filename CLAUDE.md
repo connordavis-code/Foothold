@@ -382,19 +382,44 @@ inside the client component. Fixed in `d955dd4` for `<NavLink>`.
   Notebook." Future surfaces should reference [DESIGN.md](DESIGN.md)
   as the visual contract — operator decisions live in PRODUCT.md.
 
-### Parallel review-fix workstream (2026-05-05)
-A separate workstream is consuming `docs/reviews/2026-05-05-REVIEW.md`
-(deep code review of forecast/security/cron core, generated outside
-this session) and committing fixes per finding. Already landed on
-main: `2cc4edb` (digest HTML escape, C-04), `fde00a8` (webhook
-KEY_CACHE bound + negative cache, C-03), `97bbfb5` (ILIKE wildcard
-escape in tx search), `4754dbb` (forecast SEMI_MONTHLY/ANNUALLY
-cadence rescaling), `51e533e` (forecast goal-projection ETA gate),
-`86c871a` (insights isEmpty contract tightening), `a03e907`
-(crypto key-length error). Three design specs untracked at
-`docs/superpowers/specs/2026-05-05-{c01,w04,w09}-*-design.md` for
-larger pending fixes. Treat the REVIEW.md as the inbox; a future
-session may finish the workstream or close it out.
+- **Code review + fixes** (2026-05-05) — `gsd-code-reviewer` deep audit
+  of forecast/security/cron core (64 files, see
+  [docs/reviews/2026-05-05-REVIEW.md]) produced 22 findings (4
+  Critical, 11 Warning, 7 Info). 13 commits on main close 19 of them;
+  3 explicitly deferred and acknowledged. UAT confirmed in browser
+  against sandbox Wells Fargo data (see
+  [docs/reviews/2026-05-05-UAT-checklist.md]).
+  - **Critical fixed:** C-04 `2cc4edb` (digest escapeHtml apostrophe);
+    C-03 `fde00a8` (webhook KEY_CACHE size cap + negative cache for
+    failed kid lookups, anti-amplification);
+    C-02 `86c871a` (insights isEmpty contract — empty week no longer
+    routes to Anthropic);
+    C-01 `9cc87a9` (forecast engine consumes raw PFC — Architecture B,
+    drops query-layer recurring subtraction loop with lifecycle
+    off-by-one + floor-at-0 information loss).
+  - **Warning fixed:** W-03+I-07 `97bbfb5` (ILIKE wildcard escape
+    + drop dead `?? sql\`true\`` fallback);
+    W-10 `4754dbb` (SEMI_MONTHLY/ANNUALLY amount rescale on cadence
+    collapse);
+    W-01 `51e573e` (goal-projection ETA cash gate — skip months
+    where `endCash - monthlyContribution < 0`);
+    W-04 `5729b9a` + `74d0100` (defer inline sync from
+    exchangePublicToken so plaintext access_token in JS heap drops
+    from ~30s to ~50ms; null token reference in syncItem finally);
+    W-09 `c2f20d9` (signed math through override chain;
+    `clampForDisplay` clips inflows/outflows/byCategory at engine
+    output, startCash/endCash unclamped).
+  - **Info fixed:** I-02 `a03e907` (crypto key-length in error msg).
+  - **Docs:** `d1c3472` (REVIEW.md + 3 specs); `6e05e1b` (UAT
+    checklist).
+  - **Deferred (acknowledged):** W-05/W-06 (multi-Plaid-item state,
+    blocked on Plaid Production approval); W-07 (digest 24h window
+    edge); W-08 (narrative cache canonical JSON, needs lib choice);
+    W-02/W-11 (minor / no-code-change).
+  - **Tests:** 175 → 218 vitest (+43 regressions). New architecture
+    notes added above: "Forecast engine consumes raw PFC totals" and
+    "Forecast override appliers use signed math". Specs preserved at
+    `docs/superpowers/specs/2026-05-05-{c01,w04,w09}-*-design.md`.
 
 ### In progress
 - **Plaid Production access review** — submitted 2026-05-01 + Q9
