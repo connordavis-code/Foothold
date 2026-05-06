@@ -109,7 +109,7 @@ export default async function DriftPage() {
                       className="border-b border-border/60 transition-colors duration-fast ease-out-quart hover:bg-surface-sunken/60 last:border-b-0"
                     >
                       <td className="px-3 py-1.5 font-mono text-xs tabular-nums text-muted-foreground whitespace-nowrap">
-                        {flag.weekEnd}
+                        {formatWeekEnd(flag.weekEnd)}
                       </td>
                       <td className="px-3 py-1.5 font-medium">
                         {humanizeCategory(flag.category)}
@@ -209,4 +209,15 @@ function SparseEmptyState() {
 
 function formatRatio(r: number): string {
   return `${r.toFixed(1)}×`;
+}
+
+// Calendar dates render in UTC so a YYYY-MM-DD value doesn't drift
+// by a day in non-UTC client locales.
+function formatWeekEnd(yyyymmdd: string): string {
+  const d = new Date(`${yyyymmdd}T00:00:00Z`);
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
 }
