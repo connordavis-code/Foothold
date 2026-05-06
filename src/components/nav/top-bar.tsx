@@ -3,6 +3,7 @@ import { PaletteTrigger } from '@/components/command-palette/palette-trigger';
 import { getSyncStatus } from '@/lib/db/queries/sync';
 import { PageTitle } from './page-title';
 import { SyncPill } from './sync-pill';
+import { ThemeToggle } from './theme-toggle';
 import { UserMenu } from './user-menu';
 
 type Props = {
@@ -44,6 +45,7 @@ export async function TopBar({ userId, email }: Props) {
           lastSyncedAt={status.lastSyncedAt?.toISOString() ?? null}
           reauthCount={status.reauthCount}
         />
+        <ThemeToggle />
         <UserMenu email={email} signOutAction={handleSignOut} />
       </div>
     </header>
