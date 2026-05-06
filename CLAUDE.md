@@ -357,21 +357,55 @@ inside the client component. Fixed in `d955dd4` for `<NavLink>`.
   (Light / Dark / System) at
   `src/components/nav/theme-toggle.tsx`, mounted in the top-bar
   right cluster between sync pill and user avatar.
-- Visual sweep deferred to runtime UAT but **codebase audit found
-  zero hardcoded color utilities** (no `bg-white`, `text-black`,
-  `bg-gray-*`, hex literals, or inline color styles in `src/`).
-  Every surface routes through the editorial tokens, both `:root`
-  and `.dark` blocks of `globals.css` are fully parity-mapped, and
-  `bg-gradient-hero` is intentionally dark in both modes (so the
-  hero card / empty-state icons / loading skeleton all use
-  `text-white` correctly under both themes). Recharts colors
-  reference `hsl(var(--*))` tokens and auto-flip.
+- **Codebase audit found zero hardcoded color utilities** (no
+  `bg-white`, `text-black`, `bg-gray-*`, hex literals, or inline
+  color styles in `src/`). Every surface routes through editorial
+  tokens; both `:root` and `.dark` blocks of `globals.css` are
+  fully parity-mapped; `bg-gradient-hero` is intentionally dark in
+  both modes (so the hero card / empty-state icons / loading
+  skeleton all use `text-white` correctly under both themes).
+  Recharts colors reference `hsl(var(--*))` tokens and auto-flip.
+- Runtime UAT across all 9 surfaces confirmed 2026-05-06.
 - Email digest in `src/app/api/cron/digest/route.ts` keeps its
   hex literals (server-rendered HTML for Resend, not affected by
   `.dark`).
 
-Test count: 266 vitest (unchanged — dark mode adds no testable
-predicates).
+**Mobile-first design** (2026-05-06; spec at
+`docs/superpowers/specs/2026-05-06-mobile-first-responsive-design.md`)
+- **Phase 1** — vaul installed; tap-target uplift (Button/Input
+  h-10 → h-11, 44px floor); 5-tab `<MobileTabBar>` (Home / Recurring
+  / Invest / Activity / More). The "More" slot opens a vaul Drawer
+  from the bottom carrying long-tail nav (Insights / Drift / Goals
+  / Simulator / Settings) — single canonical path replaces a
+  short-lived top-bar hamburger. Long-tail is COMPUTED from
+  `nav-routes.ts` via set-difference against the 4 primary tab
+  hrefs, so adding a route to nav-routes propagates to More
+  automatically. `viewport={ viewportFit: 'cover' }` in root layout
+  so `safe-area-inset-*` env vars resolve on iPhone.
+- **Phase 2** — Generic `<MobileList>` at `src/components/operator/`
+  with field-config object; `dateField` optional (holdings render
+  flat, txns / drift / investment-txns render date-grouped via
+  new `humanizeDate` helper at `src/lib/format/date.ts`). CSS-only
+  swap (`hidden md:block` / `block md:hidden`) — both renders ship,
+  no JS-runtime branching, no hydration risk. `<MobileFilterSheet>`
+  + `<TransactionDetailSheet>` are vaul bottom drawers; detail-
+  sheet accepts a narrow `DetailRow` shape so /transactions AND the
+  dashboard `<RecentActivityCard>` drive the same picker.
+  /transactions mobile uses IntersectionObserver-driven infinite-
+  scroll via `loadMoreTransactionsAction` — SSR owns page 1, client
+  owns the tail, appended rows reset on `initialRows` identity
+  change so filter changes / `router.refresh()` stay race-free.
+- **Dashboard polish (follow-on)** — recent-activity rows tap-to-
+  edit at <md (presentational at md+ to avoid conflict with j/k +
+  bulk-action gestures); `getRecentTransactions` left-joins
+  categories so override-aware labels finally render here too.
+  Upcoming-recurring rows wrap in conditional `<Link>` matching the
+  /recurring drill contract (`q=<merchant>&from=<6mo>`); fall
+  through to non-interactive `<li>` when no useful term — keeps
+  the affordance honest (no hover state on dead rows).
+
+Test count: 280 vitest (266 → +14 from `humanizeDate`,
+`groupByDate`, `activeTransactionFilterCount`).
 
 ### In progress
 - **Plaid Production access review** — submitted 2026-05-01 + Q9
@@ -384,15 +418,12 @@ predicates).
   paste fresh secret, update Vercel env, reconnect via `/settings`.
   `linkTokenCreate` doesn't pass `redirect_uri` — fine for non-OAuth
   banks, breaks Chase / Cap One until configured.
-- **Mobile-first responsive audit** — *primary surface for this
-  user is mobile.* Current design works at small widths via reflow,
-  but no surface has been deliberately designed for mobile. Sidebar
-  is `hidden md:flex` (vanishes <768px) — collapse → Sheet drawer
-  (vaul) is the obvious starter. Top-bar already mobile-friendly
-  (`px-4` → `md:px-6`, no collapse). Audit pass should cover: tap
-  target sizing across operator-tier tables (/transactions,
-  /investments), thumb-reach for top-bar controls, bottom-nav vs
-  sidebar pattern decision, and `<640px` UAT of every page.
+- **Mobile Phase 3 — `/simulator` portrait pass** — accordion-stack
+  override editor (one section open at a time, active-count badge
+  per section), Recharts `aspect-square` on <md with tap-tooltip,
+  legend below chart, sticky save-bar above the tab bar.
+  Acceptance: scenario edit + run + save all work on touch. Spec
+  §9 at `docs/superpowers/specs/2026-05-06-mobile-first-responsive-design.md`.
 - **Phase 3-pt3** — per-goal coaching detail page (defer until real
   data flows)
 - **Phase 4-pt2** — investment what-if simulator (deferred from Phase
