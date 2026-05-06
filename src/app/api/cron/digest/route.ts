@@ -200,9 +200,12 @@ function formatTime(d: Date): string {
 }
 
 function escapeHtml(s: string): string {
+  // Includes `'` because future renderings into single-quoted attribute
+  // contexts (e.g. `<td title='...'>`) would otherwise allow injection.
   return s
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
