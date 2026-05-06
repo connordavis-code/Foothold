@@ -347,7 +347,15 @@ inside the client component. Fixed in `d955dd4` for `<NavLink>`.
   foreground hue + amber for elevated rows); `TrendChart` deleted
   (sole consumer gone). Flag history table preserved untouched.
   /drift walkthrough confirmed. 210 vitest tests; typecheck clean.
-  Spec also captured DESIGN.md generation as a deferred follow-on.
+
+- **DESIGN.md** (2026-05-05) — generated via `impeccable document`
+  (Stitch format, YAML frontmatter + six-section body). Captures
+  tokens, named rules (160/40 hue, single-hue elevated, restrained
+  accent floor, mono-numeral, borders-not-shadows, editorial card
+  default), and do/don't list. Pair with [PRODUCT.md](PRODUCT.md)
+  for the full brief. Creative North Star: "The Operator's Field
+  Notebook." Future surfaces should reference [DESIGN.md](DESIGN.md)
+  as the visual contract — operator decisions live in PRODUCT.md.
 
 ### Parallel review-fix workstream (2026-05-05)
 A separate workstream is consuming `docs/reviews/2026-05-05-REVIEW.md`
