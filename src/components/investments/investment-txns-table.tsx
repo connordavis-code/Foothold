@@ -111,36 +111,19 @@ function TypePill({
   subtype: string | null;
 }) {
   const label = type ?? '—';
-  const tone = pillTone(type);
   return (
     <span
-      className={cn(
-        'inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider',
-        tone,
-      )}
+      // Single muted tone for every type — the label IS the affordance.
+      // The previous five-hue palette (blue/orange/emerald/rose/muted)
+      // was decoration disguised as semantics; per DESIGN.md's
+      // Restrained Floor Rule, semantic color is reserved for state
+      // (positive / negative / elevated), not for categorical labels.
+      className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
       title={subtype ?? undefined}
     >
       {label}
     </span>
   );
-}
-
-function pillTone(type: string | null): string {
-  switch (type) {
-    case 'buy':
-      return 'bg-blue-500/10 text-blue-700 dark:text-blue-300';
-    case 'sell':
-      return 'bg-orange-500/10 text-orange-700 dark:text-orange-300';
-    case 'cash':
-      return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300';
-    case 'fee':
-    case 'tax':
-      return 'bg-rose-500/10 text-rose-700 dark:text-rose-300';
-    case 'transfer':
-      return 'bg-muted text-muted-foreground';
-    default:
-      return 'bg-muted text-muted-foreground';
-  }
 }
 
 function formatDate(d: string | Date): string {
