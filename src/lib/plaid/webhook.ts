@@ -4,7 +4,6 @@ import * as jose from 'jose';
 import type { JWK } from 'jose';
 import { db } from '@/lib/db';
 import { plaidItems } from '@/lib/db/schema';
-import { logError } from '@/lib/logger';
 import { plaid } from './client';
 import { syncItem } from './sync';
 
@@ -30,8 +29,18 @@ import { syncItem } from './sync';
 // Verification keys are stable per `kid` for ~24h. Memoize so we don't
 // hit Plaid's API on every webhook. Map lives in module scope; survives
 // across requests on the same server instance, evicted on cold start.
-const KEY_CACHE = new Map<string, { jwk: JWK; expiresAt: number }>();
+//
+// The size cap + negative caching here are anti-amplification defenses:
+// the endpoint accepts anonymous POSTs (Plaid signs each call), so an
+// attacker can craft JWTs with random `kid` values that each force an
+// outbound `webhookVerificationKeyGet`. Without bounds, that's
+// unbounded outbound API hits + unbounded map growth. Plaid's normal
+// rotation churns ~1-3 kids per 24h, so 32 entries is far more headroom
+// than legitimate operation needs.
+const KEY_CACHE = new Map<string, { jwk: JWK | null; expiresAt: number }>();
 const KEY_CACHE_MS = 24 * 60 * 60 * 1000;
+const KEY_CACHE_NEGATIVE_MS = 5 * 60 * 1000;
+const KEY_CACHE_MAX_ENTRIES = 32;
 
 // iat freshness window. Plaid's example uses 5 min — anything older is
 // almost certainly a replay.
@@ -86,12 +95,25 @@ async function getVerificationKey(kid: string): Promise<JWK | null> {
   try {
     const res = await plaid.webhookVerificationKeyGet({ key_id: kid });
     const jwk = res.data.key as unknown as JWK;
-    KEY_CACHE.set(kid, { jwk, expiresAt: Date.now() + KEY_CACHE_MS });
+    cacheKey(kid, jwk, KEY_CACHE_MS);
     return jwk;
-  } catch (err) {
-    await logError('webhook.key_fetch_failed', err, { kid });
+  } catch {
+    // Negative-cache the failure so a flooder targeting the same kid
+    // doesn't re-hit Plaid every request. Don't log here — the route
+    // handler already logs `webhook.verification_failed` once we
+    // return null, so logging again would double-count.
+    cacheKey(kid, null, KEY_CACHE_NEGATIVE_MS);
     return null;
   }
+}
+
+function cacheKey(kid: string, jwk: JWK | null, ttlMs: number): void {
+  if (KEY_CACHE.size >= KEY_CACHE_MAX_ENTRIES && !KEY_CACHE.has(kid)) {
+    // Map iteration order is insertion order; evict oldest first.
+    const firstKey = KEY_CACHE.keys().next().value;
+    if (firstKey !== undefined) KEY_CACHE.delete(firstKey);
+  }
+  KEY_CACHE.set(kid, { jwk, expiresAt: Date.now() + ttlMs });
 }
 
 // =============================================================================
