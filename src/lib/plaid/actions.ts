@@ -166,6 +166,11 @@ export async function createLinkTokenForUpdate(itemId: string): Promise<string> 
     throw new Error('Item not found');
   }
 
+  // Plaintext access_token passed inline so we don't hold an extra
+  // userland reference. Plaid's SDK retains its own ref through the call;
+  // there's no portable way to zero V8's underlying string allocation —
+  // this is hygiene, not defense. Heap-dump exposure during the call is
+  // accepted in the threat model (review W-04).
   const response = await plaid.linkTokenCreate({
     user: { client_user_id: session.user.id },
     client_name: env.PLAID_CLIENT_NAME,

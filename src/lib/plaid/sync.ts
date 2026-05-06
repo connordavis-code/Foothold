@@ -55,30 +55,38 @@ export async function syncItem(itemId: string): Promise<SyncSummary> {
   // and expects plaintext. Mutating once here keeps the call sites unchanged.
   item.accessToken = decryptToken(item.accessToken);
 
-  const accountsResult = await syncAccountsForItem(item);
+  // Wrap in try/finally to drop our last reference to the plaintext
+  // access_token before this scope unwinds. Doesn't zero V8's underlying
+  // string allocation (no userland API for that), but removes the strong
+  // ref so GC can reclaim sooner — review W-04 hygiene.
+  try {
+    const accountsResult = await syncAccountsForItem(item);
 
-  // Reload accounts now that the upsert may have added new rows. Both
-  // downstream helpers need the plaid_account_id → financial_account.id map.
-  const accs = await db
-    .select()
-    .from(financialAccounts)
-    .where(eq(financialAccounts.itemId, item.id));
+    // Reload accounts now that the upsert may have added new rows. Both
+    // downstream helpers need the plaid_account_id → financial_account.id map.
+    const accs = await db
+      .select()
+      .from(financialAccounts)
+      .where(eq(financialAccounts.itemId, item.id));
 
-  // Recurring depends on transaction history, but the recurring endpoint
-  // looks at server-side history Plaid already has — so it can run in
-  // parallel with transactionsSync. Investments is independent.
-  const [txns, inv, rec] = await Promise.all([
-    syncTransactionsForItem(item, accs),
-    syncInvestmentsForItem(item, accs),
-    syncRecurringForItem(item, accs),
-  ]);
+    // Recurring depends on transaction history, but the recurring endpoint
+    // looks at server-side history Plaid already has — so it can run in
+    // parallel with transactionsSync. Investments is independent.
+    const [txns, inv, rec] = await Promise.all([
+      syncTransactionsForItem(item, accs),
+      syncInvestmentsForItem(item, accs),
+      syncRecurringForItem(item, accs),
+    ]);
 
-  return {
-    accounts: accountsResult.count,
-    transactions: txns,
-    investments: inv,
-    recurring: rec,
-  };
+    return {
+      accounts: accountsResult.count,
+      transactions: txns,
+      investments: inv,
+      recurring: rec,
+    };
+  } finally {
+    item.accessToken = '';
+  }
 }
 
 /**
