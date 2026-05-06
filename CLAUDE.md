@@ -81,6 +81,18 @@ item has no investment-type accounts.
 - Plaid-sourced rows have a `plaid_*_id` unique column; upserts use
   `ON CONFLICT (plaid_*_id) DO UPDATE FROM excluded`.
 
+### RLS on every `public.*` table — `db:push` won't add it
+Supabase auto-exposes `public.*` via PostgREST under the anon key.
+Drizzle bypasses PostgREST (connects as `postgres` w/ `BYPASSRLS`),
+but a leaked anon key would hit the REST API directly. Mitigation:
+RLS enabled on every table, no policies attached → default-deny for
+`anon`/`authenticated`, no effect on the app. `drizzle-kit push`
+does NOT emit `ENABLE ROW LEVEL SECURITY` for new tables, so when you
+add one to [schema.ts](src/lib/db/schema.ts), run
+`ALTER TABLE public.<name> ENABLE ROW LEVEL SECURITY;` against the DB
+before considering it shipped. Threat-model rationale in
+[SECURITY.md](SECURITY.md) > "Database access boundary".
+
 ### Server actions
 Mutations live in `src/lib/<domain>/actions.ts`, called from
 `<form action={...}>`. Zod-validate at the boundary, then
@@ -338,7 +350,28 @@ inside the client component. Fixed in `d955dd4` for `<NavLink>`.
   `isHikeAlert` (15% + $2/mo floor), `monthlyCost`, `groupByCategory`.
   Page collapsed -217/+15 lines.
 
-Test count: 266 vitest as of /recurring IA rework.
+**Dark mode wiring** (2026-05-06)
+- `<ThemeProvider>` mounted in `src/app/layout.tsx` (next-themes,
+  `attribute="class" defaultTheme="system" enableSystem`,
+  `disableTransitionOnChange`). `<ThemeToggle>` dropdown
+  (Light / Dark / System) at
+  `src/components/nav/theme-toggle.tsx`, mounted in the top-bar
+  right cluster between sync pill and user avatar.
+- Visual sweep deferred to runtime UAT but **codebase audit found
+  zero hardcoded color utilities** (no `bg-white`, `text-black`,
+  `bg-gray-*`, hex literals, or inline color styles in `src/`).
+  Every surface routes through the editorial tokens, both `:root`
+  and `.dark` blocks of `globals.css` are fully parity-mapped, and
+  `bg-gradient-hero` is intentionally dark in both modes (so the
+  hero card / empty-state icons / loading skeleton all use
+  `text-white` correctly under both themes). Recharts colors
+  reference `hsl(var(--*))` tokens and auto-flip.
+- Email digest in `src/app/api/cron/digest/route.ts` keeps its
+  hex literals (server-rendered HTML for Resend, not affected by
+  `.dark`).
+
+Test count: 266 vitest (unchanged — dark mode adds no testable
+predicates).
 
 ### In progress
 - **Plaid Production access review** — submitted 2026-05-01 + Q9
@@ -351,23 +384,15 @@ Test count: 266 vitest as of /recurring IA rework.
   paste fresh secret, update Vercel env, reconnect via `/settings`.
   `linkTokenCreate` doesn't pass `redirect_uri` — fine for non-OAuth
   banks, breaks Chase / Cap One until configured.
-- **Wire next-themes + dark-mode visual sweep** — `next-themes`
-  (^0.4.6) is in package.json and `darkMode: ['class']` is set in
-  `tailwind.config.ts`, but `<ThemeProvider>` is NOT in
-  `src/app/layout.tsx` and no toggle exists; the `.dark` token
-  variant in `globals.css` is parity-mapped but unreachable through
-  normal UI (DevTools `documentElement.classList.add('dark')` is
-  the only current path). Phase: wire ThemeProvider in root layout
-  (`attribute="class" defaultTheme="system" enableSystem`), add a
-  `<ThemeToggle>` in the top-bar, then walk through every surface
-  in dark mode and fix what breaks. /recurring (2026-05-06) shipped
-  without dark-mode UAT for this reason — inherits the same tokens
-  as every other surface, so dark breakage there implies dark
-  breakage everywhere, which this phase will catch.
-- **Mobile-first responsive audit** — current design works at small
-  widths via reflow, but no surface has been deliberately designed
-  for mobile. Sidebar collapse → Sheet drawer (vaul) is the obvious
-  starter.
+- **Mobile-first responsive audit** — *primary surface for this
+  user is mobile.* Current design works at small widths via reflow,
+  but no surface has been deliberately designed for mobile. Sidebar
+  is `hidden md:flex` (vanishes <768px) — collapse → Sheet drawer
+  (vaul) is the obvious starter. Top-bar already mobile-friendly
+  (`px-4` → `md:px-6`, no collapse). Audit pass should cover: tap
+  target sizing across operator-tier tables (/transactions,
+  /investments), thumb-reach for top-bar controls, bottom-nav vs
+  sidebar pattern decision, and `<640px` UAT of every page.
 - **Phase 3-pt3** — per-goal coaching detail page (defer until real
   data flows)
 - **Phase 4-pt2** — investment what-if simulator (deferred from Phase
