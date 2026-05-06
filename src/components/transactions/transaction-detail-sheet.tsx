@@ -7,10 +7,29 @@ import { toast } from 'sonner';
 import { Drawer } from 'vaul';
 import { Button } from '@/components/ui/button';
 import type { CategoryOption } from '@/lib/db/queries/categories';
-import type { TransactionListRow } from '@/lib/db/queries/transactions';
 import { humanizeCategory } from '@/lib/format/category';
 import { updateTransactionCategoriesAction } from '@/lib/transactions/actions';
 import { cn, formatCurrency } from '@/lib/utils';
+
+/**
+ * Narrow row shape the sheet actually consumes — accepted by both the
+ * /transactions table (TransactionListRow) and the dashboard recent-
+ * activity card (RecentTransaction). Defining it here keeps each
+ * surface free to query its own broader shape without forcing field
+ * parity.
+ */
+export type DetailRow = {
+  id: string;
+  name: string;
+  merchantName: string | null;
+  date: string;
+  amount: number;
+  primaryCategory: string | null;
+  pending: boolean;
+  accountName: string;
+  accountMask: string | null;
+  overrideCategoryName: string | null;
+};
 
 /**
  * Mobile half-sheet detail editor for a single transaction. Opens from
@@ -27,7 +46,7 @@ export function TransactionDetailSheet({
   categoryOptions,
   onClose,
 }: {
-  row: TransactionListRow | null;
+  row: DetailRow | null;
   categoryOptions: CategoryOption[];
   onClose: () => void;
 }) {

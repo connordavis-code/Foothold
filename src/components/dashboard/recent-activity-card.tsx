@@ -1,11 +1,17 @@
+'use client';
+
 import Link from 'next/link';
+import { useState } from 'react';
 import { ArrowRight } from 'lucide-react';
+import { TransactionDetailSheet } from '@/components/transactions/transaction-detail-sheet';
+import type { CategoryOption } from '@/lib/db/queries/categories';
 import type { RecentTransaction } from '@/lib/db/queries/dashboard';
 import { humanizeCategory } from '@/lib/format/category';
-import { formatCurrency } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 
 type Props = {
   transactions: RecentTransaction[];
+  categoryOptions: CategoryOption[];
 };
 
 /**
@@ -13,8 +19,15 @@ type Props = {
  * full table lives at /transactions). The "View all" link is the right
  * affordance for "I want to scan a hundred rows"; this surface is for
  * "what did I just spend on?".
+ *
+ * Tap-to-edit on mobile: row tap at <md opens the same half-sheet
+ * /transactions uses. At md+, the row is presentational — desktop's
+ * canonical edit flow lives in the operator table (j/k nav, multi-
+ * select, bulk-action bar), and adding a tap-sheet would conflict with
+ * those gestures.
  */
-export function RecentActivityCard({ transactions }: Props) {
+export function RecentActivityCard({ transactions, categoryOptions }: Props) {
+  const [active, setActive] = useState<RecentTransaction | null>(null);
   if (transactions.length === 0) return null;
   const visible = transactions.slice(0, 5);
 
@@ -40,20 +53,41 @@ export function RecentActivityCard({ transactions }: Props) {
 
       <ul className="divide-y divide-border/70">
         {visible.map((t) => (
-          <Row key={t.id} t={t} />
+          <Row
+            key={t.id}
+            t={t}
+            onTap={() => setActive(t)}
+          />
         ))}
       </ul>
+
+      <TransactionDetailSheet
+        row={active}
+        categoryOptions={categoryOptions}
+        onClose={() => setActive(null)}
+      />
     </section>
   );
 }
 
-function Row({ t }: { t: RecentTransaction }) {
+function Row({
+  t,
+  onTap,
+}: {
+  t: RecentTransaction;
+  onTap: () => void;
+}) {
   // Plaid sign convention: positive = money OUT. Flip for display.
   const display = -t.amount;
   const isIncome = display > 0;
+  const categoryLabel = t.overrideCategoryName
+    ? t.overrideCategoryName
+    : t.primaryCategory
+      ? humanizeCategory(t.primaryCategory)
+      : null;
 
-  return (
-    <li className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+  const inner = (
+    <div className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">
           {t.merchantName ?? t.name}
@@ -65,19 +99,41 @@ function Row({ t }: { t: RecentTransaction }) {
         </p>
         <p className="truncate text-xs text-muted-foreground">
           {formatTxDate(t.date)}
-          {t.primaryCategory && ` · ${humanizeCategory(t.primaryCategory)}`}
+          {categoryLabel && (
+            <>
+              <span> · </span>
+              <span className={t.overrideCategoryName ? 'italic' : undefined}>
+                {categoryLabel}
+              </span>
+            </>
+          )}
           {' · '}
           {t.accountName}
           {t.accountMask && ` ····${t.accountMask}`}
         </p>
       </div>
       <p
-        className={`shrink-0 font-mono text-sm tabular-nums ${
-          isIncome ? 'text-positive' : 'text-foreground'
-        }`}
+        className={cn(
+          'shrink-0 font-mono text-sm tabular-nums',
+          isIncome ? 'text-positive' : 'text-foreground',
+        )}
       >
         {formatCurrency(display, { signed: true })}
       </p>
+    </div>
+  );
+
+  // Mobile: tap-to-edit. Desktop: presentational (operator table at
+  // /transactions is the canonical edit surface).
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onTap}
+        className="block w-full text-left transition-colors duration-fast ease-out-quart md:pointer-events-none md:cursor-default md:hover:bg-transparent"
+      >
+        {inner}
+      </button>
     </li>
   );
 }
@@ -89,4 +145,3 @@ function formatTxDate(d: string | Date): string {
     day: 'numeric',
   });
 }
-

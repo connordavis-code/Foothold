@@ -1,6 +1,7 @@
 import { and, desc, eq, gte, lt, notInArray, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
+  categories,
   financialAccounts,
   plaidItems,
   transactions,
@@ -113,11 +114,17 @@ export type RecentTransaction = {
   accountName: string;
   accountMask: string | null;
   pending: boolean;
+  /** Set when the user has manually re-categorized this row. */
+  overrideCategoryName: string | null;
 };
 
 /**
  * Most recent N transactions across all the user's accounts. Includes the
  * account name + mask so the row UI can show "Plaid Checking ····0000".
+ * Pulls the override category name via left-join on categories so the
+ * recent-activity card can show the user's manual re-categorization
+ * (matching the desktop /transactions table) and so the mobile half-
+ * sheet has the data it needs to drive its picker.
  */
 export async function getRecentTransactions(
   userId: string,
@@ -134,6 +141,7 @@ export async function getRecentTransactions(
       accountName: financialAccounts.name,
       accountMask: financialAccounts.mask,
       pending: transactions.pending,
+      overrideCategoryName: categories.name,
     })
     .from(transactions)
     .innerJoin(
@@ -141,6 +149,7 @@ export async function getRecentTransactions(
       eq(financialAccounts.id, transactions.accountId),
     )
     .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
+    .leftJoin(categories, eq(categories.id, transactions.categoryOverrideId))
     .where(eq(plaidItems.userId, userId))
     .orderBy(desc(transactions.date), desc(transactions.createdAt))
     .limit(limit);

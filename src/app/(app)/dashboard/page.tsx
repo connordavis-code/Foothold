@@ -10,6 +10,7 @@ import { RecentActivityCard } from '@/components/dashboard/recent-activity-card'
 import { SplitCard } from '@/components/dashboard/split-card';
 import { UpcomingRecurringCard } from '@/components/dashboard/upcoming-recurring-card';
 import { MotionStack } from '@/components/motion/motion-stack';
+import { getCategoryOptions } from '@/lib/db/queries/categories';
 import {
   getDashboardSummary,
   getNetWorthMonthlyDelta,
@@ -42,6 +43,7 @@ export default async function DashboardPage() {
     recent,
     liquidAccounts,
     forecastHistory,
+    categoryOptions,
   ] = await Promise.all([
     getDashboardSummary(userId),
     getNetWorthMonthlyDelta(userId),
@@ -53,6 +55,7 @@ export default async function DashboardPage() {
     getRecentTransactions(userId, 5),
     countLiquidAccounts(userId),
     getForecastHistory(userId),
+    getCategoryOptions(userId),
   ]);
 
   if (!summary.hasAnyItem) {
@@ -93,7 +96,10 @@ export default async function DashboardPage() {
 
         <InsightTeaserCard insight={latestInsight} />
 
-        <RecentActivityCard transactions={recent} />
+        <RecentActivityCard
+          transactions={recent}
+          categoryOptions={categoryOptions}
+        />
       </MotionStack>
     </div>
   );
