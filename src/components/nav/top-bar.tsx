@@ -1,7 +1,6 @@
 import { signOut } from '@/auth';
 import { PaletteTrigger } from '@/components/command-palette/palette-trigger';
 import { getSyncStatus } from '@/lib/db/queries/sync';
-import { MobileNavDrawer } from './mobile-nav-drawer';
 import { PageTitle } from './page-title';
 import { SyncPill } from './sync-pill';
 import { ThemeToggle } from './theme-toggle';
@@ -36,7 +35,6 @@ export async function TopBar({ userId, email }: Props) {
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-background/85 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/70 md:gap-3 md:px-6">
       <div className="flex shrink-0 items-center gap-2">
-        <MobileNavDrawer />
         <PageTitle />
       </div>
       <div className="hidden flex-1 justify-center px-2 md:flex">
