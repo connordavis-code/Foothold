@@ -16,6 +16,7 @@ import {
   plaidItems,
   transactions,
 } from '@/lib/db/schema';
+import { escapeIlike } from '@/lib/utils/ilike-escape';
 
 export type TransactionFilters = {
   accountId?: string;
@@ -68,7 +69,7 @@ function buildWhere(userId: string, f: TransactionFilters): SQL {
   if (f.dateFrom) conds.push(gte(transactions.date, f.dateFrom));
   if (f.dateTo) conds.push(lte(transactions.date, f.dateTo));
   if (f.search) {
-    const pat = `%${f.search}%`;
+    const pat = `%${escapeIlike(f.search)}%`;
     const search = or(
       ilike(transactions.name, pat),
       ilike(transactions.merchantName, pat),

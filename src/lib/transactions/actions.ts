@@ -1,6 +1,6 @@
 'use server';
 
-import { and, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, or } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { auth } from '@/auth';
 import { db } from '@/lib/db';
@@ -13,6 +13,7 @@ import {
   plaidItems,
   transactions,
 } from '@/lib/db/schema';
+import { escapeIlike } from '@/lib/utils/ilike-escape';
 
 export type TransactionSearchHit = {
   id: string;
@@ -46,7 +47,13 @@ export async function searchTransactionsAction(
   const trimmed = query.trim();
   if (trimmed.length < MIN_QUERY) return [];
 
-  const pat = `%${trimmed}%`;
+  // escapeIlike: a literal `%` or `_` in user input would otherwise act
+  // as a SQL wildcard, so typing `%` matched every row.
+  const pat = `%${escapeIlike(trimmed)}%`;
+  const search = or(
+    ilike(transactions.name, pat),
+    ilike(transactions.merchantName, pat),
+  );
   const rows = await db
     .select({
       id: transactions.id,
@@ -66,10 +73,7 @@ export async function searchTransactionsAction(
     .where(
       and(
         eq(plaidItems.userId, session.user.id),
-        or(
-          ilike(transactions.name, pat),
-          ilike(transactions.merchantName, pat),
-        ) ?? sql`true`,
+        ...(search ? [search] : []),
       ),
     )
     .orderBy(desc(transactions.date), desc(transactions.createdAt))
