@@ -100,12 +100,25 @@ export function computeGoalImpacts(
   return result;
 }
 
+/**
+ * Walk the projection forward, accumulating contributions, returning the
+ * first month where the running total hits the goal's target.
+ *
+ * Cash gate: a contribution only counts in months where the projection
+ * shows enough end-of-month cash to make it without going negative.
+ * Without this gate, the simulator would happily report "ETA = Aug 2026"
+ * for a savings goal whose monthly contribution exceeds the user's
+ * projected cash, painting a feasible plan that the same projection
+ * shows is impossible.
+ */
 function findGoalETA(
   goal: EffectiveGoal,
   projection: MonthlyProjection[],
 ): string | null {
   let cumulative = goal.startingSaved;
   for (const month of projection) {
+    const postContributionCash = month.endCash - goal.monthlyContribution;
+    if (postContributionCash < 0) continue;
     cumulative += goal.monthlyContribution;
     if (cumulative >= goal.targetAmount) return month.month;
   }

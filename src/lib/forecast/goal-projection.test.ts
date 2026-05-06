@@ -129,6 +129,57 @@ describe('computeGoalImpacts', () => {
     expect(result[0].scenarioETA).toBeNull();
   });
 
+  // Regression for review finding W-01. findGoalETA must skip months
+  // where end-of-month cash can't support the contribution; otherwise
+  // the simulator reports a feasible ETA on a projection that itself
+  // shows the user underwater.
+  describe('cash gate (W-01)', () => {
+    function projectionWithCash(months: string[], endCash: number[]): MonthlyProjection[] {
+      return months.map((m, i) => ({
+        month: m,
+        startCash: endCash[i] ?? 0,
+        inflows: 0,
+        outflows: 0,
+        endCash: endCash[i] ?? 0,
+        byCategory: {},
+        goalProgress: {},
+      }));
+    }
+
+    it('skips contribution in months where endCash < monthlyContribution', () => {
+      // Goal needs 6 months of $500 to hit $7000 (4000 saved + 6 × 500).
+      // But months 1, 2, 3 have endCash = $300 — can't afford $500 contribution.
+      // Months 4, 5, 6, 7, 8, 9 have endCash = $2000 — fine.
+      // Original code: ETA = month 6 (always counts contribution).
+      // Fixed code: ETA = month 9 (skips first 3 months of underwater cash).
+      const months = ['2026-05', '2026-06', '2026-07', '2026-08', '2026-09',
+                      '2026-10', '2026-11', '2026-12', '2027-01', '2027-02'];
+      const cashSeries = [300, 300, 300, 2000, 2000, 2000, 2000, 2000, 2000, 2000];
+      const proj = projectionWithCash(months, cashSeries);
+      const goal = { ...baseGoal, targetAmount: 7000 };
+      const result = computeGoalImpacts(proj, proj, [goal], noOverrides);
+      expect(result[0].scenarioETA).toBe('2027-01');
+    });
+
+    it('returns null ETA when every month is underwater', () => {
+      // Permanent negative cash trajectory — no contribution ever counts.
+      const months = ['2026-05', '2026-06', '2026-07'];
+      const proj = projectionWithCash(months, [-100, -200, -300]);
+      const result = computeGoalImpacts(proj, proj, [baseGoal], noOverrides);
+      expect(result[0].scenarioETA).toBeNull();
+    });
+
+    it('ignores cash gate when contribution is zero', () => {
+      // Zero-contribution goal: gate is endCash >= 0, which is satisfied
+      // even on tight budgets. ETA stays null because target unreachable.
+      const months = ['2026-05', '2026-06'];
+      const proj = projectionWithCash(months, [50, 50]);
+      const goal = { ...baseGoal, monthlyContribution: 0 };
+      const result = computeGoalImpacts(proj, proj, [goal], noOverrides);
+      expect(result[0].scenarioETA).toBeNull();
+    });
+  });
+
   it('uses goalTargetEdits.newTargetAmount when present', () => {
     const months = Array.from({ length: 14 }, (_, i) => {
       const monthOffset = i + 5;
