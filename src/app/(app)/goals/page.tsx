@@ -218,12 +218,11 @@ function EmptyState() {
         </span>
         <div className="space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight">
-            Set your first goal
+            Set a savings target or spend cap
           </h1>
           <p className="mx-auto max-w-md text-sm text-muted-foreground">
-            Two flavors: a savings target (an emergency fund, a down
-            payment) or a monthly spend cap (eating out, entertainment).
-            Progress updates automatically as accounts sync.
+            Track an emergency fund, a down payment, or cap a category
+            like dining. Progress updates automatically as accounts sync.
           </p>
         </div>
         <div className="flex justify-center">

@@ -255,12 +255,12 @@ function EmptyState() {
         </span>
         <div className="space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight">
-            No recurring activity yet
+            Not enough history yet
           </h1>
           <p className="mx-auto max-w-md text-sm text-muted-foreground">
-            Plaid needs 60–90 days of transaction history to identify
-            recurring streams. Subscriptions, payroll, and bills will
-            surface here once enough data has synced.
+            Plaid needs 60–90 days of transaction data to detect
+            subscriptions, payroll, and bills. Connecting more accounts
+            shortens the wait.
           </p>
         </div>
         <div className="flex justify-center">

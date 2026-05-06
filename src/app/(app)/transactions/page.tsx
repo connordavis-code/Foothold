@@ -52,11 +52,11 @@ export default async function TransactionsPage({
           </span>
           <div className="space-y-2">
             <h1 className="text-2xl font-semibold tracking-tight">
-              No transactions yet
+              No accounts connected yet
             </h1>
             <p className="mx-auto max-w-md text-sm text-muted-foreground">
-              Connect a bank or credit card to start syncing transactions.
-              You'll see them flow in here as soon as Plaid hands them over.
+              Once you link a bank or credit card via Plaid, transactions
+              sync automatically and surface here within minutes.
             </p>
           </div>
           <div className="flex justify-center">

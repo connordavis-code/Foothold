@@ -52,10 +52,10 @@ function EmptyState() {
         </span>
         <div className="space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight">
-            No investments yet
+            No brokerage connected yet
           </h1>
           <p className="mx-auto max-w-md text-sm text-muted-foreground">
-            Connect a brokerage, IRA, 401(k), or HSA via Plaid to see
+            Link a brokerage, IRA, 401(k), or HSA via Plaid to see
             holdings, day moves, and recent activity here.
           </p>
         </div>
