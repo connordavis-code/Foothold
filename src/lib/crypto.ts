@@ -22,7 +22,7 @@ import { env } from '@/lib/env';
 const KEY = Buffer.from(env.PLAID_TOKEN_ENCRYPTION_KEY, 'base64');
 if (KEY.length !== 32) {
   throw new Error(
-    'PLAID_TOKEN_ENCRYPTION_KEY must decode to exactly 32 bytes (base64 of 32 random bytes).',
+    `PLAID_TOKEN_ENCRYPTION_KEY must decode to exactly 32 bytes (base64 of 32 random bytes); got ${KEY.length} bytes.`,
   );
 }
 
