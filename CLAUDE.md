@@ -346,7 +346,7 @@ inside the client component. Fixed in `d955dd4` for `<NavLink>`.
   + ratio per cat, sorted by ratio desc, capped at 8 rows, single
   foreground hue + amber for elevated rows); `TrendChart` deleted
   (sole consumer gone). Flag history table preserved untouched.
-  /drift walkthrough pending. 210 vitest tests; typecheck clean.
+  /drift walkthrough confirmed. 210 vitest tests; typecheck clean.
   Spec also captured DESIGN.md generation as a deferred follow-on.
 
 ### Parallel review-fix workstream (2026-05-05)
