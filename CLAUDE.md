@@ -382,6 +382,25 @@ inside the client component. Fixed in `d955dd4` for `<NavLink>`.
   Notebook." Future surfaces should reference [DESIGN.md](DESIGN.md)
   as the visual contract — operator decisions live in PRODUCT.md.
 
+- **Polish carry-over batch** (2026-05-05) — four items from the
+  6.6 critique's deferred TODO list, all bounded:
+  (1) `/drift` flag-history "Week ending" date format `2026-04-28`
+  → `Apr 28`, formatted in UTC so YYYY-MM-DD calendar dates don't
+  drift in non-UTC client locales (`c1536cc`).
+  (2) `/investments` `<TypePill>` rainbow collapsed from 5 hues
+  (blue/orange/emerald/rose/muted) to a single muted tone — text
+  label is the affordance, per DESIGN.md Restrained Floor Rule
+  (`d75b974`).
+  (3) Empty-state headlines across `/transactions`, `/investments`,
+  `/goals`, `/recurring` rewritten to name the cause (matching
+  /drift's `<SparseEmptyState>` "Not enough history yet" canonical
+  pattern) instead of restating the symptom (`40963e3`).
+  (4) `c` keystroke opens the bulk re-categorize picker on
+  `/transactions` (Phase 6.7 deferred bonus). Lifted to controlled
+  state on `<CategoryPicker>`; `<BulkActionBar>` owns the keystroke
+  + open-state, auto-gated by mount lifecycle (`f775934`).
+  218 vitest tests; typecheck clean.
+
 - **Code review + fixes** (2026-05-05) — `gsd-code-reviewer` deep audit
   of forecast/security/cron core (64 files, see
   [docs/reviews/2026-05-05-REVIEW.md]) produced 22 findings (4
@@ -432,11 +451,12 @@ inside the client component. Fixed in `d955dd4` for `<NavLink>`.
   paste fresh secret, update Vercel env, reconnect via `/settings`.
   `linkTokenCreate` doesn't pass `redirect_uri` — fine for non-OAuth
   banks, breaks Chase / Cap One until configured.
-- **Per-page IA reworks** for /drift, /goals, /recurring — Phase 6
-  shipped a visual refresh on these; /insights got its IA rework in
-  Phase 6.5. /drift is the next highest-leverage candidate (already
-  pure-SQL; receipts language from /insights may inform the rework).
-  Each remaining surface is roughly phase-sized.
+- **Per-page IA reworks** for /goals + /recurring — Phase 6 shipped
+  a visual refresh on both; /insights (Phase 6.5) and /drift (Phase
+  6.7-followon) got their IA reworks. /goals is the recommended next
+  candidate (more daily-use surface; "am I on pace?" is a high-
+  frequency question). Each remaining surface is roughly phase-sized
+  — use the `impeccable shape → craft` loop that worked well on /drift.
 - **Dark-mode visual sweep** — tokens defined in 6.1 and parity-
   mapped in `:root` / `.dark`, but the dark variant has never been
   walked through against the new editorial chrome.
