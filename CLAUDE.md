@@ -328,6 +328,41 @@ inside the client component. Fixed in `d955dd4` for `<NavLink>`.
   vitest tests (no regressions); typecheck clean; browser
   walkthrough confirmed.
 
+- **Phase 6.7-followon — polish + /drift IA rework** (2026-05-05) —
+  three pieces driven from the "what's left" backlog. (1) `/investments`
+  group ordering: groups now sort by aggregate market value desc
+  (was Map insertion order, which was near-correct only when sorting
+  by Value). (2) `humanizeCategory` consolidation: 12 local copies
+  collapsed into a single `src/lib/format/category.ts` module with
+  joiner-word casing fix ("Food and Drink", "Bank of America" — was
+  "Food And Drink") and unification of one outlier sentence-case
+  shape on /drift; 10 vitest specs cover the casing rules. (3) `/drift`
+  IA rework via `impeccable shape` (brief at
+  `docs/superpowers/specs/2026-05-05-drift-ia-rework-design.md`):
+  `<ElevatedTile>` becomes `<Link>` to `/transactions?category=<pfc>&from=<weekStart>&to=<weekEnd>`;
+  the 6-line trend chart gives way to a horizontal bar leaderboard
+  (`buildLeaderboard()` pure function + 9 vitest specs; new
+  `<Leaderboard>` component renders current-week bar + baseline tick
+  + ratio per cat, sorted by ratio desc, capped at 8 rows, single
+  foreground hue + amber for elevated rows); `TrendChart` deleted
+  (sole consumer gone). Flag history table preserved untouched.
+  /drift walkthrough pending. 210 vitest tests; typecheck clean.
+  Spec also captured DESIGN.md generation as a deferred follow-on.
+
+### Parallel review-fix workstream (2026-05-05)
+A separate workstream is consuming `docs/reviews/2026-05-05-REVIEW.md`
+(deep code review of forecast/security/cron core, generated outside
+this session) and committing fixes per finding. Already landed on
+main: `2cc4edb` (digest HTML escape, C-04), `fde00a8` (webhook
+KEY_CACHE bound + negative cache, C-03), `97bbfb5` (ILIKE wildcard
+escape in tx search), `4754dbb` (forecast SEMI_MONTHLY/ANNUALLY
+cadence rescaling), `51e533e` (forecast goal-projection ETA gate),
+`86c871a` (insights isEmpty contract tightening), `a03e907`
+(crypto key-length error). Three design specs untracked at
+`docs/superpowers/specs/2026-05-05-{c01,w04,w09}-*-design.md` for
+larger pending fixes. Treat the REVIEW.md as the inbox; a future
+session may finish the workstream or close it out.
+
 ### In progress
 - **Plaid Production access review** — submitted 2026-05-01 + Q9
   amendment. Approval odds ~25-35% first-pass, ~60-70% with follow-up.
