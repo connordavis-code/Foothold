@@ -35,6 +35,7 @@ export const KEYBOARD_BINDINGS: BindingGroup[] = [
       { keys: ['/'], action: 'Focus search' },
       { keys: ['Esc'], action: 'Clear row selection' },
       { keys: ['Shift+click'], action: 'Range-select rows' },
+      { keys: ['c'], action: 'Open re-categorize (with selection)' },
     ],
   },
   {

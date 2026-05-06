@@ -1,6 +1,6 @@
 'use client';
 
-import { useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -34,6 +34,38 @@ export function BulkActionBar({
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  // `c` shortcut to open the category picker. Listener attaches/
+  // detaches with the bar's mount lifecycle, which itself gates on
+  // selection > 0 (the early-return below) — so the keystroke is
+  // automatically inert when there's nothing selected. Skip when
+  // typing in any input/textarea/select/contentEditable so `c` in
+  // search fields stays printable.
+  useEffect(() => {
+    if (selectedCount === 0) return;
+    function shouldIgnore(e: KeyboardEvent): boolean {
+      const t = e.target as HTMLElement | null;
+      if (!t) return false;
+      const tag = t.tagName.toLowerCase();
+      return (
+        tag === 'input' ||
+        tag === 'textarea' ||
+        tag === 'select' ||
+        t.isContentEditable
+      );
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== 'c') return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return; // leave ⌘C / Ctrl+C alone
+      if (shouldIgnore(e)) return;
+      if (isPending) return; // action mid-flight — picker trigger is disabled
+      e.preventDefault();
+      setPickerOpen((v) => !v);
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedCount, isPending]);
 
   if (selectedCount === 0) return null;
 
@@ -119,6 +151,8 @@ export function BulkActionBar({
         options={categoryOptions}
         onApply={applyCategory}
         busy={isPending}
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
       />
       <button
         type="button"

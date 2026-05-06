@@ -23,6 +23,8 @@ type Props = {
   options: CategoryOption[];
   onApply: (name: string | null) => void;
   busy?: boolean;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 };
 
 /**
@@ -31,13 +33,21 @@ type Props = {
  * with the ⌘K palette. The "Clear category" item at the top is the
  * affordance for reverting to the raw Plaid PFC.
  *
+ * `open`/`onOpenChange` are controlled by the parent so the `c`
+ * shortcut in BulkActionBar can drive open from outside the popover.
+ *
  * Options are split into two groups: user categories (rows that
  * already exist in the categories table) and Plaid PFC suggestions
  * (humanized strings observed on transactions). Picking a PFC
  * implicitly creates a categories row at apply time.
  */
-export function CategoryPicker({ options, onApply, busy }: Props) {
-  const [open, setOpen] = useState(false);
+export function CategoryPicker({
+  options,
+  onApply,
+  busy,
+  open,
+  onOpenChange,
+}: Props) {
   const [value, setValue] = useState('');
 
   // Reset the search input when the popover closes.
@@ -50,11 +60,11 @@ export function CategoryPicker({ options, onApply, busy }: Props) {
 
   function pick(name: string | null) {
     onApply(name);
-    setOpen(false);
+    onOpenChange(false);
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
         <button
           type="button"
