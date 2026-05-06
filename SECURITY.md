@@ -31,6 +31,22 @@ versioning.
   (`src/lib/crypto.ts`). Single decryption boundary: `syncItem` in
   `src/lib/plaid/sync.ts`.
 
+## Database access boundary
+
+Supabase auto-exposes every `public.*` table via PostgREST under the
+project's anon key. Foothold does not use PostgREST — Drizzle connects
+through `DATABASE_URL` / `DIRECT_DATABASE_URL` as the `postgres` role
+(`BYPASSRLS`). Without RLS, a leaked anon key would still grant full
+read/write access via the REST API. Policy: **every `public.*` table
+runs with RLS enabled and no policies attached** — default-deny for
+`anon` and `authenticated` roles, no effect on the app's elevated
+connection. Applied 2026-05-06 in response to Supabase advisor flag
+`rls_disabled_in_public`. `db:push` does not emit
+`ENABLE ROW LEVEL SECURITY`, so any new table added to
+[src/lib/db/schema.ts](src/lib/db/schema.ts) requires
+`ALTER TABLE public.<name> ENABLE ROW LEVEL SECURITY;` to be run
+manually against the database before promoting the schema change.
+
 ## Authentication
 
 Magic-link via Resend, scoped to a single allowlisted email. Sessions
