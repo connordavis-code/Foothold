@@ -11,8 +11,13 @@ const monthlyEquivalent = (
 
 /**
  * Apply category deltas. Positive delta = increase that category's outflow
- * for affected months; negative = cut. Floor at 0 (a category can't have
- * negative outflow even if the user enters a delta larger than baseline).
+ * for affected months; negative = cut.
+ *
+ * Signed math (closes review W-09): a delta whose magnitude exceeds the
+ * category's baseline drives the value negative; clamping is deferred to
+ * `clampForDisplay` at engine output. This preserves "over-cut slack" so
+ * a later applier (e.g. lump-sum outflow) can absorb it instead of
+ * silently rounding away information.
  *
  * Recomputes endCash chain as the function progresses.
  */
@@ -35,10 +40,8 @@ export function applyCategoryDeltas(
       if (d.endMonth && month.month > d.endMonth) continue;
 
       const current = newByCategory[d.categoryId] ?? 0;
-      const adjusted = Math.max(0, current + d.monthlyDelta);
-      const actualDelta = adjusted - current;
-      newByCategory[d.categoryId] = adjusted;
-      outflowDelta += actualDelta;
+      newByCategory[d.categoryId] = current + d.monthlyDelta;
+      outflowDelta += d.monthlyDelta;
     }
 
     const newOutflows = month.outflows + outflowDelta;
@@ -59,7 +62,10 @@ export function applyCategoryDeltas(
 
 /**
  * Apply income delta to inflows for affected months. Positive = income up,
- * negative = income down. Floor at 0 (income can't be negative).
+ * negative = income down.
+ *
+ * Signed math (closes review W-09): no per-applier clamp; clampForDisplay
+ * handles the "inflows can't be negative" display semantic at engine output.
  *
  * Recomputes endCash chain forward.
  */
@@ -77,7 +83,7 @@ export function applyIncomeDelta(
       (!delta.startMonth || month.month >= delta.startMonth) &&
       (!delta.endMonth || month.month <= delta.endMonth);
     const newInflows = inRange
-      ? Math.max(0, month.inflows + delta.monthlyDelta)
+      ? month.inflows + delta.monthlyDelta
       : month.inflows;
     const startCash = runningCash;
     const endCash = startCash + newInflows - month.outflows;
@@ -148,8 +154,9 @@ export function applyRecurringChanges(
       }
     }
 
-    const newInflows = Math.max(0, month.inflows + inflowDelta);
-    const newOutflows = Math.max(0, month.outflows + outflowDelta);
+    // Signed math (W-09): no per-applier clamp.
+    const newInflows = month.inflows + inflowDelta;
+    const newOutflows = month.outflows + outflowDelta;
     const startCash = runningCash;
     const endCash = startCash + newInflows - newOutflows;
     result.push({
@@ -203,8 +210,9 @@ export function applySkipRecurringInstances(
       else inflowDelta -= monthly;
     }
 
-    const newInflows = Math.max(0, month.inflows + inflowDelta);
-    const newOutflows = Math.max(0, month.outflows + outflowDelta);
+    // Signed math (W-09): no per-applier clamp.
+    const newInflows = month.inflows + inflowDelta;
+    const newOutflows = month.outflows + outflowDelta;
     const startCash = runningCash;
     const endCash = startCash + newInflows - newOutflows;
     result.push({
@@ -266,4 +274,28 @@ export function applyLumpSums(
   }
 
   return result;
+}
+
+/**
+ * Clamp a projection's display-facing fields (inflows, outflows, byCategory
+ * values) at 0 for rendering. Cash chain (startCash, endCash) is preserved
+ * unclamped so the displayed result still reflects true cash math: a user
+ * staring at `inflows: 0` AND `endCash: -3000` simultaneously can spot that
+ * the scenario implies negative slack somewhere — that discrepancy IS the
+ * warning signal that something is over-cut. Closes review W-09.
+ *
+ * Pure: input projection is not mutated.
+ */
+export function clampForDisplay(
+  projection: MonthlyProjection[],
+): MonthlyProjection[] {
+  return projection.map((m) => ({
+    ...m,
+    inflows: Math.max(0, m.inflows),
+    outflows: Math.max(0, m.outflows),
+    byCategory: Object.fromEntries(
+      Object.entries(m.byCategory).map(([k, v]) => [k, Math.max(0, v)]),
+    ),
+    // startCash and endCash unclamped — cash can be negative.
+  }));
 }

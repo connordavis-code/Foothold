@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { applyCategoryDeltas, applyIncomeDelta, applyRecurringChanges, applySkipRecurringInstances, applyLumpSums } from './apply-overrides';
-import type { MonthlyProjection, ForecastHistory } from './types';
+import {
+  applyCategoryDeltas,
+  applyIncomeDelta,
+  applyLumpSums,
+  applyRecurringChanges,
+  applySkipRecurringInstances,
+  clampForDisplay,
+} from './apply-overrides';
+import type { ForecastHistory, MonthlyProjection } from './types';
 
 function makeProjection(months: string[]): MonthlyProjection[] {
   return months.map((month) => ({
@@ -69,15 +76,25 @@ describe('applyCategoryDeltas', () => {
     expect(result[2].endCash).toBe(800);
   });
 
-  it('does not produce negative outflows even with a large positive delta input mistake', () => {
+  it('produces signed (negative) outflows when delta exceeds baseline (W-09)', () => {
+    // Closes review W-09: the applier no longer clips per-step. A delta of
+    // -500 against a $100 baseline yields signed -400 in byCategory + outflows.
+    // Cash math reflects this: endCash = 1000 + 0 - (-400) = 1400. Display
+    // clamping is a separate step (clampForDisplay).
     const proj = makeProjection(['2026-05']);
     const result = applyCategoryDeltas(proj, [
       { categoryId: 'dining', monthlyDelta: -500 }, // larger than baseline
     ]);
-    // Outflow can't go below 0 for a category
-    expect(result[0].byCategory.dining).toBe(0);
-    expect(result[0].outflows).toBe(0);
-    expect(result[0].endCash).toBe(1000);
+    expect(result[0].byCategory.dining).toBe(-400);
+    expect(result[0].outflows).toBe(-400);
+    expect(result[0].endCash).toBe(1400);
+
+    // clampForDisplay clips display fields at 0 but preserves cash math:
+    // displayed inflows: 0, outflows: 0, but endCash still 1400.
+    const display = clampForDisplay(result);
+    expect(display[0].byCategory.dining).toBe(0);
+    expect(display[0].outflows).toBe(0);
+    expect(display[0].endCash).toBe(1400); // cash unclamped — reflects real math
   });
 
   it('increases outflow and decreases endCash for a positive delta', () => {
@@ -274,10 +291,19 @@ describe('applyIncomeDelta', () => {
     expect(result[2].inflows).toBe(0);
   });
 
-  it('clamps inflows at 0 (income can never be negative)', () => {
+  it('produces signed (negative) inflows when delta exceeds baseline (W-09)', () => {
+    // Closes review W-09: signed math at applier level. clampForDisplay
+    // clips for rendering; the applier preserves the over-cut signal so a
+    // later applier (e.g. lump-sum inflow) can absorb it.
     const proj = makeProjection(['2026-05']);
     const result = applyIncomeDelta(proj, { monthlyDelta: -10_000 });
-    expect(result[0].inflows).toBe(0);
+    expect(result[0].inflows).toBe(-10_000);
+
+    // After display clamp, inflows reads as 0 but endCash reflects the
+    // signed math: startCash 1000 + (-10000) - 100 outflow = -9100.
+    const display = clampForDisplay(result);
+    expect(display[0].inflows).toBe(0);
+    expect(display[0].endCash).toBe(-9_100);
   });
 
   it('returns an empty array unchanged for empty projection', () => {

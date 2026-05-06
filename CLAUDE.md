@@ -121,6 +121,18 @@ lifecycle off-by-one and a `Math.max(0, …)` information-loss path
 that under-projected category spend. Spec at
 `docs/superpowers/specs/2026-05-05-c01-forecast-recurring-subtraction-design.md`.
 
+### Forecast override appliers use signed math; clampForDisplay is the only clip
+Each applier in [apply-overrides.ts](src/lib/forecast/apply-overrides.ts)
+accumulates SIGNED deltas; `inflows` / `outflows` / `byCategory[id]` may
+be negative through the chain. `projectCash` runs `clampForDisplay` once
+at the end which clips those three for rendering — `startCash` /
+`endCash` are preserved unclamped so the cash chain stays consistent
+with the math (a user seeing `inflows: 0` AND `endCash: -3000` is the
+display surfacing an over-cut signal). Order of override application
+no longer matters mathematically — see
+`apply-overrides-commutativity.test.ts`. Closes review W-09. Spec at
+`docs/superpowers/specs/2026-05-05-w09-override-applier-clipping-design.md`.
+
 ---
 
 ## Lessons learned
