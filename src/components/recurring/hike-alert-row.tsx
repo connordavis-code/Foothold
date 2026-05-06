@@ -32,7 +32,7 @@ export function HikeAlertRow({ stream }: Props) {
           aria-label={`See ${label} transactions`}
         />
       )}
-      <div className="relative z-0 space-y-1">
+      <div className="space-y-1">
         <div className="flex items-baseline justify-between gap-3">
           <p className="truncate text-sm font-medium">{label}</p>
           <p className="whitespace-nowrap font-mono text-sm font-medium tabular-nums">
