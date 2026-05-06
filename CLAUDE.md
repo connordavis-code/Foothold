@@ -440,6 +440,21 @@ inside the client component. Fixed in `d955dd4` for `<NavLink>`.
     "Forecast override appliers use signed math". Specs preserved at
     `docs/superpowers/specs/2026-05-05-{c01,w04,w09}-*-design.md`.
 
+- **/goals IA rework** (2026-05-05) — `/goals` reshapes from an
+  equal-weight 2-col tile grid into a sectioned pace leaderboard
+  (Behind pace above On pace, severity-sorted within each).
+  `<GoalRow>` renders name + ProgressBar (with ideal-pace tick for
+  savings, projected-month tick for caps) + lever copy + verdict
+  pill, with stretched-`<Link>` drilldown on spend-cap rows only.
+  Asymmetric drill is intentional: caps map to a clean
+  `category=<PFC>&from=<monthStart>` /transactions filter; a savings
+  account-scope drill would surface paychecks and transfers as
+  noise. Pure predicates in `src/lib/goals/pace.ts`: `paceVerdict`
+  (over / behind / on-pace / hit) + `severityKey` (bucketed
+  100/50/25/20). Page collapsed -188/+5 lines as display logic
+  moved into reusable components. 238 vitest tests (+20). Spec at
+  `docs/superpowers/specs/2026-05-05-goals-ia-rework-design.md`.
+
 ### In progress
 - **Plaid Production access review** — submitted 2026-05-01 + Q9
   amendment. Approval odds ~25-35% first-pass, ~60-70% with follow-up.
@@ -451,12 +466,12 @@ inside the client component. Fixed in `d955dd4` for `<NavLink>`.
   paste fresh secret, update Vercel env, reconnect via `/settings`.
   `linkTokenCreate` doesn't pass `redirect_uri` — fine for non-OAuth
   banks, breaks Chase / Cap One until configured.
-- **Per-page IA reworks** for /goals + /recurring — Phase 6 shipped
-  a visual refresh on both; /insights (Phase 6.5) and /drift (Phase
-  6.7-followon) got their IA reworks. /goals is the recommended next
-  candidate (more daily-use surface; "am I on pace?" is a high-
-  frequency question). Each remaining surface is roughly phase-sized
-  — use the `impeccable shape → craft` loop that worked well on /drift.
+- **Per-page IA rework** for /recurring — Phase 6 shipped a visual
+  refresh; /insights, /drift, and /goals got their IA reworks
+  (2026-05-05). /recurring is the only remaining surface — daily-use
+  companion to /transactions, "what's quietly draining me?" is its
+  PRODUCT.md question. Phase-sized; use the `impeccable shape →
+  craft` loop that worked on /drift and /goals.
 - **Dark-mode visual sweep** — tokens defined in 6.1 and parity-
   mapped in `:root` / `.dark`, but the dark variant has never been
   walked through against the new editorial chrome.
