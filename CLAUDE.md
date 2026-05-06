@@ -223,237 +223,104 @@ inside the client component. Fixed in `d955dd4` for `<NavLink>`.
 ## Roadmap
 
 ### Done
-- **Phases 1.A–1.C** — auth, Plaid Link, sync infra, dashboard +
-  transactions + investments pages
-- **Perf pass** — batched upserts + parallel Plaid endpoints
-- **Phase 2** — recurring streams · savings + spend-cap goals · velocity
-  + EOM projection + dashboard strip
+
+> Detail-canonical: git log carries SHAs and commit messages; specs in
+> `docs/superpowers/specs/` carry shape briefs; REVIEW.md / UAT.md
+> carry per-finding cross-refs. Entries below preserve only what's
+> non-obvious from those + the codebase.
+
+**Foundation + sync** (2024 → 2026-04)
+- **Phases 1.A–1.C** — auth, Plaid Link, sync infra, dashboard /
+  transactions / investments pages. Batched upserts + parallel Plaid
+  endpoints (perf pass).
+- **Phase 2** — recurring streams · savings + spend-cap goals ·
+  velocity + EOM projection + dashboard strip.
 - **Phase 3-pt1** — `/insights` page, on-demand Generate, weekly
-  narrative cached in `insight` table keyed by `(user_id, week_start)`
+  narrative cached in `insight` table keyed by `(user_id,
+  week_start)`.
 - **Phase 3-pt2** — `/drift` dashboard: 8-week trend chart, currently-
   elevated category cards, flag history. Pure SQL, no AI.
-- **Security hardening** (2026-05-01) — AES-256-GCM encryption of
-  `plaid_item.access_token` ([src/lib/crypto.ts]); single decryption
-  boundary in `syncItem`. Dependabot weekly grouped npm PRs.
-  Public /privacy. [SECURITY.md] threat model.
-- **Vercel deployment** (2026-05-01) — live at <https://usefoothold.com>;
-  `foothold-beta.vercel.app` alias retained for legacy webhook
-  continuity. Magic-link emails from `noreply@usefoothold.com` via
-  Resend (custom domain verified). Repo public on GitHub.
-- **Plaid webhooks** (2026-05-01) — `POST /api/plaid/webhook` with
-  ES256 JWS verification ([src/lib/plaid/webhook.ts]). Reauth surfaces
-  as banner + status pill + Reconnect button (Link update mode). Local
-  testing requires a tunnel.
-- **Phase 5 — Cron + monitoring** (deployed 2026-05-04) — four Vercel
-  crons at `/api/cron/*` (insight Mon 04 UTC, sync 10 UTC, balances
-  every 6h, digest 14 UTC). Bearer-auth via `CRON_SECRET`. `error_log`
-  table is the digest's source of truth (level=error|info) — digest
-  surfaces errors AND flags "NOT SEEN" for missing crons (silence ≠
-  success). Logger fail-soft (never throws). 4×-daily balance refresh
-  needs Vercel Pro. Ultrareview pass (commit `00093bd`) fixed 7
-  findings post-merge: webhook DoS amplification, digest contract bugs
-  (subject ignored warnings; insight had no missed-Monday branch),
-  plus 5 nits.
-- **Test infrastructure** (2026-05-04, commit `5adf667`) — Vitest 4
-  with `@/` path resolution; 27 tests covering 4 of the 7 ultrareview
-  findings as regressions plus baseline `formatCurrency`/`formatPercent`
-  smoke tests. Pure predicates extracted from route handlers
-  (`buildDigestSubject`, `isPublicApiPath`,
-  `shouldLogWebhookVerificationFailure`) so tests don't need a DB or
-  Next.js runtime. `npm test` runs in ~400ms.
-- **Phase 4-A — Predictive engine + persistence + sidebar grouping**
-  (2026-05-04) — pure `projectCash()` engine in `src/lib/forecast/`
-  composing baseline (recurring + trailing 3-month median) with 5
-  override appliers + goal projection in deterministic order. 67 new
-  vitest tests (94 total). New `scenario` + `forecast_narrative`
-  tables; scenario CRUD server actions with zod validation. Sidebar
-  reorganized into Today / Plan / Records groups; brand "Finance" →
-  "Foothold". `/simulator` page builds in Plan B.
-- **Phase 4-B — Simulator UI + AI coaching** (2026-05-05) —
-  `/simulator` page over Plan A's engine: 7-section override editor,
-  Recharts baseline+scenario overlay, goal diff cards (sooner /
-  later / hypo / unreachable), scenario CRUD via existing actions.
-  `<NarrativePanel>` powered by Anthropic Haiku 4.5; cache-first via
-  `forecast_narrative` keyed on `(scenarioId, sha256(overrides +
-  history fingerprint))`. Stale-fallback on LLM failure. Panel
-  suppressed on baseline / no-overrides / dirty unsaved. 133 vitest
-  tests at end of Phase 4.
 
-- **Phase 6 — UI redesign + polish** (2026-05-05) — full visual +
-  IA rework against `docs/superpowers/specs/2026-05-05-foothold-redesign-design.md`.
-  Sub-phases: 6.1 foundation (editorial tokens, sonner + cmdk +
-  framer-motion, top-bar shell with sync pill + ⌘K trigger,
-  sidebar restyle); 6.2 dashboard card-newsfeed (hero gradient
-  + sparkline, split card, drift/goals row/upcoming/insight/recent
-  cards); 6.3 transactions operator-tier (mono table, j/k/⌘↑/⌘↓//
-  keyboard nav, ⌘K palette with transaction search); 6.4
-  investments operator-tier (flat-default holdings, group-by toggle,
-  3-cell summary). Plus: streaming loading.tsx skeletons, framer-
-  motion stagger on /dashboard, editorial empty states, multi-select
-  + bulk re-categorize on /transactions (`categoryOverrideId` FK +
-  cmdk picker), visual refresh of /drift /goals /insights /recurring
-  (IA preserved; per-page IA rework deferred). 134 vitest tests.
+**Security + deployment** (2026-05-01)
+- AES-256-GCM encryption of `plaid_item.access_token`
+  ([src/lib/crypto.ts]); single decryption boundary in `syncItem`.
+  [SECURITY.md] threat model. Dependabot weekly grouped npm PRs.
+- Live at <https://usefoothold.com>; `foothold-beta.vercel.app` alias
+  retained for legacy webhook continuity. Magic-link from
+  `noreply@usefoothold.com` via Resend.
+- Plaid webhooks at `POST /api/plaid/webhook` (ES256 JWS verification).
+  Reauth surfaces as banner + sync pill + Reconnect button (Link
+  update mode).
 
-- **Phase 6.5 — /insights IA rework** (2026-05-05) — `/insights`
-  becomes a latest-read + drilldown surface: serif narrative stays
-  the hero, with a "What Claude saw" receipts grid below (conditional
-  Spending/Drift/Goals/Recurring tiles linking into their detail
-  pages) and an "Earlier weeks" footer using `?week=YYYY-MM-DD` deep
-  links. `<GenerateButton>` is now 3-mode (generate/regenerate/back-
-  to-current) and strips `?week=` on success. New shared utils
-  (`firstSentence`, `formatWeekRange`) and pure-predicate modules
-  (`week-param`, `button-mode`, `tile-visibility`, `pace`) — all
-  vitest-tested. `getInsightSupplements` composes drift + goals +
-  recurring into the receipts payload via live-recompute for past
-  weeks (no schema change). Pace bug caught + fixed mid-walkthrough:
-  savings goals with negative velocity and no `targetDate` now
-  correctly report "behind". 175 vitest tests. Spec at
-  `docs/superpowers/specs/2026-05-05-insights-ia-rework-design.md`.
+**Phase 4 — Forecast engine + simulator** (2026-05-04 → 05)
+- `projectCash()` in `src/lib/forecast/` composes baseline
+  (recurring + trailing 3-month median) with 5 override appliers +
+  goal projection in deterministic order. New `scenario` +
+  `forecast_narrative` tables. See Architecture > "Forecast engine
+  consumes raw PFC totals" + "override appliers use signed math" for
+  load-bearing invariants.
+- `/simulator` page: 7-section override editor, Recharts overlay,
+  goal diff cards. `<NarrativePanel>` via Anthropic Haiku 4.5;
+  cache-first against `forecast_narrative` keyed on
+  `(scenarioId, sha256(overrides + history fingerprint))`,
+  stale-fallback on LLM failure.
 
-- **Phase 6.6 — UI quality pass** (2026-05-05) — driven by an
-  `impeccable critique` sweep across all 8 surfaces. Added
-  [PRODUCT.md](PRODUCT.md) (register, users, brand personality,
-  anti-references, 5 design principles) for impeccable + future-
-  agent context. Extracted `.text-eyebrow` Tailwind utility (sweeps
-  21 files where the recipe was inline). Standardized warning hue
-  (`yellow-500` → `amber-500`). Killed the TrendChart rainbow
-  with brand-tinted `--chart-1..6` derived from the 160-hue
-  gradient + 40-hue paper-canvas families. Added shadcn
-  `alert-dialog` primitive; gated `/goals` + `/simulator` delete
-  behind it (P1 error prevention; sonner success/failure). Fixed
-  `/simulator` `searchParams` to async Promise (Next 14 correctness;
-  was the synchronous Next 13 shape). Tokenize-bridge for
-  `/simulator` (the visible "design island" pre-Phase 6): in-
-  component toast → sonner, hand-rolled buttons → shadcn
-  `<Button>`, raw `bg-red-50/sky-50/amber-50` → tokens, page shell
-  aligned with Phase 6 pattern (`mx-auto max-w-6xl px-4 py-6
-  sm:px-8 sm:py-8`), eyebrow recipe normalized, ForecastChart
-  height 220→280px. Sparkles glyph audit: kept on `/insights`
-  GenerateButton + nav route only; replaced on `/insights` empty
-  (Newspaper + "First read coming up"), `<InsightTeaserCard>`
-  (BookOpen), `/dashboard` empty (Mountain — literal Foothold
-  mark). 175 vitest tests; typecheck clean. Browser walkthrough
-  confirmed clean.
+**Phase 5 — Cron + monitoring** (2026-05-04)
+- Four Vercel crons at `/api/cron/*`: insight Mon 04 UTC, sync 10 UTC,
+  balances every 6h, digest 14 UTC. Bearer-auth via `CRON_SECRET`.
+  4×-daily balance refresh requires Vercel Pro.
+- `error_log` table is the digest's source of truth — surfaces errors
+  AND flags "NOT SEEN" for missing crons (silence ≠ success). Logger
+  fail-soft (never throws). Test infra: Vitest 4 with `@/` resolution;
+  pure predicates extracted from route handlers so tests don't need
+  DB or Next runtime.
 
-- **Phase 6.7 — UI quality follow-on** (2026-05-05) — top-two
-  deferred TODOs from the 6.6 impeccable critique. (1) Global `?`
-  cheatsheet dialog: editorial Dialog, Global / /transactions /
-  /simulator sections, key-pill labels, `shouldIgnore` predicate
-  copied from `operator-shell.tsx` so `?` in inputs is untouched.
-  Bindings live in `keyboard/bindings.ts` as a single const for
-  future tooltip reuse. (2) `/transactions` operator gaps: tri-state
-  select-all-visible header checkbox (indeterminate set via DOM
-  property since React has no prop for it; click-on-indeterminate →
-  select all, per locked decision); sonner-with-undo on bulk
-  re-categorize, snapshotting per-row prior `overrideCategoryName`
-  before the action fires (router.refresh would otherwise overwrite
-  the source) and grouping the restore by prior category for
-  N-bounded round-trips. Cross-page select-all out of scope. Spec at
-  `docs/superpowers/specs/2026-05-05-phase-6.7-handoff.md`. 175
-  vitest tests (no regressions); typecheck clean; browser
-  walkthrough confirmed.
+**Phase 6 — UI redesign** (2026-05-05; spec at
+`docs/superpowers/specs/2026-05-05-foothold-redesign-design.md`)
+- Sub-phases: 6.1 foundation (editorial tokens, sonner+cmdk+framer-
+  motion, top-bar shell with sync pill + ⌘K, sidebar restyle); 6.2
+  dashboard card-newsfeed; 6.3 /transactions operator-tier (mono
+  table, j/k/⌘↑/⌘↓// nav, ⌘K palette); 6.4 /investments operator-
+  tier; 6.5 /insights IA rework (latest-read + receipts grid +
+  `?week=YYYY-MM-DD` deep links); 6.6 quality pass (PRODUCT.md added,
+  `.text-eyebrow` utility sweep, amber standardization, brand-tinted
+  `--chart-1..6`, alert-dialog gating on `/goals` + `/simulator`
+  delete, /simulator tokenize-bridge); 6.7 cheatsheet dialog +
+  tri-state select-all + sonner-with-undo on bulk re-categorize;
+  6.7-followon (/investments group-by-value sort, `humanizeCategory`
+  consolidation in `src/lib/format/category.ts`).
+- **`/drift` IA rework** — `<ElevatedTile>` drills to
+  `/transactions?category=<pfc>&from=<weekStart>&to=<weekEnd>`;
+  trend chart replaced by horizontal bar leaderboard with baseline
+  tick (`buildLeaderboard()` + `<Leaderboard>` component, single
+  foreground hue + amber for elevated rows).
+- **DESIGN.md** — Stitch format. Tokens + named rules (160/40 hue,
+  single-hue elevated, restrained accent floor, mono-numeral,
+  borders-not-shadows, editorial card default). Pair with
+  [PRODUCT.md](PRODUCT.md). North Star: "The Operator's Field
+  Notebook."
 
-- **Phase 6.7-followon — polish + /drift IA rework** (2026-05-05) —
-  three pieces driven from the "what's left" backlog. (1) `/investments`
-  group ordering: groups now sort by aggregate market value desc
-  (was Map insertion order, which was near-correct only when sorting
-  by Value). (2) `humanizeCategory` consolidation: 12 local copies
-  collapsed into a single `src/lib/format/category.ts` module with
-  joiner-word casing fix ("Food and Drink", "Bank of America" — was
-  "Food And Drink") and unification of one outlier sentence-case
-  shape on /drift; 10 vitest specs cover the casing rules. (3) `/drift`
-  IA rework via `impeccable shape` (brief at
-  `docs/superpowers/specs/2026-05-05-drift-ia-rework-design.md`):
-  `<ElevatedTile>` becomes `<Link>` to `/transactions?category=<pfc>&from=<weekStart>&to=<weekEnd>`;
-  the 6-line trend chart gives way to a horizontal bar leaderboard
-  (`buildLeaderboard()` pure function + 9 vitest specs; new
-  `<Leaderboard>` component renders current-week bar + baseline tick
-  + ratio per cat, sorted by ratio desc, capped at 8 rows, single
-  foreground hue + amber for elevated rows); `TrendChart` deleted
-  (sole consumer gone). Flag history table preserved untouched.
-  /drift walkthrough confirmed. 210 vitest tests; typecheck clean.
+**Code review + fixes** (2026-05-05; review at
+`docs/reviews/2026-05-05-REVIEW.md`, UAT at `2026-05-05-UAT-checklist.md`)
+- 19 of 22 findings closed (4 critical / 11 warning / 7 info). Three
+  deferred-acknowledged: W-05/W-06 (multi-Plaid-item state, blocks on
+  Plaid Production approval), W-07 (digest 24h window edge), W-08
+  (narrative cache canonical JSON). Architecture notes above capture
+  the load-bearing outcomes (C-01 forecast PFC, W-09 signed override
+  math). +43 vitest regressions (175 → 218).
 
-- **DESIGN.md** (2026-05-05) — generated via `impeccable document`
-  (Stitch format, YAML frontmatter + six-section body). Captures
-  tokens, named rules (160/40 hue, single-hue elevated, restrained
-  accent floor, mono-numeral, borders-not-shadows, editorial card
-  default), and do/don't list. Pair with [PRODUCT.md](PRODUCT.md)
-  for the full brief. Creative North Star: "The Operator's Field
-  Notebook." Future surfaces should reference [DESIGN.md](DESIGN.md)
-  as the visual contract — operator decisions live in PRODUCT.md.
-
-- **Polish carry-over batch** (2026-05-05) — four items from the
-  6.6 critique's deferred TODO list, all bounded:
-  (1) `/drift` flag-history "Week ending" date format `2026-04-28`
-  → `Apr 28`, formatted in UTC so YYYY-MM-DD calendar dates don't
-  drift in non-UTC client locales (`c1536cc`).
-  (2) `/investments` `<TypePill>` rainbow collapsed from 5 hues
-  (blue/orange/emerald/rose/muted) to a single muted tone — text
-  label is the affordance, per DESIGN.md Restrained Floor Rule
-  (`d75b974`).
-  (3) Empty-state headlines across `/transactions`, `/investments`,
-  `/goals`, `/recurring` rewritten to name the cause (matching
-  /drift's `<SparseEmptyState>` "Not enough history yet" canonical
-  pattern) instead of restating the symptom (`40963e3`).
-  (4) `c` keystroke opens the bulk re-categorize picker on
-  `/transactions` (Phase 6.7 deferred bonus). Lifted to controlled
-  state on `<CategoryPicker>`; `<BulkActionBar>` owns the keystroke
-  + open-state, auto-gated by mount lifecycle (`f775934`).
-  218 vitest tests; typecheck clean.
-
-- **Code review + fixes** (2026-05-05) — `gsd-code-reviewer` deep audit
-  of forecast/security/cron core (64 files, see
-  [docs/reviews/2026-05-05-REVIEW.md]) produced 22 findings (4
-  Critical, 11 Warning, 7 Info). 13 commits on main close 19 of them;
-  3 explicitly deferred and acknowledged. UAT confirmed in browser
-  against sandbox Wells Fargo data (see
-  [docs/reviews/2026-05-05-UAT-checklist.md]).
-  - **Critical fixed:** C-04 `2cc4edb` (digest escapeHtml apostrophe);
-    C-03 `fde00a8` (webhook KEY_CACHE size cap + negative cache for
-    failed kid lookups, anti-amplification);
-    C-02 `86c871a` (insights isEmpty contract — empty week no longer
-    routes to Anthropic);
-    C-01 `9cc87a9` (forecast engine consumes raw PFC — Architecture B,
-    drops query-layer recurring subtraction loop with lifecycle
-    off-by-one + floor-at-0 information loss).
-  - **Warning fixed:** W-03+I-07 `97bbfb5` (ILIKE wildcard escape
-    + drop dead `?? sql\`true\`` fallback);
-    W-10 `4754dbb` (SEMI_MONTHLY/ANNUALLY amount rescale on cadence
-    collapse);
-    W-01 `51e573e` (goal-projection ETA cash gate — skip months
-    where `endCash - monthlyContribution < 0`);
-    W-04 `5729b9a` + `74d0100` (defer inline sync from
-    exchangePublicToken so plaintext access_token in JS heap drops
-    from ~30s to ~50ms; null token reference in syncItem finally);
-    W-09 `c2f20d9` (signed math through override chain;
-    `clampForDisplay` clips inflows/outflows/byCategory at engine
-    output, startCash/endCash unclamped).
-  - **Info fixed:** I-02 `a03e907` (crypto key-length in error msg).
-  - **Docs:** `d1c3472` (REVIEW.md + 3 specs); `6e05e1b` (UAT
-    checklist).
-  - **Deferred (acknowledged):** W-05/W-06 (multi-Plaid-item state,
-    blocked on Plaid Production approval); W-07 (digest 24h window
-    edge); W-08 (narrative cache canonical JSON, needs lib choice);
-    W-02/W-11 (minor / no-code-change).
-  - **Tests:** 175 → 218 vitest (+43 regressions). New architecture
-    notes added above: "Forecast engine consumes raw PFC totals" and
-    "Forecast override appliers use signed math". Specs preserved at
-    `docs/superpowers/specs/2026-05-05-{c01,w04,w09}-*-design.md`.
-
-- **/goals IA rework** (2026-05-05) — `/goals` reshapes from an
-  equal-weight 2-col tile grid into a sectioned pace leaderboard
-  (Behind pace above On pace, severity-sorted within each).
-  `<GoalRow>` renders name + ProgressBar (with ideal-pace tick for
-  savings, projected-month tick for caps) + lever copy + verdict
-  pill, with stretched-`<Link>` drilldown on spend-cap rows only.
-  Asymmetric drill is intentional: caps map to a clean
-  `category=<PFC>&from=<monthStart>` /transactions filter; a savings
-  account-scope drill would surface paychecks and transfers as
-  noise. Pure predicates in `src/lib/goals/pace.ts`: `paceVerdict`
+**`/goals` IA rework** (2026-05-05; spec at
+`docs/superpowers/specs/2026-05-05-goals-ia-rework-design.md`)
+- 2-col tile grid → sectioned pace leaderboard (Behind pace above
+  On pace, severity-sorted). `<GoalRow>` with stretched-`<Link>`
+  drilldown on spend-cap rows only — asymmetric is intentional: caps
+  map to a clean `category+from=monthStart` /transactions filter;
+  savings account-scope drill would surface paychecks and transfers
+  as noise. Pure predicates in `src/lib/goals/pace.ts`: `paceVerdict`
   (over / behind / on-pace / hit) + `severityKey` (bucketed
-  100/50/25/20). Page collapsed -188/+5 lines as display logic
-  moved into reusable components. 238 vitest tests (+20). Spec at
-  `docs/superpowers/specs/2026-05-05-goals-ia-rework-design.md`.
+  100/50/25/20). Page collapsed -188/+5 lines.
+
+Test count: 238 vitest as of /goals IA rework.
 
 ### In progress
 - **Plaid Production access review** — submitted 2026-05-01 + Q9
