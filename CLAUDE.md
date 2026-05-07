@@ -624,8 +624,9 @@ plumbing with no testable predicates).
   `state` + `requiresUserAction` + `reason` + `byCapability`
   breakdown. Priority: `needs_reconnect` (any non-active itemStatus)
   → `unknown` (no applicable caps OR all never_synced) → `degraded`
-  (some failed + some not) → `failed` (all applicable failed) →
-  `healthy` (all fresh) → `stale`. `syncing` is set by callers
+  (some failed + some success-backed `fresh`/`stale`) → `failed`
+  (some failed + no success-backed; never_synced doesn't count as
+  working) → `healthy` (all fresh) → `stale`. `syncing` is set by callers
   (in-flight sync UI), never derived. Phase 3 query is the next
   consumer; no UI wired yet. Design deltas vs the original spec block
   documented in `docs/reliability/implementation-plan.md` § Phase 2

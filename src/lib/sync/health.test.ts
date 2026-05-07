@@ -546,14 +546,21 @@ describe('classifyItemHealth — never_synced + unknown', () => {
     expect(out.reason).toMatch(/never synced/i);
   });
 
-  it('never_synced + failure → degraded (failure is acute)', () => {
+  // Regression for review of 54270a9: the prior aggregation rule
+  // classified failed + never_synced as `degraded` even though no
+  // capability was actually working. `degraded` semantically requires
+  // at least one success-backed capability (fresh or stale). When the
+  // only signals are an acute failure and "no data," the correct
+  // verdict is `failed` — fail closed for the trust surface.
+  it('failed + never_synced (no success-backed) → failed, NOT degraded', () => {
     const out = classifyItemHealth(
       plaidInput({
         balances: tracked({ failureHoursAgo: 1 }),
         transactions: tracked({}),
       }),
     );
-    expect(out.state).toBe('degraded');
+    expect(out.state).toBe('failed');
+    expect(out.reason).toMatch(/never synced/i);
   });
 
   // A capability with only a failure on record (no prior success) is
@@ -567,5 +574,71 @@ describe('classifyItemHealth — never_synced + unknown', () => {
     );
     expect(out.byCapability.balances).toBe('failed_recent');
     expect(out.state).toBe('failed');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// degraded semantic contract: requires success-backed capability
+// ─────────────────────────────────────────────────────────────────────
+
+describe('classifyItemHealth — degraded requires success-backed data', () => {
+  // Locks in the corrected contract from review of 54270a9.
+  // degraded means "some failing AND some working" — `working` here
+  // strictly means a capability with prior successful data (fresh or
+  // stale). never_synced is not working.
+
+  it('failed + fresh → degraded (success-backed exists)', () => {
+    const out = classifyItemHealth(
+      plaidInput({
+        balances: tracked({ failureHoursAgo: 1 }),
+        transactions: tracked({ successHoursAgo: 1 }),
+      }),
+    );
+    expect(out.state).toBe('degraded');
+  });
+
+  it('failed + stale → degraded (stale is success-backed)', () => {
+    const out = classifyItemHealth(
+      plaidInput({
+        balances: tracked({ failureHoursAgo: 1 }),
+        transactions: tracked({ successHoursAgo: 50 }), // > 36h
+      }),
+    );
+    expect(out.state).toBe('degraded');
+    expect(out.byCapability.transactions).toBe('stale');
+  });
+
+  it('failed + never_synced + stale → degraded (stale rescues classification)', () => {
+    const out = classifyItemHealth(
+      plaidInput({
+        balances: tracked({ failureHoursAgo: 1 }),
+        transactions: tracked({}),
+        investments: tracked({ successHoursAgo: 50 }), // stale, success-backed
+      }),
+    );
+    expect(out.state).toBe('degraded');
+  });
+
+  it('failed + multiple never_synced (no fresh/stale) → failed', () => {
+    const out = classifyItemHealth(
+      plaidInput({
+        balances: tracked({ failureHoursAgo: 1 }),
+        transactions: tracked({}),
+        investments: tracked({}),
+      }),
+    );
+    expect(out.state).toBe('failed');
+    expect(out.reason).toMatch(/never synced/i);
+  });
+
+  it('all failed → failed (existing behavior preserved)', () => {
+    const out = classifyItemHealth(
+      plaidInput({
+        balances: tracked({ failureHoursAgo: 1 }),
+        transactions: tracked({ failureHoursAgo: 1 }),
+      }),
+    );
+    expect(out.state).toBe('failed');
+    expect(out.reason).toMatch(/all 2 applicable/i);
   });
 });

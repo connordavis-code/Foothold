@@ -13,9 +13,12 @@
  *      doesn't have a balance refresh capability — that should NOT
  *      drag overall state to `stale` just because no balance refresh
  *      ever ran. `not_applicable` capabilities are excluded from the
- *      aggregate. `degraded` is reserved for "some capabilities are
- *      failing while others are working"; `failed` is for "every
- *      applicable capability is failing right now."
+ *      aggregate. `degraded` requires that at least one capability is
+ *      success-backed (fresh or stale) — i.e. there really IS some
+ *      working data. If any capability has failed and every other
+ *      applicable capability is either also failing OR has never
+ *      synced, the source is classified `failed`, not `degraded` —
+ *      "no signal" is not "working."
  *
  *   2. `never_synced` vs `stale`. A brand-new item that hasn't run a
  *      cron yet has no signal at all — that's `unknown`, not `stale`.
@@ -147,6 +150,18 @@ function classifyCapability(
   return ageMs > staleMs ? 'stale' : 'fresh';
 }
 
+/**
+ * Open question for Phase 3+: `external_item.status = 'error'` is
+ * Plaid's catch-all for ITEM_ERROR. It can mean user-actionable
+ * (rare reauth-flavored states) OR engineering-actionable (transient
+ * provider failure, rate limit, upstream outage). Today we treat all
+ * non-active statuses identically — `needs_reconnect` with
+ * `requiresUserAction: true`. That's fail-closed: better to surface
+ * attention than mask a real issue. Once Phase 3+ has real
+ * `error_log` data, we can decide whether `error` should split into
+ * a separate state with `requiresUserAction: false`, or whether
+ * callers should narrow it from `lastFailureSummary` content.
+ */
 function describeStatus(status: string): string {
   switch (status) {
     case 'login_required':
@@ -256,14 +271,25 @@ export function classifyItemHealth(input: ClassifyInput): ClassifyOutput {
     const summarySuffix =
       summaries.length > 0 ? ` — ${summaries.join('; ')}` : '';
 
-    if (failed === applicable) {
+    // `degraded` is reserved for "some failing + some success-backed."
+    // `never_synced` is NOT success-backed — it's no signal at all,
+    // not a working capability. Failed + only never_synced therefore
+    // classifies as `failed`: there's an acute failure and zero useful
+    // data on this source. Fail closed for the trust surface.
+    const successBacked = fresh + stale;
+
+    if (successBacked === 0) {
       return {
         state: 'failed',
         requiresUserAction: false,
-        reason: `All ${applicable} applicable capabilities failing${summarySuffix}`,
+        reason:
+          failed === applicable
+            ? `All ${applicable} applicable capabilities failing${summarySuffix}`
+            : `${failed} of ${applicable} capabilities failing; remainder never synced${summarySuffix}`,
         byCapability,
       };
     }
+
     return {
       state: 'degraded',
       requiresUserAction: false,

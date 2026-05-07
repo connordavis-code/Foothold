@@ -216,10 +216,33 @@ nightly windows include slack for one missed nightly run.
 2. Zero applicable capabilities → `unknown`
 3. All applicable capabilities `never_synced` → `unknown`
    ("no signal" is more honest than "old signal")
-4. Any failed + any non-failed → `degraded`
-5. All applicable failed → `failed`
+4. Any failed AND any success-backed (`fresh` or `stale`) → `degraded`
+5. Any failed AND no success-backed (all-failed, OR failed +
+   `never_synced` only) → `failed`
 6. All applicable fresh → `healthy`
 7. Else (some stale or never_synced, no failures) → `stale`
+
+> **Post-review correction (2026-05-07).** Items 4 and 5 were tightened
+> after a code review of `54270a9`: the prior rule classified
+> `failed + never_synced` as `degraded` even though no capability was
+> actually working. `degraded` semantically requires at least one
+> success-backed capability. `never_synced` is "no signal," not
+> "working." Fail-closed: failed dominates when no working data exists.
+> Test coverage at `health.test.ts` § "degraded requires success-backed
+> data".
+
+#### Open question for Phase 3+
+
+Plaid's `external_item.status = 'error'` is a catch-all for
+`ITEM_ERROR`. It can mean user-actionable (rare reauth-flavored
+states) or engineering-actionable (transient provider failure, rate
+limit, upstream outage). The classifier currently treats all
+non-active statuses identically — `needs_reconnect` with
+`requiresUserAction: true`. That's fail-closed but potentially noisy
+for error-as-transient. Once Phase 3+ has real `error_log` patterns,
+decide whether `error` should split into a separate state with
+`requiresUserAction: false`, or whether callers should narrow it
+from `lastFailureSummary` content.
 
 #### What's still pending (Phase 3+)
 
