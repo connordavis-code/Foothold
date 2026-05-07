@@ -1,6 +1,7 @@
 import { eq, inArray } from 'drizzle-orm';
 import { auth } from '@/auth';
 import { ConnectBankButton } from '@/components/plaid/connect-bank-button';
+import { DisconnectItemButton } from '@/components/plaid/disconnect-item-button';
 import { ReconnectButton } from '@/components/plaid/reconnect-button';
 import { statusLabel } from '@/components/plaid/status';
 import { SyncButton } from '@/components/plaid/sync-button';
@@ -107,11 +108,19 @@ export default async function SettingsPage() {
                             : 'never synced'}
                         </p>
                       </div>
-                      {item.status === 'active' ? (
-                        <SyncButton itemId={item.id} />
-                      ) : (
-                        <ReconnectButton itemId={item.id} />
-                      )}
+                      <div className="flex items-center gap-1">
+                        {item.status === 'active' ? (
+                          <SyncButton itemId={item.id} />
+                        ) : (
+                          <ReconnectButton itemId={item.id} />
+                        )}
+                        <DisconnectItemButton
+                          itemId={item.id}
+                          institutionName={
+                            item.institutionName ?? 'this institution'
+                          }
+                        />
+                      </div>
                     </div>
                     {itemAccounts.length > 0 && (
                       <ul className="rounded-md border border-border divide-y divide-border text-sm">

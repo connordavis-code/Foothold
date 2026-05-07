@@ -1,6 +1,7 @@
 'use server';
 
 import { and, eq } from 'drizzle-orm';
+import { revalidatePath } from 'next/cache';
 import type { CountryCode, Products } from 'plaid';
 import { auth } from '@/auth';
 import { decryptToken, encryptToken } from '@/lib/crypto';
@@ -225,4 +226,58 @@ export async function markItemReconnected(
     .where(eq(plaidItems.id, item.id));
 
   return syncItem(item.id);
+}
+
+/**
+ * Permanently disconnect a Plaid item the user owns. Calls Plaid's
+ * itemRemove to invalidate the access_token at Plaid's end, then
+ * deletes the local plaid_item row. The schema's cascade chain
+ * (plaid_item → financial_account → transaction / holding /
+ * investment_transaction) tears down all derived data automatically.
+ *
+ * Idempotent against Plaid: if itemRemove fails because the item is
+ * already gone at Plaid (or a transient network blip), we still
+ * delete locally — leaving the row would just confuse the user. The
+ * worst case from a Plaid-side success-but-local-fail is a stale
+ * access_token sitting in their system, which itemRemove is meant
+ * to clean up; harmless on our side.
+ *
+ * Used by the Disconnect button on /settings AND as the canonical
+ * "wipe sandbox before flipping PLAID_ENV=production" path.
+ */
+export async function disconnectItemAction(
+  itemId: string,
+): Promise<{ ok: true }> {
+  const session = await auth();
+  if (!session?.user) {
+    throw new Error('Unauthorized');
+  }
+
+  const [item] = await db
+    .select({
+      id: plaidItems.id,
+      accessToken: plaidItems.accessToken,
+    })
+    .from(plaidItems)
+    .where(
+      and(eq(plaidItems.id, itemId), eq(plaidItems.userId, session.user.id)),
+    );
+  if (!item) {
+    throw new Error('Item not found');
+  }
+
+  // Best-effort revoke at Plaid. Don't block the local delete on this:
+  // if Plaid's API is down or the item is already gone, we still want
+  // the local DB to reflect the user's intent.
+  try {
+    await plaid.itemRemove({ access_token: decryptToken(item.accessToken) });
+  } catch {
+    // swallow — local delete proceeds regardless
+  }
+
+  await db.delete(plaidItems).where(eq(plaidItems.id, item.id));
+
+  revalidatePath('/settings');
+  revalidatePath('/dashboard');
+  return { ok: true };
 }
