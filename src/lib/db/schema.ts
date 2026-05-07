@@ -268,6 +268,12 @@ export const holdings = pgTable(
       .notNull()
       .references(() => securities.id, { onDelete: 'cascade' }),
     quantity: numeric('quantity', { precision: 18, scale: 6 }).notNull(),
+    // INVARIANT: total cost basis for the position (price-paid * units),
+    // NOT the per-share average. Plaid reports it as a total directly;
+    // SnapTrade reports `average_purchase_price` per-share, so the
+    // SnapTrade sync multiplies by units before writing here.
+    // /investments computes (institutionValue − costBasis) / costBasis
+    // for the % return; mismatched units produce 1000%+ nonsense.
     costBasis: numeric('cost_basis', { precision: 14, scale: 2 }),
     institutionValue: numeric('institution_value', {
       precision: 14,

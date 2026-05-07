@@ -303,11 +303,25 @@ export async function syncSnaptradeItem(
         const units = (p.units as number | null | undefined) ?? null;
         if (units == null) continue;
         const price = p.price as number | null | undefined;
+        const avgPurchasePrice = p.average_purchase_price as
+          | number
+          | null
+          | undefined;
+        // SnapTrade reports `average_purchase_price` per SHARE; Plaid
+        // reports `cost_basis` as the TOTAL position value. The
+        // holdings.cost_basis column carries Plaid's convention, so
+        // multiply by units at this boundary. Otherwise the
+        // (institutionValue − costBasis) / costBasis percentage on
+        // /investments shows nonsense like +9,617%.
+        const totalCostBasis =
+          avgPurchasePrice != null && units != null
+            ? avgPurchasePrice * units
+            : null;
         holdingRows.push({
           accountId: r.accountId,
           securityId,
           quantity: numRequired(units),
-          costBasis: num(p.average_purchase_price as number | undefined),
+          costBasis: num(totalCostBasis),
           institutionValue:
             units != null && price != null ? num(units * price) : null,
           institutionPrice: num(price ?? undefined),
