@@ -8,6 +8,7 @@ import { decryptToken, encryptToken } from '@/lib/crypto';
 import { db } from '@/lib/db';
 import { externalItems } from '@/lib/db/schema';
 import { env, plaidCountryCodes, plaidProducts } from '@/lib/env';
+import { syncExternalItem, type SyncDispatchResult } from '@/lib/sync/dispatcher';
 import { plaid } from './client';
 import { syncItem, type SyncSummary } from './sync';
 
@@ -108,9 +109,14 @@ export async function exchangePublicToken(
 
 /**
  * Re-sync an item the user owns. Used by the "Sync now" button on /settings.
- * Verifies ownership before doing any work.
+ * Verifies ownership, then dispatches to the right provider sync.
+ *
+ * Return shape is the dispatcher's discriminated union — UI consumers
+ * narrow on `result.provider` and present the matching summary.
  */
-export async function syncItemAction(itemId: string): Promise<SyncSummary> {
+export async function syncItemAction(
+  itemId: string,
+): Promise<SyncDispatchResult> {
   const session = await auth();
   if (!session?.user) {
     throw new Error('Unauthorized');
@@ -126,14 +132,15 @@ export async function syncItemAction(itemId: string): Promise<SyncSummary> {
     throw new Error('Item not found');
   }
 
-  return syncItem(item.id);
+  return syncExternalItem(item.id);
 }
 
 /**
- * Re-sync every Plaid item the signed-in user owns. Powers the top-bar
- * sync pill's "Sync now" click. Items in `login_required` / `error` /
- * etc. are skipped — `syncItem` only runs on active rows, and a stale
- * item just routes the user to /settings via the reauth pill anyway.
+ * Re-sync every active item the signed-in user owns, regardless of
+ * provider. Powers the top-bar sync pill's "Sync now" click. Items in
+ * `login_required` / `error` / etc. are skipped — sync orchestrators
+ * only run on active rows, and a stale item just routes the user to
+ * /settings via the reauth pill anyway.
  */
 export async function syncAllItemsAction(): Promise<{
   synced: number;
@@ -155,9 +162,11 @@ export async function syncAllItemsAction(): Promise<{
     );
 
   // Bounded fan-out: a single user has 1–5 items in practice, and
-  // syncItem already serializes per-endpoint inside. No global rate-limit
-  // risk worth a queue.
-  const results = await Promise.allSettled(items.map((i) => syncItem(i.id)));
+  // each provider's sync already serializes per-endpoint inside. No
+  // global rate-limit risk worth a queue.
+  const results = await Promise.allSettled(
+    items.map((i) => syncExternalItem(i.id)),
+  );
 
   return {
     synced: results.filter((r) => r.status === 'fulfilled').length,
@@ -185,10 +194,17 @@ export async function createLinkTokenForUpdate(itemId: string): Promise<string> 
     .select({ secret: externalItems.secret })
     .from(externalItems)
     .where(
-      and(eq(externalItems.id, itemId), eq(externalItems.userId, session.user.id)),
+      and(
+        eq(externalItems.id, itemId),
+        eq(externalItems.userId, session.user.id),
+        eq(externalItems.provider, 'plaid'),
+      ),
     );
   if (!item) {
     throw new Error('Item not found');
+  }
+  if (!item.secret) {
+    throw new Error(`external_item ${itemId} (provider=plaid) has NULL secret`);
   }
 
   // Plaintext access_token passed inline so we don't hold an extra
@@ -277,10 +293,17 @@ export async function disconnectItemAction(
     })
     .from(externalItems)
     .where(
-      and(eq(externalItems.id, itemId), eq(externalItems.userId, session.user.id)),
+      and(
+        eq(externalItems.id, itemId),
+        eq(externalItems.userId, session.user.id),
+        eq(externalItems.provider, 'plaid'),
+      ),
     );
   if (!item) {
     throw new Error('Item not found');
+  }
+  if (!item.secret) {
+    throw new Error(`external_item ${itemId} (provider=plaid) has NULL secret`);
   }
 
   // Best-effort revoke at Plaid. Don't block the local delete on this:

@@ -53,6 +53,11 @@ export async function GET(request: NextRequest) {
 
   for (const item of items) {
     try {
+      if (!item.secret) {
+        // Defensive: select filters provider='plaid' so this should be
+        // unreachable. If it fires, schema invariant is broken upstream.
+        throw new Error(`Plaid item ${item.id} has NULL secret`);
+      }
       const accessToken = decryptToken(item.secret);
       const res = await plaid.accountsBalanceGet({ access_token: accessToken });
 

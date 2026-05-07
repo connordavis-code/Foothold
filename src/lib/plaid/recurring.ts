@@ -2,10 +2,10 @@ import { sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   type FinancialAccount,
-  type ExternalItem,
   recurringStreams,
 } from '@/lib/db/schema';
 import { plaid } from './client';
+import type { PlaidExternalItem } from './sync';
 
 const num = (n: number | null | undefined): string | null =>
   n == null ? null : String(n);
@@ -24,7 +24,7 @@ const num = (n: number | null | undefined): string | null =>
  * depository + credit account_ids.
  */
 export async function syncRecurringForItem(
-  item: ExternalItem,
+  item: PlaidExternalItem,
   accs: FinancialAccount[],
 ): Promise<{ inflows: number; outflows: number }> {
   const eligible = accs.filter(

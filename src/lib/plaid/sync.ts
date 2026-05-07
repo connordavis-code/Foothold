@@ -34,6 +34,14 @@ export type SyncSummary = {
 };
 
 /**
+ * Plaid-specific narrowing of ExternalItem. The base shape leaves
+ * `secret` nullable (SnapTrade rows store NULL), but every Plaid
+ * helper requires a plaintext access_token in `secret`. Use this
+ * type for any function that operates on a Plaid item.
+ */
+export type PlaidExternalItem = ExternalItem & { secret: string };
+
+/**
  * Full sync for one item.
  *
  * Order:
@@ -55,32 +63,41 @@ export async function syncItem(itemId: string): Promise<SyncSummary> {
       `external_item ${itemId} is provider=${item.provider}, expected 'plaid'`,
     );
   }
+  if (!item.secret) {
+    // SnapTrade rows allow secret=NULL (userSecret lives on
+    // snaptrade_user). Plaid rows must always have an access_token.
+    throw new Error(`external_item ${itemId} (provider=plaid) has NULL secret`);
+  }
 
-  // Single decryption boundary: every helper below reads `item.secret`
+  // Narrow once for the helpers below — they all expect a non-null
+  // plaintext secret. Cast safe here because of the guard above.
+  const plaidItem = item as PlaidExternalItem;
+
+  // Single decryption boundary: every helper below reads `plaidItem.secret`
   // and expects plaintext. Mutating once here keeps the call sites unchanged.
-  item.secret = decryptToken(item.secret);
+  plaidItem.secret = decryptToken(plaidItem.secret);
 
   // Wrap in try/finally to drop our last reference to the plaintext
   // access_token before this scope unwinds. Doesn't zero V8's underlying
   // string allocation (no userland API for that), but removes the strong
   // ref so GC can reclaim sooner — review W-04 hygiene.
   try {
-    const accountsResult = await syncAccountsForItem(item);
+    const accountsResult = await syncAccountsForItem(plaidItem);
 
     // Reload accounts now that the upsert may have added new rows. Both
     // downstream helpers need the plaid_account_id → financial_account.id map.
     const accs = await db
       .select()
       .from(financialAccounts)
-      .where(eq(financialAccounts.itemId, item.id));
+      .where(eq(financialAccounts.itemId, plaidItem.id));
 
     // Recurring depends on transaction history, but the recurring endpoint
     // looks at server-side history Plaid already has — so it can run in
     // parallel with transactionsSync. Investments is independent.
     const [txns, inv, rec] = await Promise.all([
-      syncTransactionsForItem(item, accs),
-      syncInvestmentsForItem(item, accs),
-      syncRecurringForItem(item, accs),
+      syncTransactionsForItem(plaidItem, accs),
+      syncInvestmentsForItem(plaidItem, accs),
+      syncRecurringForItem(plaidItem, accs),
     ]);
 
     return {
@@ -90,7 +107,7 @@ export async function syncItem(itemId: string): Promise<SyncSummary> {
       recurring: rec,
     };
   } finally {
-    item.secret = '';
+    plaidItem.secret = '';
   }
 }
 
@@ -99,7 +116,7 @@ export async function syncItem(itemId: string): Promise<SyncSummary> {
  * UPDATE FROM excluded — one round-trip regardless of account count.
  */
 async function syncAccountsForItem(
-  item: ExternalItem,
+  item: PlaidExternalItem,
 ): Promise<{ count: number }> {
   const res = await plaid.accountsGet({ access_token: item.secret });
   if (res.data.accounts.length === 0) return { count: 0 };
@@ -151,7 +168,7 @@ async function syncAccountsForItem(
  * Plaid call.
  */
 async function syncTransactionsForItem(
-  item: ExternalItem,
+  item: PlaidExternalItem,
   accs: FinancialAccount[],
 ): Promise<{ added: number; modified: number; removed: number }> {
   const acctIdByPlaidId = new Map(accs.map((a) => [a.plaidAccountId, a.id]));
@@ -261,7 +278,7 @@ async function syncTransactionsForItem(
  * parallel — they're independent.
  */
 async function syncInvestmentsForItem(
-  item: ExternalItem,
+  item: PlaidExternalItem,
   accs: FinancialAccount[],
 ): Promise<{ holdings: number; transactions: number; securities: number }> {
   if (!accs.some((a) => a.type === 'investment')) {

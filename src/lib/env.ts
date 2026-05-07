@@ -30,6 +30,14 @@ const envSchema = z.object({
   // Anthropic (optional, used in Phase 3)
   ANTHROPIC_API_KEY: z.string().optional(),
 
+  // SnapTrade (brokerage aggregator alongside Plaid). Optional at the
+  // env-load level so the app boots without them; the SnapTrade client
+  // throws if invoked without keys, and the /settings connect picker
+  // hides the SnapTrade option when SNAPTRADE_CLIENT_ID is unset.
+  // Get keys at https://dashboard.snaptrade.com/api-key (free tier).
+  SNAPTRADE_CLIENT_ID: z.string().optional(),
+  SNAPTRADE_CONSUMER_KEY: z.string().optional(),
+
   // App
   NEXT_PUBLIC_APP_URL: z.string().url().default('http://localhost:3000'),
 

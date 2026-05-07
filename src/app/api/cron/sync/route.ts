@@ -4,7 +4,7 @@ import { isAuthorizedCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { externalItems } from '@/lib/db/schema';
 import { logError, logRun } from '@/lib/logger';
-import { syncItem } from '@/lib/plaid/sync';
+import { syncExternalItem } from '@/lib/sync/dispatcher';
 
 export const runtime = 'nodejs';
 // A fresh syncItem with full backfill can take 30s+. Pro permits up
@@ -38,13 +38,17 @@ export async function GET(request: NextRequest) {
 
   for (const { id } of items) {
     try {
-      const summary = await syncItem(id);
+      const result = await syncExternalItem(id);
       synced++;
-      await logRun(
-        'cron.nightly_sync.item',
-        `txns +${summary.transactions.added} ~${summary.transactions.modified} -${summary.transactions.removed}`,
-        { externalItemId: id, summary },
-      );
+      const message =
+        result.provider === 'plaid'
+          ? `[plaid] txns +${result.summary.transactions.added} ~${result.summary.transactions.modified} -${result.summary.transactions.removed}`
+          : `[snaptrade] holdings ${result.summary.holdings}, activities ${result.summary.activities}`;
+      await logRun('cron.nightly_sync.item', message, {
+        externalItemId: id,
+        provider: result.provider,
+        summary: result.summary,
+      });
     } catch (err) {
       failed++;
       await logError('cron.nightly_sync.item', err, { externalItemId: id });

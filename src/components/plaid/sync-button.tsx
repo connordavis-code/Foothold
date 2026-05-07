@@ -20,19 +20,30 @@ export function SyncButton({ itemId }: { itemId: string }) {
     setStatus({ kind: 'idle' });
     startTransition(async () => {
       try {
-        const summary = await syncItemAction(itemId);
-        const t = summary.transactions;
-        const i = summary.investments;
-        const r = summary.recurring;
-        const parts = [`${summary.accounts} accounts`];
-        if (t.added || t.modified || t.removed) {
-          parts.push(`${t.added} new tx, ${t.modified} updated, ${t.removed} removed`);
-        }
-        if (i.holdings || i.transactions) {
-          parts.push(`${i.holdings} holdings, ${i.transactions} inv tx`);
-        }
-        if (r.inflows || r.outflows) {
-          parts.push(`${r.outflows} subs, ${r.inflows} income streams`);
+        const result = await syncItemAction(itemId);
+        let parts: string[];
+        if (result.provider === 'plaid') {
+          const s = result.summary;
+          parts = [`${s.accounts} accounts`];
+          const t = s.transactions;
+          if (t.added || t.modified || t.removed) {
+            parts.push(`${t.added} new tx, ${t.modified} updated, ${t.removed} removed`);
+          }
+          if (s.investments.holdings || s.investments.transactions) {
+            parts.push(
+              `${s.investments.holdings} holdings, ${s.investments.transactions} inv tx`,
+            );
+          }
+          if (s.recurring.inflows || s.recurring.outflows) {
+            parts.push(`${s.recurring.outflows} subs, ${s.recurring.inflows} income streams`);
+          }
+        } else {
+          // SnapTrade: brokerage-only data, no transactions/recurring
+          const s = result.summary;
+          parts = [`${s.accounts} accounts`];
+          if (s.holdings || s.activities) {
+            parts.push(`${s.holdings} holdings, ${s.activities} activities`);
+          }
         }
         setStatus({ kind: 'success', message: parts.join(' · ') });
         router.refresh();

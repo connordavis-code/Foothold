@@ -122,7 +122,11 @@ export const externalItems = pgTable('external_item', {
   providerInstitutionId: text('provider_institution_id'),
   institutionName: text('institution_name'),
   // Encrypted long-lived credential. See header comment.
-  secret: text('secret').notNull(),
+  // Nullable: SnapTrade rows leave this NULL because their per-user
+  // `userSecret` lives on `snaptrade_user` (1:1 with users.id) — the
+  // credential isn't per-connection there. Plaid rows always set it
+  // (per-item access_token).
+  secret: text('secret'),
   // Per-provider mutable state. Plaid carries `transactionsCursor` here.
   // Always non-null (defaults to empty object) so readers can index in
   // without a null guard.
@@ -553,12 +557,41 @@ export const forecastNarratives = pgTable(
 export type ForecastNarrative = typeof forecastNarratives.$inferSelect;
 export type ForecastNarrativeInsert = typeof forecastNarratives.$inferInsert;
 
+/**
+ * SnapTrade per-user credential. SnapTrade's auth model is per-USER
+ * (one userSecret per Foothold user), not per-connection like Plaid's
+ * access_token. So the credential lives here, 1:1 with users.id, and
+ * external_item rows for SnapTrade leave .secret NULL.
+ *
+ * `snaptrade_user_id` is the immutable id we hand SnapTrade at register
+ * time — we use users.id directly (already a UUID and immutable). Stored
+ * here for clarity and so SnapTrade SDK calls don't have to re-derive it.
+ *
+ * `snaptrade_user_secret` is the long-lived credential SnapTrade returns
+ * on registration. AES-256-GCM encrypted at rest via [src/lib/crypto.ts]
+ * (same shared key as Plaid access_tokens — rotation forces reconnects
+ * across both providers).
+ */
+export const snaptradeUsers = pgTable('snaptrade_user', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  userId: text('user_id')
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  snaptradeUserId: text('snaptrade_user_id').notNull(),
+  snaptradeUserSecret: text('snaptrade_user_secret').notNull(),
+  createdAt: ts('created_at').defaultNow().notNull(),
+});
+
 // =============================================================================
 // Type exports — convenient for queries
 // =============================================================================
 
 export type User = typeof users.$inferSelect;
 export type ExternalItem = typeof externalItems.$inferSelect;
+export type SnaptradeUser = typeof snaptradeUsers.$inferSelect;
 export type FinancialAccount = typeof financialAccounts.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
 export type Security = typeof securities.$inferSelect;
