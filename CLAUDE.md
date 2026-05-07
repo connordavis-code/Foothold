@@ -403,9 +403,25 @@ inside the client component. Fixed in `d955dd4` for `<NavLink>`.
   /recurring drill contract (`q=<merchant>&from=<6mo>`); fall
   through to non-interactive `<li>` when no useful term — keeps
   the affordance honest (no hover state on dead rows).
+- **Phase 3 — `/simulator` portrait pass**: `<OverrideSection>`
+  lifted to fully-controlled (`open` + `onToggle` props); parent
+  dispatches single-open accordion on <md (auto-collapse siblings)
+  and independent multi-open on md+ (preserves desktop "compare
+  two at once"). Breakpoint detection lives inside the click
+  handler via `window.matchMedia('(max-width: 767px)')` — read at
+  click time so SSR markup is breakpoint-agnostic.
+  `<ForecastChart>` swaps to `aspect-square` + below-chart legend
+  + Recharts `trigger="click"` tooltip on <md. New
+  `<MobileScenarioSaveBar>` pinned `bottom-14` (above the 56px
+  tab bar), always visible — Save disabled when `!isDirty` so the
+  CTA's location is stable. "Save as…" opens a vaul drawer with a
+  name input rather than the desktop's inline transform. Page
+  padding `pb-24 md:pb-8` so the override editor tail clears the
+  sticky bar.
 
 Test count: 280 vitest (266 → +14 from `humanizeDate`,
-`groupByDate`, `activeTransactionFilterCount`).
+`groupByDate`, `activeTransactionFilterCount`; Phase 3 is UI
+plumbing with no testable predicates).
 
 ### In progress
 - **Plaid Production access review** — submitted 2026-05-01 + Q9
@@ -418,12 +434,6 @@ Test count: 280 vitest (266 → +14 from `humanizeDate`,
   paste fresh secret, update Vercel env, reconnect via `/settings`.
   `linkTokenCreate` doesn't pass `redirect_uri` — fine for non-OAuth
   banks, breaks Chase / Cap One until configured.
-- **Mobile Phase 3 — `/simulator` portrait pass** — accordion-stack
-  override editor (one section open at a time, active-count badge
-  per section), Recharts `aspect-square` on <md with tap-tooltip,
-  legend below chart, sticky save-bar above the tab bar.
-  Acceptance: scenario edit + run + save all work on touch. Spec
-  §9 at `docs/superpowers/specs/2026-05-06-mobile-first-responsive-design.md`.
 - **Phase 3-pt3** — per-goal coaching detail page (defer until real
   data flows)
 - **Phase 4-pt2** — investment what-if simulator (deferred from Phase
