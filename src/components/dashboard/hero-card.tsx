@@ -68,15 +68,25 @@ export function HeroCard({ netWorth, monthlyDelta, sparkline }: Props) {
         </div>
 
         <div className="w-full text-emerald-200/80 md:w-72 md:max-w-xs">
-          <Sparkline
-            values={sparkline.map((p) => p.netWorth)}
-            stroke="currentColor"
-            height={56}
-            fillOpacity={0.18}
-          />
-          <p className="mt-1 text-[10px] uppercase tracking-[0.08em] text-white/40">
-            Last {sparkline.length} days
-          </p>
+          {sparkline.length === 0 ? (
+            <div className="flex h-[56px] items-end justify-end">
+              <p className="text-[11px] leading-snug text-white/45 md:text-right">
+                Trend appears once your accounts have 30 days of history
+              </p>
+            </div>
+          ) : (
+            <>
+              <Sparkline
+                values={sparkline.map((p) => p.netWorth)}
+                stroke="currentColor"
+                height={56}
+                fillOpacity={0.18}
+              />
+              <p className="mt-1 text-[10px] uppercase tracking-[0.08em] text-white/40">
+                Last {sparkline.length} days
+              </p>
+            </>
+          )}
         </div>
       </div>
     </section>

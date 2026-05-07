@@ -250,6 +250,12 @@ export async function getNetWorthSparkline(
     )
     .groupBy(financialAccounts.type);
 
+  // Empty-state signal: no non-investment account is old enough to
+  // anchor on. Returning [] lets the renderer show "Trend builds as
+  // accounts age" instead of a flat-zero line that misrepresents
+  // history.
+  if (stableBalances.length === 0) return [];
+
   let anchorNetWorth = 0;
   for (const row of stableBalances) {
     const n = Number(row.total);
