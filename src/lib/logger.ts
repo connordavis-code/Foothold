@@ -26,6 +26,24 @@ function extractItemId(ctx?: Context): {
   };
 }
 
+// Plaid + SnapTrade SDKs both throw axios-shaped errors. Their structured
+// upstream payload (Plaid: error_code/error_type/error_message/request_id;
+// SnapTrade: similar) lives on `err.response.data`. Without capturing it,
+// 4xx error_log rows read as opaque "Request failed with status code 400"
+// and root-causing requires reproducing manually. Duck-type so we don't
+// import axios just for the type guard.
+function extractAxiosResponse(err: unknown): {
+  status: number;
+  data: unknown;
+} | null {
+  if (!err || typeof err !== 'object') return null;
+  const r = (err as { response?: unknown }).response;
+  if (!r || typeof r !== 'object') return null;
+  const status = (r as { status?: unknown }).status;
+  if (typeof status !== 'number') return null;
+  return { status, data: (r as { data?: unknown }).data ?? null };
+}
+
 export async function logError(
   op: string,
   err: unknown,
@@ -34,13 +52,24 @@ export async function logError(
   try {
     const message = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack : undefined;
+    const axiosResponse = extractAxiosResponse(err);
     const { externalItemId, rest } = extractItemId(ctx);
+    const context: Context = {
+      ...(rest ?? {}),
+      ...(stack ? { stack } : {}),
+      ...(axiosResponse
+        ? {
+            httpStatus: axiosResponse.status,
+            responseBody: axiosResponse.data,
+          }
+        : {}),
+    };
     await db.insert(errorLog).values({
       level: 'error',
       op,
       externalItemId,
       message,
-      context: stack ? { ...(rest ?? {}), stack } : rest,
+      context: Object.keys(context).length > 0 ? context : null,
     });
   } catch (loggerError) {
     console.error('[logger] failed to log error', {
