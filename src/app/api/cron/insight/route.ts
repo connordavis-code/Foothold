@@ -5,7 +5,7 @@ import { db } from '@/lib/db';
 import {
   financialAccounts,
   insights,
-  plaidItems,
+  externalItems,
   transactions,
 } from '@/lib/db/schema';
 import { generateInsightForUser } from '@/lib/insights/generate';
@@ -86,9 +86,9 @@ export async function GET(request: NextRequest) {
  * to insight on. */
 async function getActiveUserIds(): Promise<string[]> {
   const rows = await db
-    .selectDistinct({ userId: plaidItems.userId })
-    .from(plaidItems)
-    .where(eq(plaidItems.status, 'active'));
+    .selectDistinct({ userId: externalItems.userId })
+    .from(externalItems)
+    .where(eq(externalItems.status, 'active'));
   return rows.map((r) => r.userId);
 }
 
@@ -119,10 +119,10 @@ async function hasNewActivity(userId: string): Promise<boolean> {
       financialAccounts,
       eq(transactions.accountId, financialAccounts.id),
     )
-    .innerJoin(plaidItems, eq(financialAccounts.itemId, plaidItems.id))
+    .innerJoin(externalItems, eq(financialAccounts.itemId, externalItems.id))
     .where(
       and(
-        eq(plaidItems.userId, userId),
+        eq(externalItems.userId, userId),
         gt(transactions.createdAt, latest.generatedAt),
       ),
     );

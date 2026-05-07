@@ -1,6 +1,6 @@
 import { eq, max, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { plaidItems } from '@/lib/db/schema';
+import { externalItems } from '@/lib/db/schema';
 
 export type SyncStatus = {
   lastSyncedAt: Date | null;
@@ -16,12 +16,12 @@ export type SyncStatus = {
 export async function getSyncStatus(userId: string): Promise<SyncStatus> {
   const [row] = await db
     .select({
-      lastSyncedAt: max(plaidItems.lastSyncedAt),
+      lastSyncedAt: max(externalItems.lastSyncedAt),
       itemCount: sql<number>`count(*)::int`,
-      reauthCount: sql<number>`count(*) filter (where ${plaidItems.status} != 'active')::int`,
+      reauthCount: sql<number>`count(*) filter (where ${externalItems.status} != 'active')::int`,
     })
-    .from(plaidItems)
-    .where(eq(plaidItems.userId, userId));
+    .from(externalItems)
+    .where(eq(externalItems.userId, userId));
 
   return {
     lastSyncedAt: row?.lastSyncedAt ?? null,

@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
 import { isAuthorizedCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
-import { plaidItems } from '@/lib/db/schema';
+import { externalItems } from '@/lib/db/schema';
 import { logError, logRun } from '@/lib/logger';
 import { syncItem } from '@/lib/plaid/sync';
 
@@ -29,9 +29,9 @@ export async function GET(request: NextRequest) {
 
   const startedAt = Date.now();
   const items = await db
-    .select({ id: plaidItems.id })
-    .from(plaidItems)
-    .where(eq(plaidItems.status, 'active'));
+    .select({ id: externalItems.id })
+    .from(externalItems)
+    .where(eq(externalItems.status, 'active'));
 
   let synced = 0;
   let failed = 0;
@@ -43,11 +43,11 @@ export async function GET(request: NextRequest) {
       await logRun(
         'cron.nightly_sync.item',
         `txns +${summary.transactions.added} ~${summary.transactions.modified} -${summary.transactions.removed}`,
-        { plaidItemId: id, summary },
+        { externalItemId: id, summary },
       );
     } catch (err) {
       failed++;
-      await logError('cron.nightly_sync.item', err, { plaidItemId: id });
+      await logError('cron.nightly_sync.item', err, { externalItemId: id });
     }
   }
 

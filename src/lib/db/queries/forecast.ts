@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 import {
   financialAccounts,
   goals,
-  plaidItems,
+  externalItems,
   recurringStreams,
   transactions,
 } from '@/lib/db/schema';
@@ -74,8 +74,8 @@ export function mapStreamCadenceAndAmount(
  * Returns empty arrays where data is missing — caller handles gracefully.
  *
  * Schema deviations from plan (see column-by-column table in Task 3 report):
- * - financialAccounts scoped via plaidItems JOIN (no direct userId col)
- * - recurringStreams scoped via plaidItems JOIN; uses frequency/description/
+ * - financialAccounts scoped via externalItems JOIN (no direct userId col)
+ * - recurringStreams scoped via externalItems JOIN; uses frequency/description/
  *   lastAmount/predictedNextDate instead of cadence/label/amount/nextDate
  * - transactions uses date (not occurredAt); categoryOverrideId ignored here
  * - goals uses monthlyAmount (not monthlyContribution); currentSaved computed
@@ -89,7 +89,7 @@ export async function getForecastHistory(userId: string): Promise<ForecastHistor
     .slice(0, 10);
 
   const [accountRows, streamRows, txRows, goalRows] = await Promise.all([
-    // Accounts: must join plaidItems for userId scope
+    // Accounts: must join externalItems for userId scope
     db
       .select({
         id: financialAccounts.id,
@@ -97,10 +97,10 @@ export async function getForecastHistory(userId: string): Promise<ForecastHistor
         type: financialAccounts.type,
       })
       .from(financialAccounts)
-      .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
-      .where(eq(plaidItems.userId, userId)),
+      .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
+      .where(eq(externalItems.userId, userId)),
 
-    // Active recurring streams: join plaidItems for userId scope
+    // Active recurring streams: join externalItems for userId scope
     db
       .select({
         id: recurringStreams.id,
@@ -116,10 +116,10 @@ export async function getForecastHistory(userId: string): Promise<ForecastHistor
         isActive: recurringStreams.isActive,
       })
       .from(recurringStreams)
-      .innerJoin(plaidItems, eq(plaidItems.id, recurringStreams.itemId))
+      .innerJoin(externalItems, eq(externalItems.id, recurringStreams.itemId))
       .where(
         and(
-          eq(plaidItems.userId, userId),
+          eq(externalItems.userId, userId),
           eq(recurringStreams.isActive, true),
         ),
       ),
@@ -133,10 +133,10 @@ export async function getForecastHistory(userId: string): Promise<ForecastHistor
       })
       .from(transactions)
       .innerJoin(financialAccounts, eq(financialAccounts.id, transactions.accountId))
-      .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
+      .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
       .where(
         and(
-          eq(plaidItems.userId, userId),
+          eq(externalItems.userId, userId),
           gte(transactions.date, sinceDate),
         ),
       ),

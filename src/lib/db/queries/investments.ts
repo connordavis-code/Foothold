@@ -4,7 +4,7 @@ import {
   financialAccounts,
   holdings,
   investmentTransactions,
-  plaidItems,
+  externalItems,
   securities,
 } from '@/lib/db/schema';
 
@@ -61,11 +61,11 @@ export async function getHoldingsFlat(
       financialAccounts,
       eq(financialAccounts.id, holdings.accountId),
     )
-    .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
+    .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
     .innerJoin(securities, eq(securities.id, holdings.securityId))
     .where(
       and(
-        eq(plaidItems.userId, userId),
+        eq(externalItems.userId, userId),
         eq(financialAccounts.type, 'investment'),
       ),
     )
@@ -126,10 +126,10 @@ export async function getPortfolioSummary(
     db
       .select({ id: financialAccounts.id })
       .from(financialAccounts)
-      .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
+      .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
       .where(
         and(
-          eq(plaidItems.userId, userId),
+          eq(externalItems.userId, userId),
           eq(financialAccounts.type, 'investment'),
         ),
       ),
@@ -221,12 +221,12 @@ export async function getRecentInvestmentTransactions(
       financialAccounts,
       eq(financialAccounts.id, investmentTransactions.accountId),
     )
-    .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
+    .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
     .leftJoin(
       securities,
       eq(securities.id, investmentTransactions.securityId),
     )
-    .where(eq(plaidItems.userId, userId))
+    .where(eq(externalItems.userId, userId))
     .orderBy(desc(investmentTransactions.date), desc(investmentTransactions.createdAt))
     .limit(limit);
 

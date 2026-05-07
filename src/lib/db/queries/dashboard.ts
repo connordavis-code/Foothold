@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 import {
   categories,
   financialAccounts,
-  plaidItems,
+  externalItems,
   transactions,
 } from '@/lib/db/schema';
 
@@ -49,8 +49,8 @@ export async function getDashboardSummary(
       total: sql<string>`COALESCE(SUM(${financialAccounts.currentBalance}::numeric), 0)`,
     })
     .from(financialAccounts)
-    .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
-    .where(eq(plaidItems.userId, userId))
+    .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
+    .where(eq(externalItems.userId, userId))
     .groupBy(financialAccounts.type);
 
   let assets = 0;
@@ -74,10 +74,10 @@ export async function getDashboardSummary(
       financialAccounts,
       eq(financialAccounts.id, transactions.accountId),
     )
-    .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
+    .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
     .where(
       and(
-        eq(plaidItems.userId, userId),
+        eq(externalItems.userId, userId),
         gte(transactions.date, start),
         lt(transactions.date, end),
         sql`${transactions.amount}::numeric > 0`,
@@ -89,9 +89,9 @@ export async function getDashboardSummary(
     );
 
   const [itemCheck] = await db
-    .select({ id: plaidItems.id })
-    .from(plaidItems)
-    .where(eq(plaidItems.userId, userId))
+    .select({ id: externalItems.id })
+    .from(externalItems)
+    .where(eq(externalItems.userId, userId))
     .limit(1);
 
   return {
@@ -148,9 +148,9 @@ export async function getRecentTransactions(
       financialAccounts,
       eq(financialAccounts.id, transactions.accountId),
     )
-    .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
+    .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
     .leftJoin(categories, eq(categories.id, transactions.categoryOverrideId))
-    .where(eq(plaidItems.userId, userId))
+    .where(eq(externalItems.userId, userId))
     .orderBy(desc(transactions.date), desc(transactions.createdAt))
     .limit(limit);
 
@@ -190,10 +190,10 @@ export async function getNetWorthMonthlyDelta(userId: string): Promise<number> {
       financialAccounts,
       eq(financialAccounts.id, transactions.accountId),
     )
-    .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
+    .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
     .where(
       and(
-        eq(plaidItems.userId, userId),
+        eq(externalItems.userId, userId),
         gte(transactions.date, start),
         lt(transactions.date, end),
         notInArray(financialAccounts.type, ['investment']),
@@ -236,10 +236,10 @@ export async function getNetWorthSparkline(
       financialAccounts,
       eq(financialAccounts.id, transactions.accountId),
     )
-    .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
+    .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
     .where(
       and(
-        eq(plaidItems.userId, userId),
+        eq(externalItems.userId, userId),
         gte(transactions.date, startStr),
         notInArray(financialAccounts.type, ['investment']),
         sql`COALESCE(${transactions.primaryCategory}, '') NOT IN ('TRANSFER_IN', 'TRANSFER_OUT', 'LOAN_PAYMENTS')`,

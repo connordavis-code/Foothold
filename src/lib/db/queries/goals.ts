@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 import {
   financialAccounts,
   goals,
-  plaidItems,
+  externalItems,
   transactions,
 } from '@/lib/db/schema';
 
@@ -95,10 +95,10 @@ async function getMonthlyVelocity(
       financialAccounts,
       eq(financialAccounts.id, transactions.accountId),
     )
-    .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
+    .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
     .where(
       and(
-        eq(plaidItems.userId, userId),
+        eq(externalItems.userId, userId),
         inArray(transactions.accountId, accountIds),
         gte(transactions.date, ninetyDaysAgo),
       ),
@@ -130,8 +130,8 @@ export async function getGoalsWithProgress(
         currentBalance: financialAccounts.currentBalance,
       })
       .from(financialAccounts)
-      .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
-      .where(eq(plaidItems.userId, userId)),
+      .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
+      .where(eq(externalItems.userId, userId)),
   ]);
 
   const accountById = new Map(accs.map((a) => [a.id, a]));
@@ -144,7 +144,7 @@ export async function getGoalsWithProgress(
 
   for (const g of spendCapGoals) {
     const conds = [
-      eq(plaidItems.userId, userId),
+      eq(externalItems.userId, userId),
       gte(transactions.date, monthRange.start),
       lt(transactions.date, monthRange.end),
       sql`${transactions.amount}::numeric > 0`,
@@ -164,7 +164,7 @@ export async function getGoalsWithProgress(
         financialAccounts,
         eq(financialAccounts.id, transactions.accountId),
       )
-      .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
+      .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
       .where(and(...conds));
     spendByGoalId.set(g.id, Number(row?.total ?? 0));
   }

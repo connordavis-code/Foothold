@@ -91,28 +91,45 @@ export const verificationTokens = pgTable(
 // =============================================================================
 
 /**
- * One row per institution connection. A user can have multiple items
- * (e.g., one for Chase, one for Fidelity, etc.).
+ * Provider-agnostic external connection (Plaid bank/credit, SnapTrade
+ * brokerage, etc.). One row per institution connection per provider.
+ * `provider` is the discriminator that drives sync orchestration.
+ *
+ * Per-provider mutable state (Plaid /transactions/sync cursor, SnapTrade
+ * brokerage authorization metadata, etc.) lives in `providerState` JSONB
+ * so the row shape stays stable as new providers are added.
+ *
+ * `secret` carries whatever long-lived encrypted credential the provider
+ * requires. Plaid → access_token. SnapTrade → userSecret. AES-256-GCM via
+ * [src/lib/crypto.ts]; encrypt at write in the connect handler, decrypt at
+ * read in the provider's sync orchestrator (single boundary).
  */
-export const plaidItems = pgTable('plaid_item', {
+export const externalItems = pgTable('external_item', {
   id: text('id')
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
   userId: text('user_id')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
-  plaidItemId: text('plaid_item_id').unique().notNull(),
-  plaidInstitutionId: text('plaid_institution_id'),
+  // 'plaid' | 'snaptrade'
+  provider: text('provider').notNull(),
+  // Provider's identifier for this connection. Plaid → item_id.
+  // SnapTrade → brokerageAuthorizationId. UUIDs from SnapTrade and
+  // Plaid-namespaced ids from Plaid don't collide.
+  providerItemId: text('provider_item_id').unique().notNull(),
+  // Plaid → ins_*. SnapTrade → brokerage slug. Optional (some providers
+  // don't surface a stable institution id).
+  providerInstitutionId: text('provider_institution_id'),
   institutionName: text('institution_name'),
-  // Plaid access_token, encrypted at rest with AES-256-GCM. See
-  // [src/lib/crypto.ts]. Encrypted at write in `exchangePublicToken`,
-  // decrypted at read in `syncItem` (single boundary).
-  accessToken: text('access_token').notNull(),
-  // Cursor for /transactions/sync incremental sync.
-  transactionsCursor: text('transactions_cursor'),
+  // Encrypted long-lived credential. See header comment.
+  secret: text('secret').notNull(),
+  // Per-provider mutable state. Plaid carries `transactionsCursor` here.
+  // Always non-null (defaults to empty object) so readers can index in
+  // without a null guard.
+  providerState: jsonb('provider_state').notNull().default({}),
   // 'active' | 'login_required' | 'pending_expiration' | 'permission_revoked'
-  // | 'error'. Driven by Plaid ITEM webhooks; surfaces the reauth banner.
-  // syncItem only runs on 'active' rows.
+  // | 'error'. Driven by provider webhooks; surfaces the reauth banner.
+  // Sync dispatcher only runs on 'active' rows.
   status: text('status').notNull().default('active'),
   createdAt: ts('created_at').defaultNow().notNull(),
   lastSyncedAt: ts('last_synced_at'),
@@ -128,7 +145,7 @@ export const financialAccounts = pgTable('financial_account', {
     .$defaultFn(() => crypto.randomUUID()),
   itemId: text('item_id')
     .notNull()
-    .references(() => plaidItems.id, { onDelete: 'cascade' }),
+    .references(() => externalItems.id, { onDelete: 'cascade' }),
   plaidAccountId: text('plaid_account_id').unique().notNull(),
   name: text('name').notNull(),
   officialName: text('official_name'),
@@ -331,7 +348,7 @@ export const recurringStreams = pgTable('recurring_stream', {
     .$defaultFn(() => crypto.randomUUID()),
   itemId: text('item_id')
     .notNull()
-    .references(() => plaidItems.id, { onDelete: 'cascade' }),
+    .references(() => externalItems.id, { onDelete: 'cascade' }),
   accountId: text('account_id')
     .notNull()
     .references(() => financialAccounts.id, { onDelete: 'cascade' }),
@@ -443,7 +460,7 @@ export const insights = pgTable(
  * Daily Resend digest scans the last 24h. We index on occurred_at desc since
  * every read is "what happened recently."
  *
- * `plaid_item_id` uses ON DELETE SET NULL because losing an item shouldn't
+ * `external_item_id` uses ON DELETE SET NULL because losing an item shouldn't
  * blow away its error history — operators may want to audit why an item
  * was disconnected after the fact.
  */
@@ -458,7 +475,7 @@ export const errorLog = pgTable(
     level: text('level').notNull(),
     // e.g. 'cron.nightly_sync', 'webhook.transactions', 'sync.investments'
     op: text('op').notNull(),
-    plaidItemId: text('plaid_item_id').references(() => plaidItems.id, {
+    externalItemId: text('external_item_id').references(() => externalItems.id, {
       onDelete: 'set null',
     }),
     message: text('message').notNull(),
@@ -541,7 +558,7 @@ export type ForecastNarrativeInsert = typeof forecastNarratives.$inferInsert;
 // =============================================================================
 
 export type User = typeof users.$inferSelect;
-export type PlaidItem = typeof plaidItems.$inferSelect;
+export type ExternalItem = typeof externalItems.$inferSelect;
 export type FinancialAccount = typeof financialAccounts.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
 export type Security = typeof securities.$inferSelect;

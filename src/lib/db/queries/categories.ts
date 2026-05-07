@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 import {
   categories,
   financialAccounts,
-  plaidItems,
+  externalItems,
   transactions,
 } from '@/lib/db/schema';
 
@@ -43,9 +43,9 @@ export async function getCategoryOptions(
         financialAccounts,
         eq(financialAccounts.id, transactions.accountId),
       )
-      .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
+      .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
       .where(
-        and(eq(plaidItems.userId, userId), isNotNull(transactions.primaryCategory)),
+        and(eq(externalItems.userId, userId), isNotNull(transactions.primaryCategory)),
       ),
   ]);
 
@@ -123,9 +123,9 @@ export async function filterOwnedTransactions(
       financialAccounts,
       eq(financialAccounts.id, transactions.accountId),
     )
-    .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
+    .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
     .where(
-      and(eq(plaidItems.userId, userId), inArray(transactions.id, txIds)),
+      and(eq(externalItems.userId, userId), inArray(transactions.id, txIds)),
     );
   return rows.map((r) => r.id);
 }

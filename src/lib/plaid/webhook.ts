@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import * as jose from 'jose';
 import type { JWK } from 'jose';
 import { db } from '@/lib/db';
-import { plaidItems } from '@/lib/db/schema';
+import { externalItems } from '@/lib/db/schema';
 import { plaid } from './client';
 import { syncItem } from './sync';
 
@@ -153,13 +153,18 @@ export async function handlePlaidWebhook(
 ): Promise<void> {
   if (!event.item_id) return;
 
-  // Resolve the internal id once. Plaid's item_id is the *external* id
-  // (plaid_item.plaid_item_id, not plaid_item.id) — every helper below
-  // expects the internal one.
+  // Resolve the internal id once. Plaid's item_id is the provider-side id
+  // (external_item.provider_item_id when provider='plaid', not
+  // external_item.id) — every helper below expects the internal one.
   const [row] = await db
-    .select({ id: plaidItems.id })
-    .from(plaidItems)
-    .where(eq(plaidItems.plaidItemId, event.item_id));
+    .select({ id: externalItems.id })
+    .from(externalItems)
+    .where(
+      and(
+        eq(externalItems.provider, 'plaid'),
+        eq(externalItems.providerItemId, event.item_id),
+      ),
+    );
   if (!row) {
     console.warn(
       `[plaid:webhook] unknown item_id ${event.item_id} (${event.webhook_type}/${event.webhook_code})`,
@@ -183,9 +188,9 @@ export async function handlePlaidWebhook(
       }
       if (nextStatus) {
         await db
-          .update(plaidItems)
+          .update(externalItems)
           .set({ status: nextStatus })
-          .where(eq(plaidItems.id, internalId));
+          .where(eq(externalItems.id, internalId));
       }
       // NEW_ACCOUNTS_AVAILABLE: existing accounts still flow; user opts
       // in to the new ones via Plaid Link update mode. No sync trigger.

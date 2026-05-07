@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { count, eq, max } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { financialAccounts, plaidItems, transactions } from '@/lib/db/schema';
+import { financialAccounts, externalItems, transactions } from '@/lib/db/schema';
 import type { ScenarioOverrides } from './types';
 
 /**
@@ -53,13 +53,13 @@ export async function fetchFingerprintInputs(
     })
     .from(transactions)
     .innerJoin(financialAccounts, eq(financialAccounts.id, transactions.accountId))
-    .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
-    .where(eq(plaidItems.userId, userId));
+    .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
+    .where(eq(externalItems.userId, userId));
 
   const [syncStats] = await db
-    .select({ latestSync: max(plaidItems.lastSyncedAt) })
-    .from(plaidItems)
-    .where(eq(plaidItems.userId, userId));
+    .select({ latestSync: max(externalItems.lastSyncedAt) })
+    .from(externalItems)
+    .where(eq(externalItems.userId, userId));
 
   const latestSyncDate = syncStats?.latestSync
     ? new Date(syncStats.latestSync).toISOString().slice(0, 10)

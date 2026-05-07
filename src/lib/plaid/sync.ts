@@ -7,12 +7,12 @@ import type {
 import { decryptToken } from '@/lib/crypto';
 import { db } from '@/lib/db';
 import {
+  type ExternalItem,
   type FinancialAccount,
-  type PlaidItem,
   financialAccounts,
   holdings,
   investmentTransactions,
-  plaidItems,
+  externalItems,
   securities,
   transactions,
 } from '@/lib/db/schema';
@@ -47,13 +47,18 @@ export type SyncSummary = {
 export async function syncItem(itemId: string): Promise<SyncSummary> {
   const [item] = await db
     .select()
-    .from(plaidItems)
-    .where(and(eq(plaidItems.id, itemId), eq(plaidItems.status, 'active')));
-  if (!item) throw new Error(`plaid_item ${itemId} not found or not active`);
+    .from(externalItems)
+    .where(and(eq(externalItems.id, itemId), eq(externalItems.status, 'active')));
+  if (!item) throw new Error(`external_item ${itemId} not found or not active`);
+  if (item.provider !== 'plaid') {
+    throw new Error(
+      `external_item ${itemId} is provider=${item.provider}, expected 'plaid'`,
+    );
+  }
 
-  // Single decryption boundary: every helper below reads `item.accessToken`
+  // Single decryption boundary: every helper below reads `item.secret`
   // and expects plaintext. Mutating once here keeps the call sites unchanged.
-  item.accessToken = decryptToken(item.accessToken);
+  item.secret = decryptToken(item.secret);
 
   // Wrap in try/finally to drop our last reference to the plaintext
   // access_token before this scope unwinds. Doesn't zero V8's underlying
@@ -85,7 +90,7 @@ export async function syncItem(itemId: string): Promise<SyncSummary> {
       recurring: rec,
     };
   } finally {
-    item.accessToken = '';
+    item.secret = '';
   }
 }
 
@@ -94,9 +99,9 @@ export async function syncItem(itemId: string): Promise<SyncSummary> {
  * UPDATE FROM excluded — one round-trip regardless of account count.
  */
 async function syncAccountsForItem(
-  item: PlaidItem,
+  item: ExternalItem,
 ): Promise<{ count: number }> {
-  const res = await plaid.accountsGet({ access_token: item.accessToken });
+  const res = await plaid.accountsGet({ access_token: item.secret });
   if (res.data.accounts.length === 0) return { count: 0 };
 
   const rows = res.data.accounts.map((a) => ({
@@ -146,12 +151,18 @@ async function syncAccountsForItem(
  * Plaid call.
  */
 async function syncTransactionsForItem(
-  item: PlaidItem,
+  item: ExternalItem,
   accs: FinancialAccount[],
 ): Promise<{ added: number; modified: number; removed: number }> {
   const acctIdByPlaidId = new Map(accs.map((a) => [a.plaidAccountId, a.id]));
 
-  let cursor = item.transactionsCursor ?? '';
+  // Plaid /transactions/sync cursor lives in the provider_state JSONB blob
+  // on external_item — see schema.ts comment on `providerState`. Narrowed
+  // here at the read boundary; the rest of the function treats it as
+  // a plain string.
+  const providerState =
+    (item.providerState as { transactionsCursor?: string } | null) ?? {};
+  let cursor = providerState.transactionsCursor ?? '';
   let added = 0;
   let modified = 0;
   let removed = 0;
@@ -159,7 +170,7 @@ async function syncTransactionsForItem(
 
   while (hasMore) {
     const res = await plaid.transactionsSync({
-      access_token: item.accessToken,
+      access_token: item.secret,
       cursor: cursor || undefined,
     });
 
@@ -226,12 +237,14 @@ async function syncTransactionsForItem(
   }
 
   await db
-    .update(plaidItems)
+    .update(externalItems)
     .set({
-      transactionsCursor: cursor,
+      // Merge cursor into existing providerState — preserve any other
+      // provider-specific keys we don't know about (forward-compatible).
+      providerState: { ...providerState, transactionsCursor: cursor },
       lastSyncedAt: new Date(),
     })
-    .where(eq(plaidItems.id, item.id));
+    .where(eq(externalItems.id, item.id));
 
   return { added, modified, removed };
 }
@@ -248,7 +261,7 @@ async function syncTransactionsForItem(
  * parallel — they're independent.
  */
 async function syncInvestmentsForItem(
-  item: PlaidItem,
+  item: ExternalItem,
   accs: FinancialAccount[],
 ): Promise<{ holdings: number; transactions: number; securities: number }> {
   if (!accs.some((a) => a.type === 'investment')) {
@@ -265,9 +278,9 @@ async function syncInvestmentsForItem(
 
   // Fire both Plaid endpoints concurrently; they're independent.
   const [holdingsRes, firstTxPage] = await Promise.all([
-    plaid.investmentsHoldingsGet({ access_token: item.accessToken }),
+    plaid.investmentsHoldingsGet({ access_token: item.secret }),
     plaid.investmentsTransactionsGet({
-      access_token: item.accessToken,
+      access_token: item.secret,
       start_date: startStr,
       end_date: endStr,
       options: { count: 500, offset: 0 },
@@ -288,7 +301,7 @@ async function syncInvestmentsForItem(
   const total = firstTxPage.data.total_investment_transactions;
   while (offset < total) {
     const res = await plaid.investmentsTransactionsGet({
-      access_token: item.accessToken,
+      access_token: item.secret,
       start_date: startStr,
       end_date: endStr,
       options: { count: 500, offset },

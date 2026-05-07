@@ -6,7 +6,7 @@ import type { CountryCode, Products } from 'plaid';
 import { auth } from '@/auth';
 import { decryptToken, encryptToken } from '@/lib/crypto';
 import { db } from '@/lib/db';
-import { plaidItems } from '@/lib/db/schema';
+import { externalItems } from '@/lib/db/schema';
 import { env, plaidCountryCodes, plaidProducts } from '@/lib/env';
 import { plaid } from './client';
 import { syncItem, type SyncSummary } from './sync';
@@ -92,15 +92,16 @@ export async function exchangePublicToken(
   });
 
   const [inserted] = await db
-    .insert(plaidItems)
+    .insert(externalItems)
     .values({
       userId: session.user.id,
-      plaidItemId: exchange.data.item_id,
-      plaidInstitutionId: metadata.institution_id ?? null,
+      provider: 'plaid',
+      providerItemId: exchange.data.item_id,
+      providerInstitutionId: metadata.institution_id ?? null,
       institutionName: metadata.institution_name ?? null,
-      accessToken: encryptToken(exchange.data.access_token),
+      secret: encryptToken(exchange.data.access_token),
     })
-    .returning({ id: plaidItems.id });
+    .returning({ id: externalItems.id });
 
   return { itemId: inserted.id };
 }
@@ -116,10 +117,10 @@ export async function syncItemAction(itemId: string): Promise<SyncSummary> {
   }
 
   const [item] = await db
-    .select({ id: plaidItems.id })
-    .from(plaidItems)
+    .select({ id: externalItems.id })
+    .from(externalItems)
     .where(
-      and(eq(plaidItems.id, itemId), eq(plaidItems.userId, session.user.id)),
+      and(eq(externalItems.id, itemId), eq(externalItems.userId, session.user.id)),
     );
   if (!item) {
     throw new Error('Item not found');
@@ -144,12 +145,12 @@ export async function syncAllItemsAction(): Promise<{
   }
 
   const items = await db
-    .select({ id: plaidItems.id })
-    .from(plaidItems)
+    .select({ id: externalItems.id })
+    .from(externalItems)
     .where(
       and(
-        eq(plaidItems.userId, session.user.id),
-        eq(plaidItems.status, 'active'),
+        eq(externalItems.userId, session.user.id),
+        eq(externalItems.status, 'active'),
       ),
     );
 
@@ -181,10 +182,10 @@ export async function createLinkTokenForUpdate(itemId: string): Promise<string> 
   }
 
   const [item] = await db
-    .select({ accessToken: plaidItems.accessToken })
-    .from(plaidItems)
+    .select({ secret: externalItems.secret })
+    .from(externalItems)
     .where(
-      and(eq(plaidItems.id, itemId), eq(plaidItems.userId, session.user.id)),
+      and(eq(externalItems.id, itemId), eq(externalItems.userId, session.user.id)),
     );
   if (!item) {
     throw new Error('Item not found');
@@ -200,7 +201,7 @@ export async function createLinkTokenForUpdate(itemId: string): Promise<string> 
     client_name: env.PLAID_CLIENT_NAME,
     country_codes: plaidCountryCodes as CountryCode[],
     language: 'en',
-    access_token: decryptToken(item.accessToken),
+    access_token: decryptToken(item.secret),
     webhook: `${env.NEXT_PUBLIC_APP_URL}/api/plaid/webhook`,
     // Update mode also redirects through the institution for OAuth banks
     // — same /oauth-redirect re-entry route, different intent (no
@@ -227,19 +228,19 @@ export async function markItemReconnected(
   }
 
   const [item] = await db
-    .select({ id: plaidItems.id })
-    .from(plaidItems)
+    .select({ id: externalItems.id })
+    .from(externalItems)
     .where(
-      and(eq(plaidItems.id, itemId), eq(plaidItems.userId, session.user.id)),
+      and(eq(externalItems.id, itemId), eq(externalItems.userId, session.user.id)),
     );
   if (!item) {
     throw new Error('Item not found');
   }
 
   await db
-    .update(plaidItems)
+    .update(externalItems)
     .set({ status: 'active' })
-    .where(eq(plaidItems.id, item.id));
+    .where(eq(externalItems.id, item.id));
 
   return syncItem(item.id);
 }
@@ -271,12 +272,12 @@ export async function disconnectItemAction(
 
   const [item] = await db
     .select({
-      id: plaidItems.id,
-      accessToken: plaidItems.accessToken,
+      id: externalItems.id,
+      secret: externalItems.secret,
     })
-    .from(plaidItems)
+    .from(externalItems)
     .where(
-      and(eq(plaidItems.id, itemId), eq(plaidItems.userId, session.user.id)),
+      and(eq(externalItems.id, itemId), eq(externalItems.userId, session.user.id)),
     );
   if (!item) {
     throw new Error('Item not found');
@@ -286,12 +287,12 @@ export async function disconnectItemAction(
   // if Plaid's API is down or the item is already gone, we still want
   // the local DB to reflect the user's intent.
   try {
-    await plaid.itemRemove({ access_token: decryptToken(item.accessToken) });
+    await plaid.itemRemove({ access_token: decryptToken(item.secret) });
   } catch {
     // swallow — local delete proceeds regardless
   }
 
-  await db.delete(plaidItems).where(eq(plaidItems.id, item.id));
+  await db.delete(externalItems).where(eq(externalItems.id, item.id));
 
   revalidatePath('/settings');
   revalidatePath('/dashboard');

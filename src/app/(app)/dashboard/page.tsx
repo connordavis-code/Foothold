@@ -23,7 +23,7 @@ import { getGoalsWithProgress } from '@/lib/db/queries/goals';
 import { getLatestInsight } from '@/lib/db/queries/insights';
 import { getUpcomingRecurringOutflows } from '@/lib/db/queries/recurring';
 import { db } from '@/lib/db';
-import { financialAccounts, plaidItems } from '@/lib/db/schema';
+import { financialAccounts, externalItems } from '@/lib/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { projectCash } from '@/lib/forecast/engine';
 
@@ -115,10 +115,10 @@ async function countLiquidAccounts(userId: string): Promise<number> {
   const rows = await db
     .select({ id: financialAccounts.id })
     .from(financialAccounts)
-    .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
+    .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
     .where(
       and(
-        eq(plaidItems.userId, userId),
+        eq(externalItems.userId, userId),
         eq(financialAccounts.type, 'depository'),
       ),
     );

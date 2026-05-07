@@ -1,20 +1,20 @@
 import { and, eq, ne } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { plaidItems } from '@/lib/db/schema';
+import { externalItems } from '@/lib/db/schema';
 
 /**
- * Items whose Plaid connection is anything other than 'active' — the
+ * Items whose external connection is anything other than 'active' — the
  * banner + settings page surface these for reauth.
  */
 export async function getItemsNeedingReauth(userId: string) {
   return db
     .select({
-      id: plaidItems.id,
-      institutionName: plaidItems.institutionName,
-      status: plaidItems.status,
+      id: externalItems.id,
+      institutionName: externalItems.institutionName,
+      status: externalItems.status,
     })
-    .from(plaidItems)
+    .from(externalItems)
     .where(
-      and(eq(plaidItems.userId, userId), ne(plaidItems.status, 'active')),
+      and(eq(externalItems.userId, userId), ne(externalItems.status, 'active')),
     );
 }

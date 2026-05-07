@@ -1,9 +1,9 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
 import { isAuthorizedCronRequest } from '@/lib/cron/auth';
 import { decryptToken } from '@/lib/crypto';
 import { db } from '@/lib/db';
-import { financialAccounts, plaidItems } from '@/lib/db/schema';
+import { financialAccounts, externalItems } from '@/lib/db/schema';
 import { logError, logRun } from '@/lib/logger';
 import { plaid } from '@/lib/plaid/client';
 
@@ -35,10 +35,17 @@ export async function GET(request: NextRequest) {
   }
 
   const startedAt = Date.now();
+  // Plaid-only cron: accountsBalanceGet is a Plaid endpoint. SnapTrade
+  // items refresh balances inside their own sync orchestrator.
   const items = await db
-    .select({ id: plaidItems.id, accessToken: plaidItems.accessToken })
-    .from(plaidItems)
-    .where(eq(plaidItems.status, 'active'));
+    .select({ id: externalItems.id, secret: externalItems.secret })
+    .from(externalItems)
+    .where(
+      and(
+        eq(externalItems.status, 'active'),
+        eq(externalItems.provider, 'plaid'),
+      ),
+    );
 
   let refreshed = 0;
   let failed = 0;
@@ -46,7 +53,7 @@ export async function GET(request: NextRequest) {
 
   for (const item of items) {
     try {
-      const accessToken = decryptToken(item.accessToken);
+      const accessToken = decryptToken(item.secret);
       const res = await plaid.accountsBalanceGet({ access_token: accessToken });
 
       for (const a of res.data.accounts) {
@@ -65,7 +72,7 @@ export async function GET(request: NextRequest) {
     } catch (err) {
       failed++;
       await logError('cron.balance_refresh.item', err, {
-        plaidItemId: item.id,
+        externalItemId: item.id,
       });
     }
   }

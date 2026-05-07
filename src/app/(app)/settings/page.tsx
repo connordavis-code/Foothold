@@ -13,7 +13,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { db } from '@/lib/db';
-import { financialAccounts, plaidItems } from '@/lib/db/schema';
+import { financialAccounts, externalItems } from '@/lib/db/schema';
 import { formatCurrency } from '@/lib/utils';
 
 export default async function SettingsPage() {
@@ -22,9 +22,9 @@ export default async function SettingsPage() {
 
   const items = await db
     .select()
-    .from(plaidItems)
-    .where(eq(plaidItems.userId, session.user.id))
-    .orderBy(plaidItems.createdAt);
+    .from(externalItems)
+    .where(eq(externalItems.userId, session.user.id))
+    .orderBy(externalItems.createdAt);
 
   const accounts = items.length
     ? await db

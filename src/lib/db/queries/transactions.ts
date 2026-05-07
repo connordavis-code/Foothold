@@ -13,7 +13,7 @@ import { db } from '@/lib/db';
 import {
   categories,
   financialAccounts,
-  plaidItems,
+  externalItems,
   transactions,
 } from '@/lib/db/schema';
 import { escapeIlike } from '@/lib/utils/ilike-escape';
@@ -63,7 +63,7 @@ const MAX_PAGE_SIZE = 200;
  * query so they can never get out of sync.
  */
 function buildWhere(userId: string, f: TransactionFilters): SQL {
-  const conds: SQL[] = [eq(plaidItems.userId, userId)];
+  const conds: SQL[] = [eq(externalItems.userId, userId)];
   if (f.accountId) conds.push(eq(transactions.accountId, f.accountId));
   if (f.category) conds.push(eq(transactions.primaryCategory, f.category));
   if (f.dateFrom) conds.push(gte(transactions.date, f.dateFrom));
@@ -118,7 +118,7 @@ export async function getTransactions(
         financialAccounts,
         eq(financialAccounts.id, transactions.accountId),
       )
-      .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
+      .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
       .leftJoin(categories, eq(categories.id, transactions.categoryOverrideId))
       .where(where)
       .orderBy(desc(transactions.date), desc(transactions.createdAt))
@@ -131,7 +131,7 @@ export async function getTransactions(
         financialAccounts,
         eq(financialAccounts.id, transactions.accountId),
       )
-      .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
+      .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
       .where(where),
   ]);
 
@@ -155,10 +155,10 @@ export async function getDistinctCategories(userId: string): Promise<string[]> {
       financialAccounts,
       eq(financialAccounts.id, transactions.accountId),
     )
-    .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
+    .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
     .where(
       and(
-        eq(plaidItems.userId, userId),
+        eq(externalItems.userId, userId),
         sql`${transactions.primaryCategory} IS NOT NULL`,
       ),
     )
@@ -185,7 +185,7 @@ export async function getUserAccounts(userId: string): Promise<AccountOption[]> 
       subtype: financialAccounts.subtype,
     })
     .from(financialAccounts)
-    .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
-    .where(eq(plaidItems.userId, userId))
+    .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
+    .where(eq(externalItems.userId, userId))
     .orderBy(financialAccounts.type, financialAccounts.name);
 }

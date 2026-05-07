@@ -2,7 +2,7 @@ import { and, eq, gte, lte, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   financialAccounts,
-  plaidItems,
+  externalItems,
   transactions,
 } from '@/lib/db/schema';
 
@@ -219,10 +219,10 @@ export async function getDriftAnalysis(
       financialAccounts,
       eq(financialAccounts.id, transactions.accountId),
     )
-    .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
+    .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
     .where(
       and(
-        eq(plaidItems.userId, userId),
+        eq(externalItems.userId, userId),
         gte(transactions.date, earliest),
         lte(transactions.date, latest),
         sql`${transactions.amount}::numeric > 0`,

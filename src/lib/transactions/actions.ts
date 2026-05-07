@@ -15,7 +15,7 @@ import {
 } from '@/lib/db/queries/transactions';
 import {
   financialAccounts,
-  plaidItems,
+  externalItems,
   transactions,
 } from '@/lib/db/schema';
 import { escapeIlike } from '@/lib/utils/ilike-escape';
@@ -74,10 +74,10 @@ export async function searchTransactionsAction(
       financialAccounts,
       eq(financialAccounts.id, transactions.accountId),
     )
-    .innerJoin(plaidItems, eq(plaidItems.id, financialAccounts.itemId))
+    .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
     .where(
       and(
-        eq(plaidItems.userId, session.user.id),
+        eq(externalItems.userId, session.user.id),
         ...(search ? [search] : []),
       ),
     )

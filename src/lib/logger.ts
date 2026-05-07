@@ -14,13 +14,14 @@ type Context = Record<string, unknown>;
  */
 
 function extractItemId(ctx?: Context): {
-  plaidItemId: string | null;
+  externalItemId: string | null;
   rest: Context | null;
 } {
-  if (!ctx) return { plaidItemId: null, rest: null };
-  const { plaidItemId, ...rest } = ctx;
+  if (!ctx) return { externalItemId: null, rest: null };
+  const { externalItemId, ...rest } = ctx;
   return {
-    plaidItemId: typeof plaidItemId === 'string' ? plaidItemId : null,
+    externalItemId:
+      typeof externalItemId === 'string' ? externalItemId : null,
     rest: Object.keys(rest).length > 0 ? rest : null,
   };
 }
@@ -33,11 +34,11 @@ export async function logError(
   try {
     const message = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack : undefined;
-    const { plaidItemId, rest } = extractItemId(ctx);
+    const { externalItemId, rest } = extractItemId(ctx);
     await db.insert(errorLog).values({
       level: 'error',
       op,
-      plaidItemId,
+      externalItemId,
       message,
       context: stack ? { ...(rest ?? {}), stack } : rest,
     });
@@ -56,11 +57,11 @@ export async function logRun(
   ctx?: Context,
 ): Promise<void> {
   try {
-    const { plaidItemId, rest } = extractItemId(ctx);
+    const { externalItemId, rest } = extractItemId(ctx);
     await db.insert(errorLog).values({
       level: 'info',
       op,
-      plaidItemId,
+      externalItemId,
       message,
       context: rest,
     });

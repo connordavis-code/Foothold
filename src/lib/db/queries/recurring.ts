@@ -2,7 +2,7 @@ import { and, asc, desc, eq, gte, isNotNull, lte } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   financialAccounts,
-  plaidItems,
+  externalItems,
   recurringStreams,
 } from '@/lib/db/schema';
 
@@ -56,8 +56,8 @@ export async function getRecurringStreams(
       financialAccounts,
       eq(financialAccounts.id, recurringStreams.accountId),
     )
-    .innerJoin(plaidItems, eq(plaidItems.id, recurringStreams.itemId))
-    .where(eq(plaidItems.userId, userId))
+    .innerJoin(externalItems, eq(externalItems.id, recurringStreams.itemId))
+    .where(eq(externalItems.userId, userId))
     .orderBy(
       // Active first
       desc(recurringStreams.isActive),
@@ -88,10 +88,10 @@ export async function getMonthlyRecurringOutflow(
       averageAmount: recurringStreams.averageAmount,
     })
     .from(recurringStreams)
-    .innerJoin(plaidItems, eq(plaidItems.id, recurringStreams.itemId))
+    .innerJoin(externalItems, eq(externalItems.id, recurringStreams.itemId))
     .where(
       and(
-        eq(plaidItems.userId, userId),
+        eq(externalItems.userId, userId),
         eq(recurringStreams.direction, 'outflow'),
         eq(recurringStreams.isActive, true),
       ),
@@ -142,10 +142,10 @@ export async function getUpcomingRecurringOutflows(
       primaryCategory: recurringStreams.primaryCategory,
     })
     .from(recurringStreams)
-    .innerJoin(plaidItems, eq(plaidItems.id, recurringStreams.itemId))
+    .innerJoin(externalItems, eq(externalItems.id, recurringStreams.itemId))
     .where(
       and(
-        eq(plaidItems.userId, userId),
+        eq(externalItems.userId, userId),
         eq(recurringStreams.direction, 'outflow'),
         eq(recurringStreams.isActive, true),
         isNotNull(recurringStreams.predictedNextDate),
