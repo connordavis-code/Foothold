@@ -541,19 +541,56 @@ plumbing with no testable predicates).
   Fixed via `<FlagHistoryList>` client wrapper. See Lessons learned >
   "Don't pass functions across the server→client boundary in config props."
 
+**Observability + W-06 sparkline + SnapTrade inline sync** (2026-05-07 evening)
+- **Logger axios capture** (`05c12de`) — `logError` duck-types
+  axios-shaped errors and persists `httpStatus` + `responseBody` to
+  the context column. Plaid + SnapTrade SDK 4xx rows in `error_log`
+  now carry their structured upstream payload (Plaid:
+  `error_code`/`error_type`/`request_id`; SnapTrade: similar) instead
+  of the opaque "Request failed with status code 400" that used to
+  be all that survived. Forced by the `cron.balance_refresh` 400s
+  being un-debuggable from logs alone.
+- **W-06 sparkline scope + empty state** (`2e86e8d` + `1af7b07`,
+  finding W-06 in `docs/reviews/2026-05-05-REVIEW.md`) —
+  `getNetWorthSparkline` previously anchored on `summary.netWorth`
+  (which already includes accounts opened mid-window) and walked
+  back through transactions. New accounts have no compensating
+  opening-balance txn, so their `currentBalance` carried into "30
+  days ago" with nothing to subtract — visible as a fake $50k jump
+  on first-render after any new account connect within the window.
+  Fix: anchor on signed sum of stable, non-investment accounts
+  (`createdAt <= startStr`) and apply the same `lte(createdAt,
+  startDate)` filter to the transaction JOIN. When zero stable
+  accounts exist (brand-new install), the query returns `[]` and
+  `<HeroCard>` swaps the sparkline for "Trend appears once your
+  accounts have 30 days of history". Today's sparkline value can
+  diverge from `getDashboardSummary().netWorth` when accounts are
+  <window-old; sparkline is rendered shape-only so the divergence
+  isn't user-visible.
+- **SnapTrade inline sync** (`d0b7de4`) —
+  `syncSnaptradeBrokeragesAction` returns the inserted
+  `external_item.id`s; `<SnaptradeRedirectClient>` runs
+  `syncItemAction(id)` per new item via `Promise.allSettled`. Brand-
+  new brokerage connections render holdings on `/investments`
+  immediately instead of waiting up to 24h for the nightly cron.
+  `allSettled` preserves partial success when one of multiple new
+  brokerages fails its initial sync — toast surfaces the failure
+  count, success state otherwise renders a primary "View
+  investments" CTA.
+
 ### In progress
-- **SnapTrade keys** — get from
-  [dashboard.snaptrade.com/api-key](https://dashboard.snaptrade.com/api-key)
-  (free tier, 5 brokerage connections, real-time data). Set
-  `SNAPTRADE_CLIENT_ID` + `SNAPTRADE_CONSUMER_KEY` in `.env.local`
-  AND Vercel before the SnapTrade picker option becomes visible.
+- **`cron.balance_refresh` HTTP 400 root-cause** — both Plaid items
+  (WF, AmEx) have been failing on `accounts/balance/get` since the
+  prod WF item was created at 2026-05-07 03:31 UTC. Pre-`05c12de`
+  logger only captured the AxiosError stack — Plaid's structured
+  `error_code` was discarded. New logger deployed; next scheduled
+  cron at 00:00 UTC will write the actual response body to
+  `error_log.context.responseBody`. Read via
+  `node scripts/diagnose-balance-refresh.mjs`. Expected fix bundles
+  with W-05's `eq(financialAccounts.itemId, item.id)` UPDATE-WHERE
+  scope correction (same file: `src/app/api/cron/balances/route.ts`).
 
 ### Next up
-- **First Fidelity connect via SnapTrade** — once env vars are set,
-  pick "Brokerage" in /settings → Add account → completes via SnapTrade
-  Connection Portal. Initial sync currently waits for nightly cron
-  (10 UTC) — refining `/snaptrade-redirect` to invoke per-item sync
-  inline is a small follow-up.
 - **Plaid Production access review** for Fidelity (deprioritized) —
   Plaid has no OAuth integration with Fidelity in production; filing
   doesn't help. Re-check Plaid Dashboard > OAuth institutions every
@@ -562,8 +599,9 @@ plumbing with no testable predicates).
   / `plaid_security_id` / `plaid_investment_transaction_id` columns
   are reused for SnapTrade IDs (UUIDs don't collide). Renaming to
   `provider_*_id` is honest but not load-bearing.
-- **Phase 3-pt3** — per-goal coaching detail page (defer until real
-  data flows)
+- **Phase 3-pt3** — per-goal coaching detail page. Real data is
+  flowing now (was the original gating constraint); needs brainstorm
+  + spec to define drilldown shape.
 - **Phase 4-pt2** — investment what-if simulator (deferred from Phase
   4 by design; needs its own brainstorm focused on modeling depth).
 
