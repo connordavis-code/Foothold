@@ -579,16 +579,41 @@ plumbing with no testable predicates).
   investments" CTA.
 
 ### In progress
-- **`cron.balance_refresh` HTTP 400 root-cause** — both Plaid items
-  (WF, AmEx) have been failing on `accounts/balance/get` since the
-  prod WF item was created at 2026-05-07 03:31 UTC. Pre-`05c12de`
-  logger only captured the AxiosError stack — Plaid's structured
-  `error_code` was discarded. New logger deployed; next scheduled
-  cron at 00:00 UTC will write the actual response body to
-  `error_log.context.responseBody`. Read via
-  `node scripts/diagnose-balance-refresh.mjs`. Expected fix bundles
-  with W-05's `eq(financialAccounts.itemId, item.id)` UPDATE-WHERE
-  scope correction (same file: `src/app/api/cron/balances/route.ts`).
+- **Reliability initiative** — make Foothold trustworthy enough to
+  replace checking multiple finance apps. Six-phase plan + canonical
+  handoff in `docs/reliability/implementation-plan.md` and
+  `docs/reliability/README.md`. Principle: important financial
+  numbers should carry freshness/health context (fresh, stale,
+  partial, failed, unverifiable).
+- **Phase 1 (balance refresh + W-05) — implemented; production
+  verification pending the next 00:00 UTC cron.** Three changes in
+  `src/app/api/cron/balances/route.ts` + new pure helpers in
+  `src/lib/plaid/balance-refresh.{ts,test.ts}` (13 tests):
+  (a) capability filter — pre-fetch per-item `financial_account` rows,
+  retain only `depository`+`credit`, pass explicit `account_ids` to
+  `accountsBalanceGet`. Items with zero capable accounts → `continue`
+  + info log `cron.balance_refresh.skipped`, not a 4xx.
+  (b) W-05 — UPDATE WHERE now scoped on `(itemId, providerAccountId)`
+  to survive disconnect+reconnect re-use scenarios.
+  (c) null-clobber guard — `buildBalanceUpdate` only includes a balance
+  field when Plaid returned a non-null value, preserving prior
+  `currentBalance`/`availableBalance` rather than writing null over
+  real data (read surfaces in `dashboard.ts`, `forecast.ts`,
+  `goals.ts` treat null as zero, so silent null-writes were worse
+  than a 4xx).
+  Per-item success now writes `cron.balance_refresh.item` info row
+  carrying `accountCount` + `updatedCount` — Phase 3's health query
+  reads this `op` to derive last-successful-balance-refresh per item.
+  Aggregate response + summary log gain a `skipped` counter.
+  **Verification protocol** (after deploy): `node
+  scripts/diagnose-balance-refresh.mjs` after 00:00 UTC and confirm
+  (a) `cron.balance_refresh.item` info rows exist for both WF + AmEx,
+  (b) zero new HTTP 400 rows, (c) WF depository + AmEx credit balances
+  updated; nothing else touched. **If AmEx still 400s**, root cause is
+  institution/product-capability-specific (not the bare-call shape) —
+  read `error_log.context.responseBody` for the structured Plaid
+  `error_code` and iterate. Phase 1 then ships only the depository
+  path.
 
 ### Next up
 - **Plaid Production access review** for Fidelity (deprioritized) —
