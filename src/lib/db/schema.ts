@@ -150,7 +150,7 @@ export const financialAccounts = pgTable('financial_account', {
   itemId: text('item_id')
     .notNull()
     .references(() => externalItems.id, { onDelete: 'cascade' }),
-  plaidAccountId: text('plaid_account_id').unique().notNull(),
+  providerAccountId: text('provider_account_id').unique().notNull(),
   name: text('name').notNull(),
   officialName: text('official_name'),
   mask: text('mask'),
@@ -238,7 +238,7 @@ export const securities = pgTable('security', {
   id: text('id')
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  plaidSecurityId: text('plaid_security_id').unique().notNull(),
+  providerSecurityId: text('provider_security_id').unique().notNull(),
   ticker: text('ticker'),
   name: text('name'),
   // equity | etf | mutual_fund | fixed_income | cash | crypto | derivative | other
@@ -401,7 +401,7 @@ export const investmentTransactions = pgTable(
     securityId: text('security_id').references(() => securities.id, {
       onDelete: 'set null',
     }),
-    plaidInvestmentTransactionId: text('plaid_investment_transaction_id')
+    providerInvestmentTransactionId: text('provider_investment_transaction_id')
       .unique()
       .notNull(),
     // Plaid: positive = cash OUT of account, negative = cash IN.

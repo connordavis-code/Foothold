@@ -85,7 +85,7 @@ export async function syncItem(itemId: string): Promise<SyncSummary> {
     const accountsResult = await syncAccountsForItem(plaidItem);
 
     // Reload accounts now that the upsert may have added new rows. Both
-    // downstream helpers need the plaid_account_id → financial_account.id map.
+    // downstream helpers need the provider_account_id → financial_account.id map.
     const accs = await db
       .select()
       .from(financialAccounts)
@@ -123,7 +123,7 @@ async function syncAccountsForItem(
 
   const rows = res.data.accounts.map((a) => ({
     itemId: item.id,
-    plaidAccountId: a.account_id,
+    providerAccountId: a.account_id,
     name: a.name,
     officialName: a.official_name ?? null,
     mask: a.mask ?? null,
@@ -138,7 +138,7 @@ async function syncAccountsForItem(
     .insert(financialAccounts)
     .values(rows)
     .onConflictDoUpdate({
-      target: financialAccounts.plaidAccountId,
+      target: financialAccounts.providerAccountId,
       set: {
         name: sql`excluded.name`,
         officialName: sql`excluded.official_name`,
@@ -171,7 +171,7 @@ async function syncTransactionsForItem(
   item: PlaidExternalItem,
   accs: FinancialAccount[],
 ): Promise<{ added: number; modified: number; removed: number }> {
-  const acctIdByPlaidId = new Map(accs.map((a) => [a.plaidAccountId, a.id]));
+  const acctIdByProviderId = new Map(accs.map((a) => [a.providerAccountId, a.id]));
 
   // Plaid /transactions/sync cursor lives in the provider_state JSONB blob
   // on external_item — see schema.ts comment on `providerState`. Narrowed
@@ -195,7 +195,7 @@ async function syncTransactionsForItem(
     // informational; ON CONFLICT DO UPDATE handles both naturally.
     const upserts = [...res.data.added, ...res.data.modified]
       .map((t) => {
-        const accountId = acctIdByPlaidId.get(t.account_id);
+        const accountId = acctIdByProviderId.get(t.account_id);
         if (!accountId) return null;
         return {
           accountId,
@@ -284,7 +284,7 @@ async function syncInvestmentsForItem(
   if (!accs.some((a) => a.type === 'investment')) {
     return { holdings: 0, transactions: 0, securities: 0 };
   }
-  const acctIdByPlaidId = new Map(accs.map((a) => [a.plaidAccountId, a.id]));
+  const acctIdByProviderId = new Map(accs.map((a) => [a.providerAccountId, a.id]));
 
   const endDate = new Date();
   const startDate = item.lastSyncedAt
@@ -333,10 +333,10 @@ async function syncInvestmentsForItem(
   const allSecs = Array.from(securityIndex.values());
 
   // 1) Securities — single upsert; RETURNING populates the id map.
-  const secIdByPlaidId = new Map<string, string>();
+  const secIdByProviderId = new Map<string, string>();
   if (allSecs.length > 0) {
     const secRows = allSecs.map((s) => ({
-      plaidSecurityId: s.security_id,
+      providerSecurityId: s.security_id,
       ticker: s.ticker_symbol ?? null,
       name: s.name ?? null,
       type: s.type ?? null,
@@ -350,7 +350,7 @@ async function syncInvestmentsForItem(
       .insert(securities)
       .values(secRows)
       .onConflictDoUpdate({
-        target: securities.plaidSecurityId,
+        target: securities.providerSecurityId,
         set: {
           ticker: sql`excluded.ticker`,
           name: sql`excluded.name`,
@@ -362,17 +362,17 @@ async function syncInvestmentsForItem(
       })
       .returning({
         id: securities.id,
-        plaidSecurityId: securities.plaidSecurityId,
+        providerSecurityId: securities.providerSecurityId,
       });
-    for (const r of inserted) secIdByPlaidId.set(r.plaidSecurityId, r.id);
+    for (const r of inserted) secIdByProviderId.set(r.providerSecurityId, r.id);
   }
 
   // 2) Holdings + 3) investment_transactions — independent writes, run
   // concurrently. Both depend only on the maps populated above.
   const holdingRows = allHoldings
     .map((h) => {
-      const accountId = acctIdByPlaidId.get(h.account_id);
-      const securityId = secIdByPlaidId.get(h.security_id);
+      const accountId = acctIdByProviderId.get(h.account_id);
+      const securityId = secIdByProviderId.get(h.security_id);
       if (!accountId || !securityId) return null;
       return {
         accountId,
@@ -389,15 +389,15 @@ async function syncInvestmentsForItem(
 
   const invTxRows = allTxs
     .map((t) => {
-      const accountId = acctIdByPlaidId.get(t.account_id);
+      const accountId = acctIdByProviderId.get(t.account_id);
       if (!accountId) return null;
       const securityId = t.security_id
-        ? (secIdByPlaidId.get(t.security_id) ?? null)
+        ? (secIdByProviderId.get(t.security_id) ?? null)
         : null;
       return {
         accountId,
         securityId,
-        plaidInvestmentTransactionId: t.investment_transaction_id,
+        providerInvestmentTransactionId: t.investment_transaction_id,
         amount: numRequired(t.amount),
         quantity: num(t.quantity),
         price: num(t.price),
@@ -433,7 +433,7 @@ async function syncInvestmentsForItem(
           .insert(investmentTransactions)
           .values(invTxRows)
           .onConflictDoNothing({
-            target: investmentTransactions.plaidInvestmentTransactionId,
+            target: investmentTransactions.providerInvestmentTransactionId,
           })
       : Promise.resolve(),
   ]);

@@ -44,10 +44,10 @@ export type SnaptradeSyncSummary = {
  *      → investment_transactions. Run per-account fetches concurrently.
  *   5. Update external_item.lastSyncedAt.
  *
- * The plaidAccountId / plaidSecurityId / plaidInvestmentTransactionId
- * columns are reused as the SnapTrade-side stable id (UUIDs from
- * SnapTrade can't collide with Plaid's namespaced ids). Future cleanup
- * may rename to provider_*_id but isn't load-bearing.
+ * provider_account_id / provider_security_id /
+ * provider_investment_transaction_id columns hold the SnapTrade-side
+ * stable ids on these rows. The columns are provider-shared with Plaid
+ * (UUIDs from SnapTrade can't collide with Plaid's namespaced ids).
  */
 export async function syncSnaptradeItem(
   externalItemId: string,
@@ -101,14 +101,14 @@ export async function syncSnaptradeItem(
       return { accounts: 0, holdings: 0, activities: 0, securities: 0 };
     }
 
-    // 2. Upsert financial_account rows. Reuse plaidAccountId column as
-    // the unique provider-side id (SnapTrade UUIDs don't collide with
-    // Plaid id namespace).
+    // 2. Upsert financial_account rows. providerAccountId holds the
+    // SnapTrade brokerage-account UUID here (SnapTrade UUIDs don't
+    // collide with Plaid id namespace, so the column is provider-shared).
     const accountRows = stAccounts
       .filter((a) => typeof a.id === 'string')
       .map((a) => ({
         itemId: item.id,
-        plaidAccountId: a.id as string,
+        providerAccountId: a.id as string,
         name: (a.name as string | undefined) ?? 'Brokerage account',
         officialName: (a.institution_name as string | undefined) ?? null,
         mask: (a.number as string | null | undefined) ?? null,
@@ -128,7 +128,7 @@ export async function syncSnaptradeItem(
         .insert(financialAccounts)
         .values(accountRows)
         .onConflictDoUpdate({
-          target: financialAccounts.plaidAccountId,
+          target: financialAccounts.providerAccountId,
           set: {
             name: sql`excluded.name`,
             officialName: sql`excluded.official_name`,
@@ -149,7 +149,7 @@ export async function syncSnaptradeItem(
       .from(financialAccounts)
       .where(eq(financialAccounts.itemId, item.id));
     const acctIdByStId = new Map(
-      dbAccounts.map((a) => [a.plaidAccountId, a.id]),
+      dbAccounts.map((a) => [a.providerAccountId, a.id]),
     );
 
     // 3. Positions + activities, per account, concurrently.
@@ -170,7 +170,7 @@ export async function syncSnaptradeItem(
       dbAccounts.map(async (acc) => {
         const result = {
           accountId: acc.id,
-          plaidAccountId: acc.plaidAccountId,
+          providerAccountId: acc.providerAccountId,
           positions: [] as unknown[],
           activities: [] as unknown[],
         };
@@ -179,20 +179,20 @@ export async function syncSnaptradeItem(
             await snaptrade().accountInformation.getUserAccountPositions({
               userId,
               userSecret,
-              accountId: acc.plaidAccountId,
+              accountId: acc.providerAccountId,
             });
           result.positions = posRes.data ?? [];
         } catch (err) {
           await logError('snaptrade.sync.positions', err, {
             externalItemId: item.id,
-            snaptradeAccountId: acc.plaidAccountId,
+            snaptradeAccountId: acc.providerAccountId,
           });
         }
         try {
           const actRes = await snaptrade().transactionsAndReporting.getActivities({
             userId,
             userSecret,
-            accounts: acc.plaidAccountId,
+            accounts: acc.providerAccountId,
             startDate: startStr,
             endDate: endStr,
           });
@@ -200,7 +200,7 @@ export async function syncSnaptradeItem(
         } catch (err) {
           await logError('snaptrade.sync.activities', err, {
             externalItemId: item.id,
-            snaptradeAccountId: acc.plaidAccountId,
+            snaptradeAccountId: acc.providerAccountId,
           });
         }
         return result;
@@ -260,7 +260,7 @@ export async function syncSnaptradeItem(
     const secIdByStId = new Map<string, string>();
     if (symbols.size > 0) {
       const secRows = Array.from(symbols.values()).map((s) => ({
-        plaidSecurityId: s.id,
+        providerSecurityId: s.id,
         ticker: s.ticker ?? null,
         name: s.name ?? null,
         type: s.type ?? null,
@@ -274,7 +274,7 @@ export async function syncSnaptradeItem(
         .insert(securities)
         .values(secRows)
         .onConflictDoUpdate({
-          target: securities.plaidSecurityId,
+          target: securities.providerSecurityId,
           set: {
             ticker: sql`excluded.ticker`,
             name: sql`excluded.name`,
@@ -284,9 +284,9 @@ export async function syncSnaptradeItem(
         })
         .returning({
           id: securities.id,
-          plaidSecurityId: securities.plaidSecurityId,
+          providerSecurityId: securities.providerSecurityId,
         });
-      for (const r of inserted) secIdByStId.set(r.plaidSecurityId, r.id);
+      for (const r of inserted) secIdByStId.set(r.providerSecurityId, r.id);
     }
 
     // 6. Upsert holdings + investment_transactions concurrently.
@@ -343,7 +343,7 @@ export async function syncSnaptradeItem(
         invTxRows.push({
           accountId: r.accountId,
           securityId,
-          plaidInvestmentTransactionId: id,
+          providerInvestmentTransactionId: id,
           // SnapTrade convention: amount > 0 = cash IN, < 0 = cash OUT.
           // Our convention (Plaid): amount > 0 = cash OUT. Flip the sign
           // so downstream display + math matches.
@@ -385,7 +385,7 @@ export async function syncSnaptradeItem(
             .insert(investmentTransactions)
             .values(invTxRows)
             .onConflictDoNothing({
-              target: investmentTransactions.plaidInvestmentTransactionId,
+              target: investmentTransactions.providerInvestmentTransactionId,
             })
         : Promise.resolve(),
     ]);

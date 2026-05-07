@@ -26,8 +26,8 @@ const num = (n: number | null | undefined): string | null =>
  * see new transactions?" semantics elsewhere.
  *
  * New-account silently no-ops: balance/get may surface accounts we
- * haven't seen yet, but the WHERE matches by plaidAccountId so unknown
- * ones don't update anything. The nightly cron picks them up.
+ * haven't seen yet, but the WHERE matches by providerAccountId so
+ * unknown ones don't update anything. The nightly cron picks them up.
  */
 export async function GET(request: NextRequest) {
   if (!isAuthorizedCronRequest(request)) {
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
             availableBalance: num(a.balances.available),
             updatedAt: new Date(),
           })
-          .where(eq(financialAccounts.plaidAccountId, a.account_id))
+          .where(eq(financialAccounts.providerAccountId, a.account_id))
           .returning({ id: financialAccounts.id });
         accountsTouched += updated.length;
       }

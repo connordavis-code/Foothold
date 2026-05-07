@@ -31,7 +31,7 @@ const items = await sql`
 `;
 
 const accounts = await sql`
-  SELECT item_id, type, subtype, name, plaid_account_id
+  SELECT item_id, type, subtype, name, provider_account_id
   FROM financial_account
   ORDER BY item_id
 `;
@@ -50,7 +50,7 @@ for (const it of items) {
   console.log(`  provider_state=${JSON.stringify(it.provider_state)}`);
   console.log(`  accounts (${accts.length}):`);
   for (const a of accts) {
-    console.log(`    - ${a.type}/${a.subtype}  ${a.name}  acct=${a.plaid_account_id}`);
+    console.log(`    - ${a.type}/${a.subtype}  ${a.name}  acct=${a.provider_account_id}`);
   }
 }
 
