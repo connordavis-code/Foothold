@@ -9,6 +9,7 @@ import {
   securities,
   snaptradeUsers,
 } from '@/lib/db/schema';
+import { logError } from '@/lib/logger';
 import { snaptrade } from './client';
 
 const num = (n: number | null | undefined): string | null =>
@@ -159,27 +160,50 @@ export async function syncSnaptradeItem(
     const startStr = startDate.toISOString().slice(0, 10);
     const endStr = new Date().toISOString().slice(0, 10);
 
+    // Per-account fetch is the most likely failure surface: a freshly-
+    // connected brokerage may return PENDING_DATA / 4xx for some
+    // accounts before the first nightly refresh, and free-tier
+    // delayed-data plans can return null bodies. Isolate failures so
+    // a single bad account doesn't void the whole sync; log each
+    // failure to error_log so the digest surfaces it.
     const perAccountResults = await Promise.all(
       dbAccounts.map(async (acc) => {
-        const [posRes, actRes] = await Promise.all([
-          snaptrade().accountInformation.getUserAccountPositions({
-            userId,
-            userSecret,
-            accountId: acc.plaidAccountId,
-          }),
-          snaptrade().transactionsAndReporting.getActivities({
+        const result = {
+          accountId: acc.id,
+          plaidAccountId: acc.plaidAccountId,
+          positions: [] as unknown[],
+          activities: [] as unknown[],
+        };
+        try {
+          const posRes =
+            await snaptrade().accountInformation.getUserAccountPositions({
+              userId,
+              userSecret,
+              accountId: acc.plaidAccountId,
+            });
+          result.positions = posRes.data ?? [];
+        } catch (err) {
+          await logError('snaptrade.sync.positions', err, {
+            externalItemId: item.id,
+            snaptradeAccountId: acc.plaidAccountId,
+          });
+        }
+        try {
+          const actRes = await snaptrade().transactionsAndReporting.getActivities({
             userId,
             userSecret,
             accounts: acc.plaidAccountId,
             startDate: startStr,
             endDate: endStr,
-          }),
-        ]);
-        return {
-          accountId: acc.id,
-          positions: posRes.data ?? [],
-          activities: actRes.data ?? [],
-        };
+          });
+          result.activities = actRes.data ?? [];
+        } catch (err) {
+          await logError('snaptrade.sync.activities', err, {
+            externalItemId: item.id,
+            snaptradeAccountId: acc.plaidAccountId,
+          });
+        }
+        return result;
       }),
     );
 
@@ -220,12 +244,14 @@ export async function syncSnaptradeItem(
       };
     };
     for (const r of perAccountResults) {
-      for (const p of r.positions) {
+      for (const raw of r.positions) {
+        const p = raw as Record<string, unknown>;
         const s = harvestSym(p.symbol);
         if (s && !symbols.has(s.id)) symbols.set(s.id, s);
       }
-      for (const a of r.activities) {
-        const s = harvestSym((a as Record<string, unknown>).symbol);
+      for (const raw of r.activities) {
+        const a = raw as Record<string, unknown>;
+        const s = harvestSym(a.symbol);
         if (s && !symbols.has(s.id)) symbols.set(s.id, s);
       }
     }
@@ -268,23 +294,23 @@ export async function syncSnaptradeItem(
     const invTxRows: Array<typeof investmentTransactions.$inferInsert> = [];
 
     for (const r of perAccountResults) {
-      for (const p of r.positions) {
+      for (const raw of r.positions) {
+        const p = raw as Record<string, unknown>;
         const sym = harvestSym(p.symbol);
         if (!sym) continue;
         const securityId = secIdByStId.get(sym.id);
         if (!securityId) continue;
         const units = (p.units as number | null | undefined) ?? null;
         if (units == null) continue;
+        const price = p.price as number | null | undefined;
         holdingRows.push({
           accountId: r.accountId,
           securityId,
           quantity: numRequired(units),
           costBasis: num(p.average_purchase_price as number | undefined),
           institutionValue:
-            p.units != null && p.price != null
-              ? num((p.units as number) * (p.price as number))
-              : null,
-          institutionPrice: num(p.price as number | undefined),
+            units != null && price != null ? num(units * price) : null,
+          institutionPrice: num(price ?? undefined),
           institutionPriceAsOf: null,
           isoCurrencyCode: sym.currency ?? 'USD',
         });
