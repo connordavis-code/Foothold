@@ -25,7 +25,7 @@ const runs = await sql`
 `;
 
 const items = await sql`
-  SELECT id, provider, institution_name, status, provider_state, last_synced_at
+  SELECT id, provider, institution_name, status, provider_state, created_at, last_synced_at
   FROM external_item
   ORDER BY created_at ASC
 `;
@@ -46,7 +46,7 @@ console.log('=== EXTERNAL ITEMS ===');
 for (const it of items) {
   const accts = byItem.get(it.id) ?? [];
   console.log(`\n${it.provider}/${it.institution_name} (${it.id})`);
-  console.log(`  status=${it.status} last_synced_at=${it.last_synced_at}`);
+  console.log(`  status=${it.status} created_at=${it.created_at} last_synced_at=${it.last_synced_at}`);
   console.log(`  provider_state=${JSON.stringify(it.provider_state)}`);
   console.log(`  accounts (${accts.length}):`);
   for (const a of accts) {
