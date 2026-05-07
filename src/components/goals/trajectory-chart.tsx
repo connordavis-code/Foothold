@@ -72,7 +72,9 @@ export function GoalTrajectoryChart({
             stroke="hsl(var(--muted-foreground))"
           />
           <YAxis
-            tickFormatter={(v: number) => `$${Math.round(v / 1000)}k`}
+            tickFormatter={(v: number) =>
+              v >= 1000 ? `$${Math.round(v / 1000)}k` : `$${Math.round(v)}`
+            }
             tick={{ fontSize: 11 }}
             stroke="hsl(var(--muted-foreground))"
             width={40}
