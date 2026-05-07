@@ -627,12 +627,33 @@ plumbing with no testable predicates).
   (some failed + some success-backed `fresh`/`stale`) → `failed`
   (some failed + no success-backed; never_synced doesn't count as
   working) → `healthy` (all fresh) → `stale`. `syncing` is set by callers
-  (in-flight sync UI), never derived. Phase 3 query is the next
-  consumer; no UI wired yet. Design deltas vs the original spec block
-  documented in `docs/reliability/implementation-plan.md` § Phase 2
-  Status (notably: dropped `accounts` capability; defensive
+  (in-flight sync UI), never derived. Design deltas vs the original
+  spec block documented in `docs/reliability/implementation-plan.md`
+  § Phase 2 Status (notably: dropped `accounts` capability; defensive
   tracked-but-no-policy → N/A; required-Record input forces explicit
   N/A handling).
+- **Phase 3 (sync health DB query) — shipped.**
+  `src/lib/db/queries/health.{ts,test.ts}` (23 pure tests on three
+  mapping helpers). `getSourceHealth(userId)` returns one
+  `SourceHealth` row per `external_item` carrying the Phase 2 verdict
+  (state/reason/requiresUserAction/byCapability) plus raw timestamps
+  for "as of when" UI copy. Capability inference is provider-aware
+  and account-types-driven for Plaid (`balances`/`transactions`/`recurring`
+  gate on depository+credit; `investments` gates on investment),
+  fixed-shape for SnapTrade (`transactions + investments` always).
+  Log → CapabilityState mapping: balances reads
+  `cron.balance_refresh.item` info rows (the success log Phase 1 added);
+  transactions/investments/recurring share `cron.nightly_sync.item`
+  info rows. Failure queries use `LIKE 'cron.<class>%'` to be
+  future-proof against per-capability sub-ops; success uses exact
+  match to filter out `.skipped`. Composite index added to schema —
+  **`npm run db:push` required** to apply
+  `error_log_item_op_occurred_idx (external_item_id, op, occurred_at)`.
+  Query shape is 1 + 4N (1 typed Drizzle for items+account-types
+  array_agg, 4 parallel error_log lookups per item). No
+  `external_item.secret` selected; `WHERE external_item.user_id = $1`
+  scopes per-user. No UI wired (per scope) — Phase 4 (Settings) and
+  Phase 5 (Dashboard trust strip) are the consumers.
 
 ### Next up
 - **Plaid Production access review** for Fidelity (deprioritized) —

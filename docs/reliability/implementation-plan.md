@@ -296,6 +296,96 @@ Adjust names to match local schema conventions.
 - Query is scoped to the authenticated user.
 - No secrets are exposed.
 
+### Status (2026-05-07): shipped — query layer ready for Phase 4
+
+`src/lib/db/queries/health.ts` + `src/lib/db/queries/health.test.ts`
+shipped. 23 pure tests on the three mapping helpers. Composite index
+on `error_log(external_item_id, op, occurred_at)` declared in
+`schema.ts`; **`npm run db:push` is required after pulling this
+change** to apply the index in Postgres.
+
+#### Public surface
+
+- `SourceHealth` type — one row per `external_item`, carries the
+  Phase 2 verdict (`state`, `reason`, `requiresUserAction`,
+  `byCapability`) plus raw timestamps for "as of when" UI copy
+- `getSourceHealth(userId): Promise<SourceHealth[]>` — orderd by
+  `external_item.created_at` for stable row order
+- Pure helpers exposed for testing + Phase 4 reuse:
+  - `inferCapabilities(provider, accountTypes)` — applicability rules
+  - `buildCapabilityStates(applicable, raw)` — translate raw timestamps
+    into `Record<SyncCapability, CapabilityState>` for Phase 2's classifier
+  - `aggregateTopLevelTimestamps(raw)` — top-level lastSuccess/lastFailure
+
+#### Capability inference rules
+
+| Provider × accounts | balances | transactions | investments | recurring |
+|---|---|---|---|---|
+| Plaid + depository       | ✓ | ✓ |   | ✓ |
+| Plaid + credit (e.g. AmEx) | ✓ | ✓ |   | ✓ |
+| Plaid + investment-only  |   |   | ✓ |   |
+| Plaid + dep+inv          | ✓ | ✓ | ✓ | ✓ |
+| Plaid + loan-only / other / empty | (no applicable capabilities) |
+| SnapTrade (any account types) |   | ✓ | ✓ |   |
+
+Plaid `balances` rule mirrors Phase 1's `selectRefreshableAccounts`
+filter (depository+credit only). Plaid `transactions`/`recurring`
+likewise gate on depository/credit because both run off the regular
+transactions stream. SnapTrade is fixed-shape — brokerages always
+sync activities + holdings; account types are not consulted.
+
+#### Log → CapabilityState mapping
+
+| Capability    | Success log query | Failure log query |
+|---------------|-------------------|--------------------|
+| balances      | `op = 'cron.balance_refresh.item' AND level = 'info'` | `op LIKE 'cron.balance_refresh%' AND level = 'error'` |
+| transactions  | `op = 'cron.nightly_sync.item' AND level = 'info'` | `op LIKE 'cron.nightly_sync%' AND level = 'error'` |
+| investments   | (shares nightly_sync.item) | (shares nightly_sync) |
+| recurring     | (shares nightly_sync.item) | (shares nightly_sync) |
+
+Three capabilities (transactions, investments, recurring) share the
+nightly cron's per-item info row today because the nightly sync
+processes all three as a unit. They appear as separate fields in
+`SourceHealth` so Phase 4 UI can render them independently when
+per-capability success-logging splits in a future phase.
+
+`cron.balance_refresh.skipped` rows are NOT read here — capability
+applicability is already inferred from `account_types`, so an item
+that legitimately skips refresh (zero depository/credit accounts)
+will already have `balances` classified as `not_applicable` by the
+inference. Skipped rows remain in `error_log` for digest visibility.
+
+Webhook failures (`webhook.transactions`, `webhook.signature_verification`,
+etc.) are NOT counted as capability failures. Webhook delivery is
+supplementary to the cron schedule — a failed webhook doesn't break
+the next nightly sync. If observability needs them, they can be
+surfaced separately as a "reliability events" feed.
+
+#### Query shape
+
+1 typed Drizzle query for items + aggregated `financial_account.type[]`
+via `ARRAY_AGG(DISTINCT type) FILTER (WHERE type IS NOT NULL)`,
+followed by 4 parallel `error_log` lookups per item (success+failure
+× balance+nightly). Total: `1 + 4N` queries for `N` sources. The
+composite index keeps each lookup at an index seek + LIMIT 1; for
+typical N=2–5 the round-trip is negligible.
+
+#### Security
+
+`external_item.secret` (encrypted access token / userSecret) is never
+selected. Query is scoped on `external_item.user_id = $1` at the
+SQL level so cross-user data exposure isn't possible at the query
+boundary.
+
+#### Pending follow-up
+
+- **`npm run db:push`** must be run after this commit to apply the
+  composite index. Drizzle's strict-prompt issue (CLAUDE.md > Lessons
+  learned > "Don't feed db:push via stdin") still applies; toggle
+  `strict: false` temporarily if the prompt hangs.
+- No UI wired (per scope). Phase 4 (Settings panel) and Phase 5
+  (Dashboard trust strip) are the consumers.
+
 ## Phase 4: Settings Health Panel
 
 ### Problem

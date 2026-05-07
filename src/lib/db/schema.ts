@@ -495,6 +495,17 @@ export const errorLog = pgTable(
   },
   (e) => ({
     occurredAtIdx: index('error_log_occurred_at_idx').on(e.occurredAt),
+    // Phase 3 sync-health query reads "last success/failure per item per
+    // op" via predicates of the shape `WHERE external_item_id = ? AND
+    // op = ? AND level = ? ORDER BY occurred_at DESC LIMIT 1`. The
+    // composite leading on (external_item_id, op) gives an index seek
+    // straight to the relevant rows; trailing occurred_at supports the
+    // DESC LIMIT 1 without a separate sort.
+    itemOpOccurredIdx: index('error_log_item_op_occurred_idx').on(
+      e.externalItemId,
+      e.op,
+      e.occurredAt,
+    ),
   }),
 );
 
