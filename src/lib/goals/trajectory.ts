@@ -25,6 +25,9 @@ export type WalkBackInput = {
  * Convention matches the rest of the codebase: transaction.amount > 0 means
  * money OUT, < 0 means money IN. So walking backward, we ADD positive amounts
  * back to the running total.
+ *
+ * `today`'s delta is assumed to already be folded into `anchor` — it is only
+ * re-applied when walking into yesterday. `dailyDelta` keys are UTC dates.
  */
 export function walkBackTrajectory(
   input: WalkBackInput,
@@ -35,7 +38,7 @@ export function walkBackTrajectory(
   let running = anchor;
   for (let i = 0; i < days; i++) {
     const d = new Date(today);
-    d.setDate(today.getDate() - i);
+    d.setUTCDate(today.getUTCDate() - i);
     const key = yyyymmdd(d);
     series.push({ date: key, cumulative: running });
     running += dailyDelta.get(key) ?? 0;

@@ -50,4 +50,22 @@ describe('walkBackTrajectory', () => {
     });
     expect(series).toEqual([{ date: '2026-05-07', cumulative: 500 }]);
   });
+
+  it('ignores deltas keyed outside the window', () => {
+    // A delta a week before today shouldn't affect a 3-day window.
+    const series = walkBackTrajectory({
+      anchor: 1000,
+      dailyDelta: new Map([
+        ['2026-04-30', 999],
+        ['2026-05-07', 100],
+      ]),
+      today: new Date('2026-05-07T12:00:00Z'),
+      days: 3,
+    });
+    expect(series).toEqual([
+      { date: '2026-05-05', cumulative: 1100 },
+      { date: '2026-05-06', cumulative: 1100 },
+      { date: '2026-05-07', cumulative: 1000 },
+    ]);
+  });
 });
