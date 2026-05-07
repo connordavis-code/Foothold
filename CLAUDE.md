@@ -113,6 +113,49 @@ Mutations live in `src/lib/<domain>/actions.ts`, called from
   See [globals.css](src/app/globals.css). `font-serif` reserved for
   /insights narrative only.
 
+### Multi-aggregator: external_item + dispatcher
+Plaid is no longer the only aggregator. `external_item` (was
+`plaid_item`) carries a `provider` discriminator — currently
+`'plaid' | 'snaptrade'`. Per-provider mutable state lives in
+`provider_state` JSONB so adding new providers doesn't churn the
+column set (Plaid stores its `transactionsCursor` here).
+
+`secret` on `external_item` is **nullable**. Plaid rows always set it
+(per-item access_token); SnapTrade rows leave it NULL because their
+`userSecret` is per-USER, not per-connection — that lives on
+[snaptrade_user](src/lib/db/schema.ts) (1:1 with users.id). When
+working in Plaid code paths, narrow with the `PlaidExternalItem`
+type from [plaid/sync.ts](src/lib/plaid/sync.ts) which asserts
+`secret: string`. Plaid-specific selects in
+[plaid/actions.ts](src/lib/plaid/actions.ts) defensively filter
+`provider='plaid'`.
+
+Sync entry point: [`syncExternalItem(id)`](src/lib/sync/dispatcher.ts)
+reads `provider` and routes to `syncPlaidItem` or `syncSnaptradeItem`,
+returning a discriminated-union summary. Cron + /settings sync button
+use it. The Plaid update-mode reconnect flow stays Plaid-specific
+(`markItemReconnected` calls `syncPlaidItem` directly).
+
+Disconnect: [`disconnectExternalItemAction`](src/lib/sync/actions.ts) —
+'use server' module dispatching by provider. Lives separate from
+`dispatcher.ts` because that file exports non-action plain functions,
+which Next 14 RSC rejects in `'use server'` modules.
+
+SnapTrade reuses `plaid_account_id` / `plaid_security_id` /
+`plaid_investment_transaction_id` as provider-stable IDs (UUIDs vs
+Plaid namespace IDs don't collide). Future cleanup may rename to
+provider-neutral; not load-bearing.
+
+SnapTrade activity amounts are **flipped** at the sync boundary
+([snaptrade/sync.ts](src/lib/snaptrade/sync.ts)) so the codebase's
+"positive = cash OUT" invariant holds across providers.
+
+UI gating: `snaptradeConfigured()` from
+[snaptrade/client.ts](src/lib/snaptrade/client.ts) is server-evaluated
+and passed as `snaptradeEnabled` into
+[ConnectAccountButton](src/components/connect/connect-account-button.tsx).
+Keys unset → SnapTrade card hidden; Plaid path unchanged.
+
 ### Transaction category override is display-only
 `transactions.categoryOverrideId` overrides the row's displayed
 category (table + dashboard recent), but the filter dropdown still
@@ -218,6 +261,29 @@ Two fixes: (a) pre-render the icon as a children prop (server
 component renders `<Icon />`, the resulting element crosses cleanly),
 or (b) store a string identifier and resolve to the component
 inside the client component. Fixed in `d955dd4` for `<NavLink>`.
+
+### Don't pass functions across the server→client boundary in config props (2026-05-07)
+Same general failure mode as the forwardRef lesson — functions in any
+shape (component, callback, getter) can't cross RSC. /drift's mobile
+flag-history list passed a `<MobileList>` config object full of
+functions (`rowKey`, `topLine`, `rightCell`, `rowHref`) directly from
+the server page. Latent for weeks because the render path was gated on
+`flagHistory.length > 0`; AmEx's production backfill flipped a category
+into elevated state for the first time and the bug fired.
+
+Symptom: `Application error: a server-side exception has occurred (see
+the server logs for more information). Digest: <number>`. Next 14
+renders the error.tsx fallback for any uncaught page-render exception;
+the actual "Functions cannot be passed directly to Client Components"
+message only surfaces in Vercel logs.
+
+Fix: tiny client-component wrapper that holds the config in client-side
+scope. /transactions does this via `<MobileTransactionsShell>` — same
+pattern. Fixed in `deb1d43` via `<FlagHistoryList>`.
+
+This is **strike two for non-serializable values across RSC** (count
+the forwardRef lesson). One more and it gets promoted from Lesson to
+Architecture note (or a code-level guard, e.g., a lint rule).
 
 ---
 
@@ -423,17 +489,79 @@ Test count: 280 vitest (266 → +14 from `humanizeDate`,
 `groupByDate`, `activeTransactionFilterCount`; Phase 3 is UI
 plumbing with no testable predicates).
 
+**Plaid Production cutover** (2026-05-06–07)
+- `PLAID_ENV=production` flipped; Wells Fargo connected via real OAuth
+  end-to-end. Two banks initially failed at Link with different
+  wordings — diagnostic split:
+  - **AmEx** ("Plaid doesn't support connections between AmEx and
+    Foothold"): per-app-product-config mismatch. Default `PLAID_PRODUCTS`
+    requested `transactions+investments`; AmEx is credit-card-only with
+    no investments product, so the AND-filter on `linkTokenCreate`
+    excluded it. Fix in `fb0e421`: split to `products: ['transactions']`
+    + `additional_consented_products: ['investments']` so investments is
+    initialized per-institution where supported, silently skipped
+    elsewhere. AmEx connects cleanly post-fix.
+  - **Fidelity** ("Fidelity accounts are not able to be connected
+    through Plaid at this time"): Plaid platform-side block, not in
+    Plaid Dashboard's OAuth-institutions list at all. Public industry
+    context: Plaid–Fidelity dispute over data-access fees, with Fidelity
+    routing partners through their own Akoya/Fidelity-Access channel.
+    No code-level fix; tracked under SnapTrade integration as the
+    realistic path.
+
+**Multi-aggregator scaffolding** (2026-05-07)
+- **Phase A** (`cebde2d`): generalize `plaid_item` → `external_item`
+  with `provider` discriminator + `provider_state` JSONB. Plaid
+  cursor migrated into providerState. Migration SQL in
+  `docs/migrations/2026-05-06-external-item.sql`, applied in-place to
+  the live Wells Fargo row. 27 files mechanically renamed; logger
+  context key `plaidItemId` → `externalItemId`.
+- **Phase B** (`7bb611b`): SnapTrade integration data layer. New
+  `snaptrade_user` table (1:1 with users.id) holds per-user encrypted
+  `userSecret`; `external_item.secret` relaxed to NULLABLE so SnapTrade
+  rows can leave it NULL. `snaptrade-typescript-sdk` installed; client
+  wrapper + server actions (register / portal-URL / reconcile /
+  disconnect); sync orchestrator mapping accounts → positions →
+  activities onto the existing `holding` + `investment_transaction`
+  tables. New dispatcher `syncExternalItem` in `src/lib/sync/`
+  routes by provider. Cron + sync-button updated to use it. Sign
+  convention flipped on SnapTrade activities to match Plaid's
+  positive=cash-OUT invariant.
+- **Phase C** (`d96d6e9`): UI surface. `<ConnectAccountButton>` provider
+  picker on /settings (Bank/credit via Plaid, Brokerage via SnapTrade);
+  /snaptrade-redirect parent/child page mirroring /oauth-redirect's
+  pattern; unified `disconnectExternalItemAction` dispatching by
+  provider. SnapTrade option gated server-side via `snaptradeConfigured()`
+  — keys unset hides the brokerage card.
+
+**Drift RSC boundary fix** (2026-05-07; `deb1d43`)
+- Latent server→client boundary bug in /drift exposed when AmEx's
+  backfill flipped a category into elevated state for the first time
+  (flagHistory.length > 0 → MobileList rendered with config-of-functions).
+  Fixed via `<FlagHistoryList>` client wrapper. See Lessons learned >
+  "Don't pass functions across the server→client boundary in config props."
+
 ### In progress
-- **Plaid Production access review** — submitted 2026-05-01 + Q9
-  amendment. Approval odds ~25-35% first-pass, ~60-70% with follow-up.
-  May 6 triage agent scheduled. One sandbox Wells Fargo item kept for
-  webhook E2E — wipe before flipping `PLAID_ENV=production`.
+- **SnapTrade keys** — get from
+  [dashboard.snaptrade.com/api-key](https://dashboard.snaptrade.com/api-key)
+  (free tier, 5 brokerage connections, real-time data). Set
+  `SNAPTRADE_CLIENT_ID` + `SNAPTRADE_CONSUMER_KEY` in `.env.local`
+  AND Vercel before the SnapTrade picker option becomes visible.
 
 ### Next up
-- **Reconnect once Plaid approved** — flip `PLAID_ENV=production`,
-  paste fresh secret, update Vercel env, reconnect via `/settings`.
-  `linkTokenCreate` doesn't pass `redirect_uri` — fine for non-OAuth
-  banks, breaks Chase / Cap One until configured.
+- **First Fidelity connect via SnapTrade** — once env vars are set,
+  pick "Brokerage" in /settings → Add account → completes via SnapTrade
+  Connection Portal. Initial sync currently waits for nightly cron
+  (10 UTC) — refining `/snaptrade-redirect` to invoke per-item sync
+  inline is a small follow-up.
+- **Plaid Production access review** for Fidelity (deprioritized) —
+  Plaid has no OAuth integration with Fidelity in production; filing
+  doesn't help. Re-check Plaid Dashboard > OAuth institutions every
+  few months in case the situation changes.
+- **Provider-neutral column rename** (cleanup) — `plaid_account_id`
+  / `plaid_security_id` / `plaid_investment_transaction_id` columns
+  are reused for SnapTrade IDs (UUIDs don't collide). Renaming to
+  `provider_*_id` is honest but not load-bearing.
 - **Phase 3-pt3** — per-goal coaching detail page (defer until real
   data flows)
 - **Phase 4-pt2** — investment what-if simulator (deferred from Phase
