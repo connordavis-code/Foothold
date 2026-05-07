@@ -22,10 +22,26 @@ export async function createLinkToken(): Promise<string> {
     throw new Error('Unauthorized');
   }
 
+  // `products` is an AND filter at the institution-capability level —
+  // every requested product must be supported by the institution or
+  // Plaid Link refuses with "Plaid doesn't support connections between
+  // {institution} and {app}". AmEx is credit-card-only (no investments),
+  // so requiring both products excludes it. Required-minimum is just
+  // `transactions`; everything else moves to `additional_consented_products`,
+  // which Plaid initializes per-institution where supported and silently
+  // skips where not. User consent to the full set is captured up-front
+  // via the Link disclosure.
+  const requiredProducts = ['transactions'] as Products[];
+  const optionalProducts = (plaidProducts as Products[]).filter(
+    (p) => !requiredProducts.includes(p),
+  );
+
   const response = await plaid.linkTokenCreate({
     user: { client_user_id: session.user.id },
     client_name: env.PLAID_CLIENT_NAME,
-    products: plaidProducts as Products[],
+    products: requiredProducts,
+    additional_consented_products:
+      optionalProducts.length > 0 ? optionalProducts : undefined,
     country_codes: plaidCountryCodes as CountryCode[],
     language: 'en',
     // Webhook URL is baked into the item at creation; existing items keep
