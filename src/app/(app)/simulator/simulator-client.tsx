@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { Scenario } from '@/lib/db/schema';
 import { projectCash } from '@/lib/forecast/engine';
 import type { ForecastHistory, ScenarioOverrides } from '@/lib/forecast/types';
@@ -15,6 +15,7 @@ import { GoalTargetOverrides } from '@/components/simulator/goal-target-override
 import { SkipRecurringOverrides } from '@/components/simulator/skip-recurring-overrides';
 import { ForecastChart } from '@/components/simulator/forecast-chart';
 import { GoalDiffCards } from '@/components/simulator/goal-diff-cards';
+import { MobileScenarioSaveBar } from '@/components/simulator/mobile-scenario-save-bar';
 import { NarrativePanel } from '@/components/simulator/narrative-panel';
 
 type Props = {
@@ -87,6 +88,30 @@ export function SimulatorClient({
     setLiveOverrides((scn?.overrides as ScenarioOverrides | undefined) ?? {});
   };
 
+  // Override-section accordion state. Single Set keyed by section id;
+  // toggleSection collapses siblings on mobile (single-open accordion
+  // per spec §5) and toggles independently on desktop. Breakpoint
+  // detection via window.matchMedia inside the handler — read at click
+  // time, not at render, so SSR markup is identical at every viewport.
+  const [openSections, setOpenSections] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const toggleSection = useCallback((key: string) => {
+    setOpenSections((prev) => {
+      const isMobile =
+        typeof window !== 'undefined' &&
+        window.matchMedia('(max-width: 767px)').matches;
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        if (isMobile) next.clear();
+        next.add(key);
+      }
+      return next;
+    });
+  }, []);
+
   const hasNoData =
     history.currentCash === 0 &&
     history.recurringStreams.length === 0 &&
@@ -117,7 +142,7 @@ export function SimulatorClient({
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-8">
+    <div className="mx-auto max-w-6xl px-4 py-6 pb-24 sm:px-8 sm:py-8 md:pb-8">
       <ScenarioHeader
         scenarios={scenarios}
         selectedScenarioId={selectedScenarioId}
@@ -137,7 +162,12 @@ export function SimulatorClient({
         {/* Left: override editor */}
         <div>
           <p className="text-eyebrow mb-3">Overrides</p>
-          <OverrideSection label="Categories" count={liveOverrides.categoryDeltas?.length ?? 0}>
+          <OverrideSection
+            label="Categories"
+            count={liveOverrides.categoryDeltas?.length ?? 0}
+            open={openSections.has('categories')}
+            onToggle={() => toggleSection('categories')}
+          >
             <CategoryOverrides
               value={liveOverrides.categoryDeltas}
               onChange={(next) =>
@@ -146,7 +176,12 @@ export function SimulatorClient({
               knownCategories={history.categories}
             />
           </OverrideSection>
-          <OverrideSection label="Lump sums" count={liveOverrides.lumpSums?.length ?? 0}>
+          <OverrideSection
+            label="Lump sums"
+            count={liveOverrides.lumpSums?.length ?? 0}
+            open={openSections.has('lumpSums')}
+            onToggle={() => toggleSection('lumpSums')}
+          >
             <LumpSumOverrides
               value={liveOverrides.lumpSums}
               onChange={(next) =>
@@ -155,7 +190,12 @@ export function SimulatorClient({
               availableMonths={availableMonths}
             />
           </OverrideSection>
-          <OverrideSection label="Recurring" count={liveOverrides.recurringChanges?.length ?? 0}>
+          <OverrideSection
+            label="Recurring"
+            count={liveOverrides.recurringChanges?.length ?? 0}
+            open={openSections.has('recurring')}
+            onToggle={() => toggleSection('recurring')}
+          >
             <RecurringOverrides
               value={liveOverrides.recurringChanges}
               onChange={(next) =>
@@ -164,7 +204,12 @@ export function SimulatorClient({
               baseStreams={history.recurringStreams}
             />
           </OverrideSection>
-          <OverrideSection label="Income" count={liveOverrides.incomeDelta ? 1 : 0}>
+          <OverrideSection
+            label="Income"
+            count={liveOverrides.incomeDelta ? 1 : 0}
+            open={openSections.has('income')}
+            onToggle={() => toggleSection('income')}
+          >
             <IncomeOverrides
               value={liveOverrides.incomeDelta}
               onChange={(next) =>
@@ -173,7 +218,12 @@ export function SimulatorClient({
               availableMonths={availableMonths}
             />
           </OverrideSection>
-          <OverrideSection label="Hypothetical goals" count={liveOverrides.hypotheticalGoals?.length ?? 0}>
+          <OverrideSection
+            label="Hypothetical goals"
+            count={liveOverrides.hypotheticalGoals?.length ?? 0}
+            open={openSections.has('hypotheticalGoals')}
+            onToggle={() => toggleSection('hypotheticalGoals')}
+          >
             <HypotheticalGoalOverrides
               value={liveOverrides.hypotheticalGoals}
               onChange={(next) =>
@@ -181,7 +231,12 @@ export function SimulatorClient({
               }
             />
           </OverrideSection>
-          <OverrideSection label="Existing goal edits" count={liveOverrides.goalTargetEdits?.length ?? 0}>
+          <OverrideSection
+            label="Existing goal edits"
+            count={liveOverrides.goalTargetEdits?.length ?? 0}
+            open={openSections.has('goalTargetEdits')}
+            onToggle={() => toggleSection('goalTargetEdits')}
+          >
             <GoalTargetOverrides
               value={liveOverrides.goalTargetEdits}
               onChange={(next) =>
@@ -190,7 +245,12 @@ export function SimulatorClient({
               realGoals={history.goals}
             />
           </OverrideSection>
-          <OverrideSection label="Skip recurring" count={liveOverrides.skipRecurringInstances?.length ?? 0}>
+          <OverrideSection
+            label="Skip recurring"
+            count={liveOverrides.skipRecurringInstances?.length ?? 0}
+            open={openSections.has('skipRecurring')}
+            onToggle={() => toggleSection('skipRecurring')}
+          >
             <SkipRecurringOverrides
               value={liveOverrides.skipRecurringInstances}
               onChange={(next) =>
@@ -224,6 +284,14 @@ export function SimulatorClient({
           </div>
         </div>
       </div>
+
+      <MobileScenarioSaveBar
+        scenarios={scenarios}
+        selectedScenarioId={selectedScenarioId}
+        liveOverrides={liveOverrides}
+        isDirty={isDirty}
+        onSelect={handleSelectScenario}
+      />
     </div>
   );
 }

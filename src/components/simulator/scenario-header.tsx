@@ -175,7 +175,10 @@ export function ScenarioHeader({
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      {/* Action cluster: desktop only. Mobile renders <MobileScenarioSaveBar>
+          fixed above the tab bar so the primary CTA stays thumb-reachable
+          while scrolling overrides. */}
+      <div className="hidden items-center gap-2 md:flex">
         {nameDraft !== null ? (
           // Inline name editor — replaces window.prompt for new scenarios.
           <form

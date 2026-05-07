@@ -1,38 +1,38 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { ChevronRight } from 'lucide-react';
 
 type Props = {
   label: string;
   count: number;             // active items in this section (badge)
-  defaultOpen?: boolean;
+  open: boolean;
+  onToggle: () => void;
   children: ReactNode;
 };
 
 /**
- * Collapsible section with header showing label + active-item count.
- * Uses local useState for expanded; no global accordion coordination
- * (each section opens independently — reader can compare two simultaneously).
- *
- * Visual: bottom border separator, lightweight chrome. Matches the
- * "balanced v3" mockup quietness — no heavy backgrounds, just a thin
- * accent on the active state.
+ * Collapsible override section. Fully controlled — open state lives
+ * in the parent so the simulator can dispatch single-open accordion
+ * behavior on mobile (auto-collapse siblings when one opens) while
+ * keeping independent multi-open on desktop. See SimulatorClient's
+ * `toggleSection` for the breakpoint-aware dispatcher.
  */
 export function OverrideSection({
   label,
   count,
-  defaultOpen = false,
+  open,
+  onToggle,
   children,
 }: Props) {
-  const [open, setOpen] = useState(defaultOpen);
   const isEmpty = count === 0;
 
   return (
     <div className="border-b border-border/60 py-2.5">
       <button
-        onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between text-sm hover:text-foreground transition-colors"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="flex min-h-[44px] w-full items-center justify-between text-sm transition-colors hover:text-foreground"
       >
         <span className="flex items-center gap-1.5 text-foreground">
           <ChevronRight
