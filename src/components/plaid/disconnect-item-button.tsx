@@ -15,7 +15,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { disconnectItemAction } from '@/lib/plaid/actions';
+import { disconnectExternalItemAction } from '@/lib/sync/actions';
 import { cn } from '@/lib/utils';
 
 /**
@@ -42,7 +42,7 @@ export function DisconnectItemButton({
   const handleConfirm = () => {
     startTransition(async () => {
       try {
-        await disconnectItemAction(itemId);
+        await disconnectExternalItemAction(itemId);
         toast.success(`Disconnected ${institutionName}.`);
         setOpen(false);
         router.refresh();

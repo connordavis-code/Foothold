@@ -1,6 +1,6 @@
 import { eq, inArray } from 'drizzle-orm';
 import { auth } from '@/auth';
-import { ConnectBankButton } from '@/components/plaid/connect-bank-button';
+import { ConnectAccountButton } from '@/components/connect/connect-account-button';
 import { DisconnectItemButton } from '@/components/plaid/disconnect-item-button';
 import { ReconnectButton } from '@/components/plaid/reconnect-button';
 import { statusLabel } from '@/components/plaid/status';
@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/card';
 import { db } from '@/lib/db';
 import { financialAccounts, externalItems } from '@/lib/db/schema';
+import { snaptradeConfigured } from '@/lib/snaptrade/client';
 import { formatCurrency } from '@/lib/utils';
 
 export default async function SettingsPage() {
@@ -73,12 +74,11 @@ export default async function SettingsPage() {
           <div className="space-y-1.5">
             <CardTitle>Connected institutions</CardTitle>
             <CardDescription>
-              Banks and brokerages connected via Plaid. Sandbox uses fake
-              data — pick any institution and log in with{' '}
-              <span className="font-mono">user_good / pass_good</span>.
+              Banks and credit cards via Plaid; brokerages via SnapTrade
+              when SnapTrade keys are configured.
             </CardDescription>
           </div>
-          <ConnectBankButton />
+          <ConnectAccountButton snaptradeEnabled={snaptradeConfigured()} />
         </CardHeader>
         <CardContent>
           {items.length === 0 ? (
