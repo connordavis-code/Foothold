@@ -614,6 +614,24 @@ plumbing with no testable predicates).
   read `error_log.context.responseBody` for the structured Plaid
   `error_code` and iterate. Phase 1 then ships only the depository
   path.
+- **Phase 2 (sync health classification, pure) — shipped.**
+  `src/lib/sync/health.{ts,test.ts}` (39 tests). Discriminated-union
+  `CapabilityState` (`not_applicable` vs `tracked` with success/failure
+  timestamps + optional summary); 4 capabilities (`balances`,
+  `transactions`, `investments`, `recurring`); per-provider
+  `FRESHNESS_POLICY` (Plaid balances 12h, nightly windows 36h;
+  SnapTrade omits balances + recurring). `classifyItemHealth` returns
+  `state` + `requiresUserAction` + `reason` + `byCapability`
+  breakdown. Priority: `needs_reconnect` (any non-active itemStatus)
+  → `unknown` (no applicable caps OR all never_synced) → `degraded`
+  (some failed + some not) → `failed` (all applicable failed) →
+  `healthy` (all fresh) → `stale`. `syncing` is set by callers
+  (in-flight sync UI), never derived. Phase 3 query is the next
+  consumer; no UI wired yet. Design deltas vs the original spec block
+  documented in `docs/reliability/implementation-plan.md` § Phase 2
+  Status (notably: dropped `accounts` capability; defensive
+  tracked-but-no-policy → N/A; required-Record input forces explicit
+  N/A handling).
 
 ### Next up
 - **Plaid Production access review** for Fidelity (deprioritized) —

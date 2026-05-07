@@ -150,6 +150,87 @@ Classification should be data-only and UI-agnostic.
   useful data remains available.
 - `needs_reconnect` wins over stale/degraded when user action is required.
 
+### Status (2026-05-07): shipped — pure layer ready for Phase 3
+
+`src/lib/sync/health.ts` + `src/lib/sync/health.test.ts` shipped. 39
+pure tests across 7 describe blocks covering the four areas the
+product brief called out (provider freshness windows, partial failures,
+needs_reconnect precedence, capability-not-applicable) plus
+recovery/never_synced edge cases. Full vitest suite at 346/346.
+
+#### Public surface
+
+- `Provider`, `SyncHealthState`, `SyncCapability`,
+  `CapabilityClassification`, `CapabilityState`, `ClassifyInput`,
+  `ClassifyOutput` types
+- `FRESHNESS_POLICY` constant (provider × capability `staleHours` map)
+- `classifyItemHealth(input): ClassifyOutput`
+
+#### Design deltas vs the original spec block above
+
+- **Dropped `accounts` from `SyncCapability`.** Account metadata
+  refreshes as a side-effect of every sync; there's no separate
+  "accounts cron" that can independently go stale. The four meaningful
+  capabilities are `balances | transactions | investments | recurring`.
+- **`CapabilityState` is a discriminated union**:
+  `{ kind: 'not_applicable' }` | `{ kind: 'tracked', lastSuccessAt,
+  lastFailureAt, lastFailureSummary? }`. The N/A branch is the
+  load-bearing distinction the product brief asked for — it ensures a
+  SnapTrade item with no balance refresh path doesn't degrade the
+  headline just because balances never refresh.
+- **Input shape requires all 4 capabilities** (`Record<SyncCapability,
+  CapabilityState>`, not `Partial<...>`). This forces Phase 3 to be
+  explicit about applicability per source rather than relying on key
+  absence to mean N/A. Adding a 5th capability later is intentionally
+  a breaking change so all callers handle the new dimension.
+- **Defensive: tracked-but-no-policy is treated as N/A.** If Phase 3
+  ever sends a `tracked` state for a (provider, capability) pair
+  the policy table doesn't cover (e.g. SnapTrade balances), the
+  classifier returns `not_applicable` rather than letting the
+  misclassification corrupt aggregate state. Test coverage at
+  `health.test.ts` § "SnapTrade balances passed as tracked is
+  defensively N/A".
+- **Output includes `byCapability` breakdown** so Phase 4 UI
+  can render per-row state without recomputing.
+- **`syncing` is set by the caller**, never returned by the helper —
+  it's a runtime state from in-flight `syncItemAction` calls, not
+  derivable from snapshot data. The output type narrows accordingly:
+  `state: Exclude<SyncHealthState, 'syncing'>`.
+
+#### Provider freshness windows shipped
+
+| Capability    | Plaid (staleHours) | SnapTrade (staleHours) |
+|---------------|-------------------:|-----------------------:|
+| balances      | 12                 | N/A (no separate path) |
+| transactions  | 36                 | 36                     |
+| investments   | 36                 | 36                     |
+| recurring     | 36                 | N/A (brokerages don't have recurring streams) |
+
+Plaid balances uses 12h to allow one missed 6h cron + slack. The
+nightly windows include slack for one missed nightly run.
+
+#### Classification priority (high → low)
+
+1. `itemStatus !== 'active'` → `needs_reconnect` (`requiresUserAction:
+   true`); reason carries the raw status flavor
+2. Zero applicable capabilities → `unknown`
+3. All applicable capabilities `never_synced` → `unknown`
+   ("no signal" is more honest than "old signal")
+4. Any failed + any non-failed → `degraded`
+5. All applicable failed → `failed`
+6. All applicable fresh → `healthy`
+7. Else (some stale or never_synced, no failures) → `stale`
+
+#### What's still pending (Phase 3+)
+
+- **Phase 3 query** (`src/lib/db/queries/health.ts` + composite index
+  on `error_log`) is still TODO. That layer reads `external_item +
+  financial_account.type[] + error_log` and produces the
+  `Record<SyncCapability, CapabilityState>` per-item input that this
+  helper consumes.
+- **No UI wired yet**, per scope: Phases 4–6 will consume the helper
+  via the Phase 3 query.
+
 ## Phase 3: Health Query
 
 ### Problem
