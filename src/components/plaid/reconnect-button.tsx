@@ -9,6 +9,10 @@ import {
   createLinkTokenForUpdate,
   markItemReconnected,
 } from '@/lib/plaid/actions';
+import {
+  clearOAuthHandoff,
+  saveOAuthHandoff,
+} from '@/lib/plaid/oauth-handoff';
 
 /**
  * Drives Plaid Link in update mode for an item that needs reauth. Update
@@ -39,6 +43,7 @@ export function ReconnectButton({ itemId }: { itemId: string }) {
   }, [itemId]);
 
   const onSuccess = useCallback(() => {
+    clearOAuthHandoff();
     startTransition(async () => {
       try {
         await markItemReconnected(itemId);
@@ -54,12 +59,21 @@ export function ReconnectButton({ itemId }: { itemId: string }) {
     onSuccess,
   });
 
+  const handleOpen = useCallback(() => {
+    if (!linkToken) return;
+    saveOAuthHandoff({
+      linkToken,
+      intent: { kind: 'reconnect', itemId },
+    });
+    open();
+  }, [linkToken, itemId, open]);
+
   return (
     <div className="flex flex-col items-end gap-1">
       <Button
         variant="outline"
         size="sm"
-        onClick={() => open()}
+        onClick={handleOpen}
         disabled={!ready || !linkToken || isPending}
       >
         <Link2 className="h-3.5 w-3.5" />

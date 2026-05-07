@@ -14,6 +14,10 @@ import {
   exchangePublicToken,
   syncItemAction,
 } from '@/lib/plaid/actions';
+import {
+  clearOAuthHandoff,
+  saveOAuthHandoff,
+} from '@/lib/plaid/oauth-handoff';
 
 type Status = 'idle' | 'exchanging' | 'syncing';
 
@@ -56,6 +60,11 @@ export function ConnectBankButton() {
 
   const onSuccess = useCallback(
     async (publicToken: string, metadata: PlaidLinkOnSuccessMetadata) => {
+      // Successful Link end-state — no OAuth re-entry needed for this
+      // flow. Clear the handoff so a future connect doesn't see stale
+      // data. (For OAuth banks the /oauth-redirect re-entry path also
+      // clears it on its own success.)
+      clearOAuthHandoff();
       setStatus('exchanging');
       let itemId: string;
       try {
@@ -91,6 +100,16 @@ export function ConnectBankButton() {
     onSuccess,
   });
 
+  const handleOpen = useCallback(() => {
+    if (!linkToken) return;
+    // Persist the link_token so /oauth-redirect can re-instantiate Link
+    // with the same token after the institution OAuth round-trip. No-op
+    // for non-OAuth banks (Link finishes inline; clearOAuthHandoff in
+    // onSuccess wipes the unused entry).
+    saveOAuthHandoff({ linkToken, intent: { kind: 'connect' } });
+    open();
+  }, [linkToken, open]);
+
   const busy = status !== 'idle';
   const label =
     status === 'exchanging'
@@ -101,7 +120,7 @@ export function ConnectBankButton() {
 
   return (
     <div className="flex flex-col items-end gap-2">
-      <Button onClick={() => open()} disabled={!ready || !linkToken || busy}>
+      <Button onClick={handleOpen} disabled={!ready || !linkToken || busy}>
         <Plus className="h-4 w-4" />
         {label}
       </Button>

@@ -32,6 +32,13 @@ export async function createLinkToken(): Promise<string> {
     // this points at localhost — fine for /sandbox/item/fire_webhook
     // testing only, real Plaid traffic needs a tunnel or the deployed URL.
     webhook: `${env.NEXT_PUBLIC_APP_URL}/api/plaid/webhook`,
+    // OAuth-only banks (Wells Fargo, AmEx, Fidelity, Chase, Cap One, BofA…)
+    // redirect the user to the institution and back to this URI to finish
+    // Link. Production requires this URI be registered in Plaid Dashboard
+    // → Team Settings → API → Allowed redirect URIs. Without it, those
+    // banks fail Link entirely. The /oauth-redirect route re-instantiates
+    // Link with `receivedRedirectUri` to complete the public-token exchange.
+    redirect_uri: `${env.NEXT_PUBLIC_APP_URL}/oauth-redirect`,
   });
 
   return response.data.link_token;
@@ -178,6 +185,10 @@ export async function createLinkTokenForUpdate(itemId: string): Promise<string> 
     language: 'en',
     access_token: decryptToken(item.accessToken),
     webhook: `${env.NEXT_PUBLIC_APP_URL}/api/plaid/webhook`,
+    // Update mode also redirects through the institution for OAuth banks
+    // — same /oauth-redirect re-entry route, different intent (no
+    // public-token exchange; markItemReconnected on success).
+    redirect_uri: `${env.NEXT_PUBLIC_APP_URL}/oauth-redirect`,
   });
 
   return response.data.link_token;
