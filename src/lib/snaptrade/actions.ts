@@ -88,12 +88,15 @@ export async function createSnaptradeConnectUrlAction(): Promise<string> {
  * finishes the Connection Portal. Idempotent — re-running it after
  * a partial run won't double-insert.
  *
- * Returns the count of newly-recorded connections so the redirect
- * page can confirm to the user.
+ * Returns the count of newly-recorded connections plus their generated
+ * external_item ids so the redirect page can chain into per-item sync
+ * and the user sees holdings immediately rather than waiting for the
+ * nightly cron.
  */
 export async function syncSnaptradeBrokeragesAction(): Promise<{
   added: number;
   total: number;
+  newItemIds: string[];
 }> {
   const session = await auth();
   if (!session?.user?.id) throw new Error('Unauthorized');
@@ -112,7 +115,7 @@ export async function syncSnaptradeBrokeragesAction(): Promise<{
   const auths = authsRes.data;
 
   if (!Array.isArray(auths) || auths.length === 0) {
-    return { added: 0, total: 0 };
+    return { added: 0, total: 0, newItemIds: [] };
   }
 
   // Existing external_item rows for this user under SnapTrade — keyed
@@ -142,13 +145,18 @@ export async function syncSnaptradeBrokeragesAction(): Promise<{
       providerState: { snaptradeUserId },
     }));
 
+  let newItemIds: string[] = [];
   if (newRows.length > 0) {
-    await db.insert(externalItems).values(newRows);
+    const inserted = await db
+      .insert(externalItems)
+      .values(newRows)
+      .returning({ id: externalItems.id });
+    newItemIds = inserted.map((row) => row.id);
     revalidatePath('/settings');
     revalidatePath('/dashboard');
   }
 
-  return { added: newRows.length, total: auths.length };
+  return { added: newRows.length, total: auths.length, newItemIds };
 }
 
 /**
