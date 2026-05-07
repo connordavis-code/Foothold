@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lt, notInArray, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, lt, lte, notInArray, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   categories,
@@ -207,24 +207,58 @@ export type SparklinePoint = { date: string; netWorth: number };
 
 /**
  * Daily net-worth series for the last `days` days, ordered oldest→newest.
- * Computed by walking transactions backwards from the current net worth:
- * netWorth(d days ago) = netWorth(today) + sum(txn amounts where
- * date > today - d). Same exclusions as monthly delta.
+ * Walks transactions backwards from a window-start anchor — the anchor
+ * is computed from accounts that already existed at window start
+ * (`createdAt <= startStr`) so a freshly-connected account's current
+ * balance doesn't carry into "30 days ago" with no compensating
+ * transaction (which would inflate historical net worth — that's the
+ * W-06 bug from the 2026-05-05 review). Investments are still excluded
+ * from the walk; we don't have price history.
  *
- * Cheap (one query, all aggregation in JS) and good enough for a 30-pixel
- * sparkline. Doesn't capture investment value drift — that needs a price
- * history table that doesn't exist yet.
+ * Consequence: today's sparkline value will diverge from
+ * `getDashboardSummary().netWorth` whenever the user has accounts opened
+ * inside the window. The dashboard renders the sparkline as a relative
+ * shape (no absolute Y axis) and shows the headline net worth number
+ * separately, so the divergence isn't visible to users.
  */
 export async function getNetWorthSparkline(
   userId: string,
   days = 30,
 ): Promise<SparklinePoint[]> {
-  // Anchor on today's net worth, then unwind day by day.
-  const summary = await getDashboardSummary(userId);
   const today = new Date();
   const startDate = new Date(today);
   startDate.setDate(today.getDate() - (days - 1));
   const startStr = startDate.toISOString().slice(0, 10);
+
+  // Anchor: signed sum of currentBalance from non-investment accounts
+  // that already existed at window start. New accounts are excluded
+  // entirely — sparkline shows the trend on the user's stable set, not
+  // a phantom history extrapolated from new-account balances.
+  const stableBalances = await db
+    .select({
+      type: financialAccounts.type,
+      total: sql<string>`COALESCE(SUM(${financialAccounts.currentBalance}::numeric), 0)`,
+    })
+    .from(financialAccounts)
+    .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
+    .where(
+      and(
+        eq(externalItems.userId, userId),
+        notInArray(financialAccounts.type, ['investment']),
+        lte(financialAccounts.createdAt, startDate),
+      ),
+    )
+    .groupBy(financialAccounts.type);
+
+  let anchorNetWorth = 0;
+  for (const row of stableBalances) {
+    const n = Number(row.total);
+    if ((ASSET_TYPES as readonly string[]).includes(row.type)) {
+      anchorNetWorth += n;
+    } else if ((LIABILITY_TYPES as readonly string[]).includes(row.type)) {
+      anchorNetWorth -= n;
+    }
+  }
 
   const rows = await db
     .select({
@@ -242,6 +276,8 @@ export async function getNetWorthSparkline(
         eq(externalItems.userId, userId),
         gte(transactions.date, startStr),
         notInArray(financialAccounts.type, ['investment']),
+        // Same scope as the anchor: stable accounts only.
+        lte(financialAccounts.createdAt, startDate),
         sql`COALESCE(${transactions.primaryCategory}, '') NOT IN ('TRANSFER_IN', 'TRANSFER_OUT', 'LOAN_PAYMENTS')`,
       ),
     )
@@ -250,11 +286,11 @@ export async function getNetWorthSparkline(
   const dailyDelta = new Map<string, number>();
   for (const r of rows) dailyDelta.set(r.date, Number(r.total));
 
-  // Walk backwards: today's value = current netWorth. Each step into the
+  // Walk backwards: today's value = anchor net worth. Each step into the
   // past adds back that day's outflows (positive amounts) and removes
   // that day's inflows (negative).
   const series: SparklinePoint[] = [];
-  let runningNetWorth = summary.netWorth;
+  let runningNetWorth = anchorNetWorth;
   const yyyymmdd = (d: Date) => d.toISOString().slice(0, 10);
 
   for (let i = 0; i < days; i++) {
