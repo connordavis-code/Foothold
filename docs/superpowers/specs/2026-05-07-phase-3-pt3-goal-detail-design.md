@@ -69,7 +69,7 @@ The phase was originally deferred at the /goals IA rework with the note *"defer 
 
 - Eyebrow text: `${typeLabel} · Created ${humanizeDate(created_at)}` (uses existing `humanizeDate` from `src/lib/format/date.ts`).
 - Status pill colors flow from the locked /goals palette (`text-amber-700` / `bg-amber-500/15` / `border-amber-500/30` for behind; `text-foreground` for on-pace; `text-destructive` for over-cap; muted for hit/missed).
-- Edit + delete reuse the existing AlertDialog pattern from /goals (no new edit form — that lives in `/goals/[id]/edit` follow-up if ever).
+- Edit + delete buttons appear on this detail page in addition to (not replacing) the existing /goals controls. Both surface the same AlertDialog gates and the same server actions (`updateGoalAction`, `deleteGoalAction` from `src/lib/goals/actions.ts`). The Edit button opens the existing edit form (currently a modal on /goals); no new edit form is created in this phase.
 
 ### 5.2 Projection card (HEADLINE)
 
@@ -134,7 +134,7 @@ Output from `composeCoaching(input)`. Two-sentence structure, type-aware:
 - Spend-cap, already over: *"Already **${overage} over** the cap."*
 
 **Action (sentence 2, only when behind/over):**
-- Savings: pull `/drift`'s top elevated category (or top discretionary category if drift hasn't flagged anything). *"Trim ${categoryName} (your largest discretionary at ${monthlyAmount}/mo) by ${monthlyDeficit} to recover."*
+- Savings: pull `/drift`'s top elevated category for the user. If drift has nothing flagged, fall back to the largest non-recurring outflow category by trailing-3-month median (excluding `TRANSFER_IN`, `TRANSFER_OUT`, `LOAN_PAYMENTS` — same exclusions as `getDashboardSummary`'s `monthSpend` predicate). *"Trim ${categoryName} (your largest discretionary at ${monthlyAmount}/mo) by ${monthlyDeficit} to recover."*
 - Spend-cap: top-3 contributing merchants this month from the feed. *"Skipping any one of ${m1} (${a1}), ${m2} (${a2}), ${m3} (${a3}) resets your pace."*
 
 When on-track or hit, the action sentence is omitted — short positive confirmation only.
