@@ -179,3 +179,26 @@ export async function deleteGoal(goalId: string) {
 
   revalidatePath('/goals');
 }
+
+/**
+ * Soft-archive a goal — flips isActive=false. Archived goals stay in the
+ * DB so the user can revisit them and the historical data behind them
+ * (transactions, accounts) stays attributable. The /goals leaderboard
+ * surfaces them in a muted "Archived" section; /goals/[id] still
+ * renders with an "· Archived" eyebrow.
+ *
+ * `restore` (true) is the inverse — flips isActive=true. Same action so
+ * the toggle button can drive both directions from one server entry.
+ */
+export async function setGoalArchived(goalId: string, archived: boolean) {
+  const session = await auth();
+  if (!session?.user) throw new Error('Unauthorized');
+
+  await db
+    .update(goals)
+    .set({ isActive: !archived, updatedAt: new Date() })
+    .where(and(eq(goals.id, goalId), eq(goals.userId, session.user.id)));
+
+  revalidatePath('/goals');
+  revalidatePath(`/goals/${goalId}`);
+}

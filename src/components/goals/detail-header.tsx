@@ -1,6 +1,7 @@
 // src/components/goals/detail-header.tsx
 import { Pencil } from 'lucide-react';
 import Link from 'next/link';
+import { ArchiveGoalButton } from '@/components/goals/archive-goal-button';
 import { DeleteGoalButton } from '@/components/goals/delete-goal-button';
 import { Button } from '@/components/ui/button';
 import type { GoalWithProgress } from '@/lib/db/queries/goals';
@@ -29,12 +30,17 @@ export function GoalDetailHeader({ goal }: Props) {
             <span className="ml-2 text-amber-700 dark:text-amber-300">· Archived</span>
           )}
         </p>
-        <div className="flex gap-0.5">
+        <div className="flex items-center gap-0.5">
           <Button asChild variant="ghost" size="sm" className="h-8 w-8 p-0">
             <Link href={`/goals/${goal.id}/edit`} aria-label="Edit goal">
               <Pencil className="h-4 w-4" />
             </Link>
           </Button>
+          <ArchiveGoalButton
+            goalId={goal.id}
+            goalName={goal.name}
+            isArchived={!goal.isActive}
+          />
           <DeleteGoalButton goalId={goal.id} goalName={goal.name} />
         </div>
       </div>
