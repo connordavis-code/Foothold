@@ -56,15 +56,23 @@ export type SourceHealth = {
  *   - recurring:    depository OR credit
  *
  * SnapTrade:
- *   - transactions + investments always
- *   - balances + recurring never
+ *   - transactions: dropped when `opts.transactionsUnsupported` —
+ *     SnapTrade's data partnership doesn't expose activities for some
+ *     account subtypes (e.g. Fidelity IRA / Roth / 401k); the sync
+ *     layer surfaces this via `snaptrade.sync.activities.unsupported`
+ *     info rows on permanent HTTP 410.
+ *   - investments: always
+ *   - balances + recurring: never (delegate to provider's daily refresh)
  */
 export function inferCapabilities(
   provider: Provider,
   accountTypes: string[],
+  opts?: { transactionsUnsupported?: boolean },
 ): SyncCapability[] {
   if (provider === 'snaptrade') {
-    return ['transactions', 'investments'];
+    return opts?.transactionsUnsupported
+      ? ['investments']
+      : ['transactions', 'investments'];
   }
 
   const types = new Set(accountTypes);
@@ -105,6 +113,16 @@ export type RawOpTimestamps = {
   snaptradePositionsFailureAt: Date | null;
   snaptradePositionsFailureMessage: string | null;
   /**
+   * SnapTrade item-level "activities permanently unsupported" info row.
+   * Written by `syncSnaptradeItem` when EVERY account 410s on
+   * getActivities (HTTP 410 = upstream-permanent N/A, e.g. Fidelity
+   * IRA pattern). Consumed by `isSnaptradeTransactionsUnsupported`
+   * which compares the timestamp against any later success/failure;
+   * a subsequent successful activities sync supersedes the marker so
+   * the system self-heals if upstream ever exposes the data.
+   */
+  snaptradeActivitiesUnsupportedAt: Date | null;
+  /**
    * Dispatcher-level failure (`syncExternalItem` wraps both providers
    * and logs `op = 'sync.dispatcher'` on uncaught errors). Counts as
    * a nightly-side failure for both providers — covers the case
@@ -140,6 +158,38 @@ function mostRecentFailure(
   if (a.at === null) return b;
   if (b.at === null) return a;
   return a.at.getTime() >= b.at.getTime() ? a : b;
+}
+
+/**
+ * Pure: returns true iff the latest activities-related signal for a
+ * SnapTrade item is the "unsupported" marker. Self-healing — if
+ * upstream later exposes activities and a successful sync writes the
+ * regular info row, that newer timestamp supersedes and this returns
+ * false again.
+ *
+ * Mirrors how `classifyCapability` reasons about success-vs-failure
+ * recency (newer wins). The unsupported marker counts as a third axis:
+ *
+ *   - Has unsupported AND (no success OR unsupported newer than success)
+ *     AND (no failure OR unsupported newer than failure) → true
+ *   - Otherwise → false
+ *
+ * Plaid items always return false (the marker is SnapTrade-specific;
+ * the field is null on Plaid rows by construction).
+ */
+export function isSnaptradeTransactionsUnsupported(
+  ops: Pick<
+    RawOpTimestamps,
+    | 'snaptradeActivitiesUnsupportedAt'
+    | 'snaptradeActivitiesSuccessAt'
+    | 'snaptradeActivitiesFailureAt'
+  >,
+): boolean {
+  const u = ops.snaptradeActivitiesUnsupportedAt;
+  if (u === null) return false;
+  const s = ops.snaptradeActivitiesSuccessAt?.getTime() ?? -Infinity;
+  const f = ops.snaptradeActivitiesFailureAt?.getTime() ?? -Infinity;
+  return u.getTime() > Math.max(s, f);
 }
 
 /**
@@ -398,6 +448,7 @@ async function loadOpTimestamps(itemId: string): Promise<RawOpTimestamps> {
     stPosSucc,
     stPosFail,
     dispatchFail,
+    stActUnsup,
   ] = await Promise.all([
     db
       .select({ at: errorLog.occurredAt })
@@ -507,6 +558,18 @@ async function loadOpTimestamps(itemId: string): Promise<RawOpTimestamps> {
       )
       .orderBy(desc(errorLog.occurredAt))
       .limit(1),
+    db
+      .select({ at: errorLog.occurredAt })
+      .from(errorLog)
+      .where(
+        and(
+          eq(errorLog.externalItemId, itemId),
+          eq(errorLog.op, 'snaptrade.sync.activities.unsupported'),
+          eq(errorLog.level, 'info'),
+        ),
+      )
+      .orderBy(desc(errorLog.occurredAt))
+      .limit(1),
   ]);
 
   return {
@@ -524,6 +587,7 @@ async function loadOpTimestamps(itemId: string): Promise<RawOpTimestamps> {
     snaptradePositionsFailureMessage: stPosFail[0]?.message ?? null,
     dispatcherFailureAt: dispatchFail[0]?.at ?? null,
     dispatcherFailureMessage: dispatchFail[0]?.message ?? null,
+    snaptradeActivitiesUnsupportedAt: stActUnsup[0]?.at ?? null,
   };
 }
 
@@ -576,8 +640,15 @@ export async function getSourceHealth(userId: string): Promise<SourceHealth[]> {
     items.map(async (item): Promise<SourceHealth> => {
       const provider = item.provider as Provider;
       const accountTypes = item.accountTypes ?? [];
-      const applicable = inferCapabilities(provider, accountTypes);
       const ops = await loadOpTimestamps(item.id);
+      // SnapTrade activities-unsupported signal is data-driven — must
+      // load ops BEFORE inferring capabilities, so a Fidelity-IRA item
+      // resolves to investments-only and the trust strip stops alarming
+      // on a permanent upstream limitation.
+      const transactionsUnsupported = isSnaptradeTransactionsUnsupported(ops);
+      const applicable = inferCapabilities(provider, accountTypes, {
+        transactionsUnsupported,
+      });
       const resolved = resolveCapabilityTimestamps(
         provider,
         item.lastSyncedAt,

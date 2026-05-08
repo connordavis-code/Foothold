@@ -6,6 +6,7 @@ import {
   aggregateTopLevelTimestamps,
   buildCapabilityStates,
   inferCapabilities,
+  isSnaptradeTransactionsUnsupported,
   resolveCapabilityTimestamps,
 } from './health';
 
@@ -37,6 +38,7 @@ const EMPTY_OPS: RawOpTimestamps = {
   snaptradePositionsFailureMessage: null,
   dispatcherFailureAt: null,
   dispatcherFailureMessage: null,
+  snaptradeActivitiesUnsupportedAt: null,
 };
 
 const EMPTY_RESOLVED: ResolvedCapabilityTimestamps = {
@@ -119,6 +121,117 @@ describe('inferCapabilities — SnapTrade', () => {
       'transactions',
       'investments',
     ]);
+  });
+
+  it('transactionsUnsupported flag drops transactions (Fidelity-IRA pattern)', () => {
+    expect(
+      inferCapabilities('snaptrade', ['investment'], {
+        transactionsUnsupported: true,
+      }),
+    ).toEqual(['investments']);
+  });
+
+  it('transactionsUnsupported: false is the same as omitting the flag', () => {
+    expect(
+      inferCapabilities('snaptrade', ['investment'], {
+        transactionsUnsupported: false,
+      }),
+    ).toEqual(['transactions', 'investments']);
+  });
+
+  it('transactionsUnsupported flag is ignored for Plaid (defensive)', () => {
+    // Plaid never writes the unsupported marker, but the flag should
+    // be a no-op for Plaid even if the caller mistakenly passes it.
+    expect(
+      inferCapabilities('plaid', ['depository'], {
+        transactionsUnsupported: true,
+      }),
+    ).toEqual(['balances', 'transactions', 'recurring']);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// isSnaptradeTransactionsUnsupported — pure resolver for the marker
+// ─────────────────────────────────────────────────────────────────────
+
+describe('isSnaptradeTransactionsUnsupported', () => {
+  it('no marker → false (no-op for items that have never seen 410)', () => {
+    expect(
+      isSnaptradeTransactionsUnsupported({
+        snaptradeActivitiesUnsupportedAt: null,
+        snaptradeActivitiesSuccessAt: null,
+        snaptradeActivitiesFailureAt: null,
+      }),
+    ).toBe(false);
+  });
+
+  it('only marker present → true (every account 410d, no other signal)', () => {
+    expect(
+      isSnaptradeTransactionsUnsupported({
+        snaptradeActivitiesUnsupportedAt: ts(2),
+        snaptradeActivitiesSuccessAt: null,
+        snaptradeActivitiesFailureAt: null,
+      }),
+    ).toBe(true);
+  });
+
+  it('newer success supersedes older marker → false (self-healing)', () => {
+    // Upstream fixed it; the regular activities info row supersedes.
+    expect(
+      isSnaptradeTransactionsUnsupported({
+        snaptradeActivitiesUnsupportedAt: ts(48),
+        snaptradeActivitiesSuccessAt: ts(2),
+        snaptradeActivitiesFailureAt: null,
+      }),
+    ).toBe(false);
+  });
+
+  it('newer failure supersedes older marker → false (transient error wins)', () => {
+    // A non-410 failure means the capability is now broken-but-tracked,
+    // not permanently-N/A. User should see the failure surface.
+    expect(
+      isSnaptradeTransactionsUnsupported({
+        snaptradeActivitiesUnsupportedAt: ts(48),
+        snaptradeActivitiesSuccessAt: null,
+        snaptradeActivitiesFailureAt: ts(2),
+      }),
+    ).toBe(false);
+  });
+
+  it('marker newer than older success → true (latest cycle 410d again)', () => {
+    // Brokerage worked once, then the partnership broke or the user
+    // moved to an unsupported subtype.
+    expect(
+      isSnaptradeTransactionsUnsupported({
+        snaptradeActivitiesUnsupportedAt: ts(2),
+        snaptradeActivitiesSuccessAt: ts(48),
+        snaptradeActivitiesFailureAt: null,
+      }),
+    ).toBe(true);
+  });
+
+  it('marker newer than older failure → true (failure was transient, latest cycle 410d)', () => {
+    expect(
+      isSnaptradeTransactionsUnsupported({
+        snaptradeActivitiesUnsupportedAt: ts(2),
+        snaptradeActivitiesSuccessAt: null,
+        snaptradeActivitiesFailureAt: ts(48),
+      }),
+    ).toBe(true);
+  });
+
+  it('exact tie between marker and success → success wins (>, not >=)', () => {
+    // Defensive: if both ops happen in the same millisecond (unlikely
+    // but possible with batched writes), prefer the working signal so
+    // we don't N/A a capability that just succeeded.
+    const t = ts(2);
+    expect(
+      isSnaptradeTransactionsUnsupported({
+        snaptradeActivitiesUnsupportedAt: t,
+        snaptradeActivitiesSuccessAt: t,
+        snaptradeActivitiesFailureAt: null,
+      }),
+    ).toBe(false);
   });
 });
 

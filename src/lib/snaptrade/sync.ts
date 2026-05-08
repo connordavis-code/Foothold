@@ -19,6 +19,21 @@ const numRequired = (n: number): string => String(n);
 const DAY_MS = 24 * 60 * 60 * 1000;
 const INITIAL_BACKFILL_DAYS = 90;
 
+// SnapTrade returns HTTP 410 Gone for activities on brokerages where the
+// data partnership doesn't expose transaction history (most notably
+// Fidelity IRA / Roth / 401k subtypes — positions work, activities don't,
+// permanently). Distinguish from transient 4xx so we can mark transactions
+// not_applicable for those items rather than alarm in the trust strip
+// every cron. Duck-type the axios response shape (same pattern as
+// `extractAxiosResponse` in src/lib/logger.ts) so we don't import axios
+// just for a type guard.
+function isHttp410(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const r = (err as { response?: unknown }).response;
+  if (!r || typeof r !== 'object') return false;
+  return (r as { status?: unknown }).status === 410;
+}
+
 export type SnaptradeSyncSummary = {
   accounts: number;
   holdings: number;
@@ -182,6 +197,10 @@ export async function syncSnaptradeItem(
           // per-capability errors.
           positionsOk: false,
           activitiesOk: false,
+          // Set when getActivities returns HTTP 410 — upstream-permanent
+          // "transactions not exposed for this account subtype" signal.
+          // Distinct from `activitiesOk: false` (transient/unknown failure).
+          activitiesUnsupported: false,
         };
         try {
           const posRes =
@@ -209,10 +228,21 @@ export async function syncSnaptradeItem(
           result.activities = actRes.data ?? [];
           result.activitiesOk = true;
         } catch (err) {
-          await logError('snaptrade.sync.activities', err, {
-            externalItemId: item.id,
-            snaptradeAccountId: acc.providerAccountId,
-          });
+          if (isHttp410(err)) {
+            // Permanent upstream limitation (Fidelity IRA pattern):
+            // SnapTrade's data partnership doesn't expose activities
+            // for this account subtype. Don't write an error row —
+            // the digest would re-spam this every cycle. The
+            // item-level `snaptrade.sync.activities.unsupported` info
+            // row written below is the durable signal consumed by
+            // the health query.
+            result.activitiesUnsupported = true;
+          } else {
+            await logError('snaptrade.sync.activities', err, {
+              externalItemId: item.id,
+              snaptradeAccountId: acc.providerAccountId,
+            });
+          }
         }
         return result;
       }),
@@ -415,6 +445,16 @@ export async function syncSnaptradeItem(
     const activitiesAllOk =
       perAccountResults.length > 0 &&
       perAccountResults.every((r) => r.activitiesOk);
+    // Item-level "transactions capability not supported" signal: every
+    // account 410'd, no transient failures, no successes. Health query
+    // reads this as "transactions is N/A for this item" so the trust
+    // strip stops surfacing the brokerage. Self-healing — if upstream
+    // ever exposes activities, the next successful sync writes the
+    // regular info row which supersedes this one (MAX(occurred_at)
+    // ordering in the query layer).
+    const activitiesAllUnsupported =
+      perAccountResults.length > 0 &&
+      perAccountResults.every((r) => r.activitiesUnsupported);
     if (positionsAllOk) {
       await logRun(
         'snaptrade.sync.positions',
@@ -429,6 +469,15 @@ export async function syncSnaptradeItem(
       await logRun(
         'snaptrade.sync.activities',
         `${perAccountResults.length} accounts synced activities`,
+        {
+          externalItemId: item.id,
+          accountCount: perAccountResults.length,
+        },
+      );
+    } else if (activitiesAllUnsupported) {
+      await logRun(
+        'snaptrade.sync.activities.unsupported',
+        `${perAccountResults.length} accounts: transactions not exposed by upstream (HTTP 410)`,
         {
           externalItemId: item.id,
           accountCount: perAccountResults.length,
