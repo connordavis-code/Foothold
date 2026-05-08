@@ -17,16 +17,24 @@ export const maxDuration = 60;
 /**
  * Intraday balance refresh. Schedule: every 6h (00/06/12/18 UTC).
  *
- * Calls Plaid `accounts/balance/get` (live read — may hit the bank
- * directly) instead of the cached `accounts/get` used by syncItem.
- * The whole point is intraday freshness, so paying the extra Plaid
- * quota is intentional.
+ * Calls Plaid `accounts/get` (cached — Plaid returns the balance from
+ * its last bank fetch, which Plaid refreshes opportunistically). NOT
+ * `accounts/balance/get`: that endpoint is gated on the `balance`
+ * product, which the Plaid app is not authorized for in production
+ * (returns INVALID_PRODUCT). Enabling `balance` requires Dashboard
+ * approval + adding it to PLAID_PRODUCTS + reconnecting existing items
+ * via Link update mode — see CLAUDE.md > Lessons learned for the full
+ * fix path. Until then, "intraday freshness" is whatever Plaid's
+ * cache holds; in practice that's hours-fresh for active institutions
+ * and stale-since-nightly-sync for the rest. The reliability UI from
+ * Phase 2/3 surfaces "as of X hours ago" honestly so this is acceptable
+ * MVP behavior.
  *
  * Does NOT touch plaid_item.last_synced_at — that signal is reserved
  * for full syncs, and polluting it would break the "when did we last
  * see new transactions?" semantics elsewhere.
  *
- * New-account silently no-ops: balance/get may surface accounts we
+ * New-account silently no-ops: accountsGet may surface accounts we
  * haven't seen yet, but the WHERE matches by providerAccountId so
  * unknown ones don't update anything. The nightly cron picks them up.
  */
@@ -61,11 +69,12 @@ export async function GET(request: NextRequest) {
         throw new Error(`Plaid item ${item.id} has NULL secret`);
       }
 
-      // Capability filter — accountsBalanceGet doesn't meaningfully
-      // refresh investment/loan/other balances, and bare-call returns
-      // can write null over real values. Pre-filter to depository+credit
-      // and pass account_ids explicitly. See balance-refresh.ts for the
-      // load-bearing rationale.
+      // Capability filter — investment/loan/other balances live in
+      // different tables (holdings, etc.) and writing accountsGet's
+      // values into financialAccounts.{currentBalance,availableBalance}
+      // for those types would be semantically wrong. Pre-filter to
+      // depository+credit and pass account_ids explicitly. See
+      // balance-refresh.ts for the load-bearing rationale.
       const itemAccounts = await db
         .select({
           providerAccountId: financialAccounts.providerAccountId,
@@ -90,7 +99,7 @@ export async function GET(request: NextRequest) {
       }
 
       const accessToken = decryptToken(item.secret);
-      const res = await plaid.accountsBalanceGet({
+      const res = await plaid.accountsGet({
         access_token: accessToken,
         options: {
           account_ids: refreshable.map((a) => a.providerAccountId),

@@ -285,6 +285,28 @@ This is **strike two for non-serializable values across RSC** (count
 the forwardRef lesson). One more and it gets promoted from Lesson to
 Architecture note (or a code-level guard, e.g., a lint rule).
 
+### Don't ship a Plaid endpoint without verifying its product authorization (2026-05-07)
+`accounts/balance/get` requires the `balance` product authorized at
+the Plaid APP level — Dashboard + `PLAID_PRODUCTS` env — separate
+from per-item Link consent. Cron at
+[src/app/api/cron/balances/route.ts] called `accountsBalanceGet` while
+`PLAID_PRODUCTS=transactions,investments`; Plaid 400'd every 6h with
+`INVALID_PRODUCT: client is not authorized to access ["balance"]`,
+hidden until the structured-axios logger from `05c12de` surfaced the
+response body via `error_log.context.responseBody`. **Fix is at the
+Plaid app level, not per-item** — same error_code as institution-
+capability mismatches (`PRODUCTS_NOT_SUPPORTED` on AmEx-style credit-
+only items pre-`fb0e421`), but the per-item capability filter from
+`c4293e4` couldn't help because the gate is upstream. Two fix paths:
+(A) enable `balance` in Plaid Dashboard → API Products, add to
+`PLAID_PRODUCTS`, reconnect existing items via Link update mode;
+(B) swap to `accountsGet` (cached, no `balance` product gate, accepts
+staler balances — Plaid refreshes the cache opportunistically). Shipped
+B for MVP since Phase 2/3 reliability UI labels "as of X hours ago"
+honestly. **Whenever adding a new Plaid endpoint, check Plaid docs for
+the required product, then verify it's in `PLAID_PRODUCTS` AND
+authorized in Plaid Dashboard before deploying.**
+
 ---
 
 ## Coding conventions
