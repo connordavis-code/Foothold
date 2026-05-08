@@ -79,7 +79,7 @@ export function TrustStrip({
         />
         <div className="min-w-0 flex-1">
           {n === 1 ? (
-            <p className="text-sm">
+            <p className="break-words text-sm">
               <span className="font-medium">1 source needs attention:</span>{' '}
               {summary.elevated[0].institutionName} —{' '}
               <span className="text-muted-foreground">
@@ -93,7 +93,7 @@ export function TrustStrip({
               </p>
               <ul className="mt-1 space-y-0.5 text-sm">
                 {summary.elevated.map((row) => (
-                  <li key={row.itemId}>
+                  <li key={row.itemId} className="break-words">
                     <span>{row.institutionName}</span> —{' '}
                     <span className="text-muted-foreground">{row.reason}</span>
                   </li>

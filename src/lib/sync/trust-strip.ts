@@ -1,4 +1,5 @@
 import type { SourceHealth } from '@/lib/db/queries/health';
+import { truncateReason } from '@/lib/sync/health-summary';
 
 /**
  * Derived view-model for the dashboard trust strip. Pure — no DB,
@@ -60,7 +61,11 @@ export function summarizeTrustStrip(
       elevated.push({
         itemId: s.itemId,
         institutionName: s.institutionName ?? 'Unknown institution',
-        reason: s.reason,
+        // Cap verbose upstream error messages (e.g. SnapTrade SDK
+        // dumping full HTTP response headers into err.message). Same
+        // cap as `<SourceHealthRow>`'s summarizer — see MAX_REASON_LEN
+        // in health-summary.ts. Full text remains in error_log.
+        reason: truncateReason(s.reason),
       });
     }
   }

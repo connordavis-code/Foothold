@@ -180,4 +180,33 @@ describe('summarizeTrustStrip — elevated', () => {
     ]);
     expect(r.kind).toBe('elevated');
   });
+
+  it('verbose SnapTrade error message → reason capped at 140 chars with ellipsis', () => {
+    // Reproduces the Fidelity 410 case where SnapTrade SDK dumps full
+    // HTTP response headers into err.message. Without the cap, the
+    // dashboard trust strip rendered ~6 lines of cramped JSON.
+    const verboseReason =
+      '1 of 2 capabilities failing — transactions: Request failed with status code 410 RESPONSE HEADERS: { "date":"Fri, 08 May 2026 15:22:51 GMT", "content-type":"application/json", "content-length":"67", "connection":"keep-alive", "server":"gunicorn", "allow":"GET, HEAD, OPTIONS", "x-frame-options":"DENY", "vary":"origin" }';
+    const r = summarizeTrustStrip([
+      fid({ state: 'degraded', reason: verboseReason }),
+    ]);
+    expect(r.kind).toBe('elevated');
+    if (r.kind !== 'elevated') return;
+    expect(r.elevated[0].reason.length).toBeLessThanOrEqual(140);
+    expect(r.elevated[0].reason.endsWith('…')).toBe(true);
+    // Most-informative prefix (capability + HTTP status) is preserved
+    expect(r.elevated[0].reason).toContain('1 of 2 capabilities failing');
+    expect(r.elevated[0].reason).toContain('410');
+  });
+
+  it('reason at or under cap passes through unchanged', () => {
+    const shortReason =
+      '1 of 3 capabilities failing — transactions: rate_limit';
+    const r = summarizeTrustStrip([
+      amex({ state: 'degraded', reason: shortReason }),
+    ]);
+    expect(r.kind).toBe('elevated');
+    if (r.kind !== 'elevated') return;
+    expect(r.elevated[0].reason).toBe(shortReason);
+  });
 });

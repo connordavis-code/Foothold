@@ -2,15 +2,19 @@ import { formatRelative } from '@/lib/format/date';
 import type { SourceHealth } from '@/lib/db/queries/health';
 
 /**
- * Maximum length for the rendered secondary line. Caps verbose
+ * Maximum length for a rendered classifier reason. Caps verbose
  * upstream error messages — SnapTrade's SDK in particular throws
  * errors whose `.message` includes the full HTTP response headers
  * dump verbatim, which floods the row otherwise. Full failure text
  * still lives in `error_log` for diagnostics.
+ *
+ * Exported so other rendering surfaces (e.g. dashboard `<TrustStrip>`)
+ * apply the same cap. Each surface owns its own truncation boundary
+ * because it owns its own layout constraints.
  */
-const MAX_REASON_LEN = 140;
+export const MAX_REASON_LEN = 140;
 
-function truncate(s: string, max: number): string {
+export function truncateReason(s: string, max: number = MAX_REASON_LEN): string {
   if (s.length <= max) return s;
   return `${s.slice(0, max - 1).trimEnd()}…`;
 }
@@ -40,5 +44,5 @@ export function summarizeSourceHealth(
       ? `Synced ${formatRelative(source.lastSuccessfulSyncAt, now)}`
       : 'Sync pending';
   }
-  return truncate(source.reason, MAX_REASON_LEN);
+  return truncateReason(source.reason);
 }
