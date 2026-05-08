@@ -11,6 +11,7 @@ import {
 } from '@/lib/db/schema';
 import { logError, logRun } from '@/lib/logger';
 import { snaptrade } from './client';
+import { isHttp410 } from './errors';
 
 const num = (n: number | null | undefined): string | null =>
   n == null ? null : String(n);
@@ -18,21 +19,6 @@ const numRequired = (n: number): string => String(n);
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const INITIAL_BACKFILL_DAYS = 90;
-
-// SnapTrade returns HTTP 410 Gone for activities on brokerages where the
-// data partnership doesn't expose transaction history (most notably
-// Fidelity IRA / Roth / 401k subtypes — positions work, activities don't,
-// permanently). Distinguish from transient 4xx so we can mark transactions
-// not_applicable for those items rather than alarm in the trust strip
-// every cron. Duck-type the axios response shape (same pattern as
-// `extractAxiosResponse` in src/lib/logger.ts) so we don't import axios
-// just for a type guard.
-function isHttp410(err: unknown): boolean {
-  if (!err || typeof err !== 'object') return false;
-  const r = (err as { response?: unknown }).response;
-  if (!r || typeof r !== 'object') return false;
-  return (r as { status?: unknown }).status === 410;
-}
 
 export type SnaptradeSyncSummary = {
   accounts: number;

@@ -37,6 +37,17 @@ function extractAxiosResponse(err: unknown): {
   data: unknown;
 } | null {
   if (!err || typeof err !== 'object') return null;
+  // SnaptradeError-style wrappers flatten the axios fields:
+  // `err.status` and `err.responseBody`, with no nested `err.response`.
+  // Check this shape first; it's strictly more specific than raw axios
+  // (a raw AxiosError has neither field at the top level).
+  const flatStatus = (err as { status?: unknown }).status;
+  if (typeof flatStatus === 'number') {
+    return {
+      status: flatStatus,
+      data: (err as { responseBody?: unknown }).responseBody ?? null,
+    };
+  }
   const r = (err as { response?: unknown }).response;
   if (!r || typeof r !== 'object') return null;
   const status = (r as { status?: unknown }).status;
