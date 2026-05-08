@@ -740,17 +740,23 @@ plan at `docs/superpowers/plans/2026-05-07-phase-3-pt3-goal-detail.md`)
   buttons; per-account sub-list preserved as-is. State pill follows
   DESIGN.md restraint: amber for `degraded` (Partial) /
   `needs_reconnect` (Reconnect), destructive for `failed`,
-  silent for `healthy` / `stale` / `unknown`. Action picker driven
-  by `requiresUserAction` (not raw itemStatus). Pure helpers:
+  silent for `healthy` / `stale` / `unknown`. Pure helpers:
   `summarizeSourceHealth(source, now)` for the secondary line
   (healthy → "Synced 5m ago"; elevated → classifier reason
   verbatim); `formatRelative(d, now)` promoted from
   `settings/page.tsx` to `src/lib/format/date.ts` for cross-page
-  reuse. 26 new pure tests; full vitest 428/428. Mobile uses single
-  responsive component rather than literal `<MobileList>` —
-  rationale in `docs/reliability/implementation-plan.md` § Phase 4
-  Status (MobileList is for dense scrolling lists with single tap
-  targets; settings has multi-button rows).
+  reuse. **Provider-aware reconnect** — Plaid uses update-mode (per-
+  item link token via `<ReconnectButton>`); SnapTrade routes through
+  the user-scoped Connection Portal via new
+  `<SnaptradeReconnectButton>`. `<DisconnectItemButton>` takes a
+  `provider` prop so the confirmation copy reads correctly for both.
+  Provider name renders as a prefix on the secondary line ("Plaid ·
+  Synced 5m ago"). 26 new pure tests; full vitest 428/428. Mobile
+  uses single responsive component rather than literal
+  `<MobileList>` — rationale in
+  `docs/reliability/implementation-plan.md` § Phase 4 Status
+  (MobileList is for dense scrolling lists with single tap targets;
+  settings has multi-button rows).
 
 ### Next up
 - **Plaid Production access review** for Fidelity (deprioritized) —

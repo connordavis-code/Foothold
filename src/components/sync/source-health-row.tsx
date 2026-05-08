@@ -1,10 +1,17 @@
 import type { SourceHealth } from '@/lib/db/queries/health';
 import { formatRelative } from '@/lib/format/date';
+import type { Provider } from '@/lib/sync/health';
 import { summarizeSourceHealth } from '@/lib/sync/health-summary';
 import { cn } from '@/lib/utils';
 import { DisconnectItemButton } from '@/components/plaid/disconnect-item-button';
 import { ReconnectButton } from '@/components/plaid/reconnect-button';
 import { SyncButton } from '@/components/plaid/sync-button';
+import { SnaptradeReconnectButton } from '@/components/snaptrade/reconnect-button';
+
+const PROVIDER_LABEL: Record<Provider, string> = {
+  plaid: 'Plaid',
+  snaptrade: 'SnapTrade',
+};
 
 /**
  * Header row for a connected source on /settings.
@@ -32,6 +39,7 @@ export function SourceHealthRow({
   now?: Date;
 }) {
   const summary = summarizeSourceHealth(source, now);
+  const providerLabel = PROVIDER_LABEL[source.provider];
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
@@ -42,7 +50,9 @@ export function SourceHealthRow({
           </span>
           <StatePill state={source.state} />
         </p>
-        <p className="mt-1 text-xs text-muted-foreground">{summary}</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {providerLabel} · {summary}
+        </p>
         {source.state !== 'healthy' && source.lastSuccessfulSyncAt && (
           // For elevated states, also show "last successful X ago" so
           // the operator knows how stale the underlying numbers are
@@ -54,13 +64,22 @@ export function SourceHealthRow({
       </div>
       <div className="flex shrink-0 items-center gap-1">
         {source.requiresUserAction ? (
-          <ReconnectButton itemId={source.itemId} />
+          // Plaid uses per-item update mode (Link token); SnapTrade
+          // routes through the user-scoped Connection Portal. Two
+          // genuinely different reconnect flows — branching here is
+          // honest, not duplication.
+          source.provider === 'snaptrade' ? (
+            <SnaptradeReconnectButton />
+          ) : (
+            <ReconnectButton itemId={source.itemId} />
+          )
         ) : (
           <SyncButton itemId={source.itemId} />
         )}
         <DisconnectItemButton
           itemId={source.itemId}
           institutionName={source.institutionName ?? 'this institution'}
+          provider={source.provider}
         />
       </div>
     </div>

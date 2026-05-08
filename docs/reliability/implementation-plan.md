@@ -555,6 +555,30 @@ responsive component honors operator-tier visual conventions
   (live /settings page; verify pill rendering across all sources
   and dark mode parity).
 
+#### Post-review corrections (2026-05-07)
+
+Code review of `3d43316` flagged three real issues. All addressed:
+
+- **Medium — SnapTrade reconnect crashed via Plaid update-mode.**
+  `<SourceHealthRow>` now branches on `source.provider` for the
+  reconnect action. New `<SnaptradeReconnectButton>` at
+  `src/components/snaptrade/reconnect-button.tsx` calls
+  `createSnaptradeConnectUrlAction()` and hard-navigates to the
+  Connection Portal (matches the new-connection flow because
+  SnapTrade's portal is user-scoped, not connection-scoped — there
+  is no per-item update mode). Plaid path unchanged.
+- **Low — disconnect dialog copy was Plaid-specific.**
+  `<DisconnectItemButton>` now takes a `provider` prop and renders
+  the right body text ("Plaid Link" vs "SnapTrade Connection
+  Portal"). Default is `'plaid'` for backward compatibility with any
+  existing callers. The action `disconnectExternalItemAction` itself
+  was already provider-neutral; only the dialog copy was stale.
+- **Low — provider label not rendered on the row.** The secondary
+  line is now prefixed with the provider name: "Plaid · Synced 5m
+  ago" / "SnapTrade · Synced 5m ago". Top line stays focused on
+  institution name + state pill so the institution remains the
+  visual anchor.
+
 ## Phase 5: Dashboard Trust Strip
 
 ### Problem
