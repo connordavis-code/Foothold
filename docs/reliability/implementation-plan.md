@@ -634,6 +634,91 @@ Examples:
 - No major layout churn.
 - No hidden failure state when a connected item is degraded.
 
+### Status (2026-05-07): shipped — second UI consumer of getSourceHealth
+
+`src/app/(app)/dashboard/page.tsx` now fetches `getSourceHealth()` and
+renders `<TrustStrip>` above `<HeroCard>` inside the existing
+`<MotionStack>`. Three render branches: muted single line for healthy
+("Fresh 5m ago · 5 sources"), muted line for no_signal ("Sync pending
+· N sources"), amber-bordered block with sentence-at-N=1 / mini-list-
+at-N≥2 + "Open settings" CTA for any source elevated to
+`degraded` / `failed` / `needs_reconnect`.
+
+#### Files
+
+- new: `src/lib/sync/trust-strip.ts` — pure helper
+  `summarizeTrustStrip(sources)` reduces `SourceHealth[]` to one of
+  three discriminated-union shapes (`healthy` | `no_signal` |
+  `elevated`). Stale + unknown per-source states are intentionally
+  silent here, mirroring the `<StatePill>` rule from `<SourceHealthRow>`.
+- new: `src/lib/sync/trust-strip.test.ts` — 10 pure tests covering
+  precedence, the conservative-anchor rule, mixed-state cases, the
+  null `institutionName` fallback, and the elevated-wins-over-no_signal
+  edge.
+- new: `src/components/sync/trust-strip.tsx` — server component, no
+  `'use client'`. `<Link>` to /settings (no client interactivity needed).
+- updated: `src/app/(app)/dashboard/page.tsx` — adds `getSourceHealth`
+  to the parallel `Promise.all`, renders `<TrustStrip sources={…} />`
+  above `<HeroCard>`. Empty-state path unchanged (already handled by
+  `<EmptyState>` for `!summary.hasAnyItem`).
+
+#### Locked design decisions (via AskUserQuestion before implementation)
+
+1. **Healthy state renders an always-visible muted line.** Rejected:
+   silent-unless-elevated. Reason: the strip's whole job is to
+   communicate freshness; silence in healthy state would force the
+   user back to /settings to get the receipt. Phase 4's `<StatePill>`
+   rule (silent for healthy/stale/unknown) applies to a *pill*, not a
+   sentence — a sentence can be muted enough to whisper.
+2. **Placement: above the hero card.** Rejected: metadata inside the
+   hero card (degraded state would visually contaminate the headline
+   number); top-bar chip (too small to scale to multi-source detail).
+3. **Elevated copy: sentence at N=1, mini-list at N≥2.** Rejected:
+   always single-sentence rollup (degenerates to count-only past
+   N=2); count + chevron (forces a click to learn anything — weaker
+   trust signal).
+
+#### Conservative-anchor decision
+
+`freshAt` in the healthy branch is the OLDEST among per-source
+`lastSuccessfulSyncAt` values, not the newest. Newest would flatter
+("synced 2 minutes ago!") even when other sources are 12 hours old.
+Conservative reading: "as of this point, every tracked source had
+reported in." Aligns with the initiative's North Star about honest
+freshness — flattering the worst case undercuts the work.
+
+Sources with null `lastSuccessfulSyncAt` (stale/unknown without any
+prior success) are excluded from the anchor computation but still
+count toward `sourceCount`. If ALL sources have null → `no_signal`
+branch fires instead.
+
+#### Visual restraint (DESIGN.md "Single-Hue Elevated Rule")
+
+- Healthy / no_signal: `<p>` with `text-xs text-muted-foreground`
+  only. No border, no icon. Daily reassurance with near-zero visual
+  cost.
+- Elevated: `border-amber-500/50` + `bg-amber-500/5`; icon
+  (`AlertTriangle`) and accent text in `text-amber-700
+  dark:text-amber-400`. Body copy stays in regular foreground for
+  readability — the accent hue earns the attention budget; reasons
+  stay legible.
+- Reusing classifier `reason` strings verbatim (same pattern as
+  Phase 4's `summarizeSourceHealth`). One source-of-truth for the
+  language across /settings and /dashboard — fix wording in one
+  place if it ever reads weirdly.
+
+#### Verification
+
+- typecheck clean
+- 10 new pure tests (`trust-strip.test.ts`) — full vitest 447/447
+- **Browser UAT not performed** — same constraint as Phase 4 (dev
+  server needs authenticated access via magic-link). Manual UAT
+  recommended at next session: live `/dashboard` should show the
+  muted "Fresh X ago" line in current healthy state; injecting an
+  `error_log` row to simulate `cron.balance_refresh%` failure on a
+  source should flip the strip to the amber block with the "Open
+  settings" CTA.
+
 ## Phase 6: Freshness Context On Numbers
 
 ### Problem

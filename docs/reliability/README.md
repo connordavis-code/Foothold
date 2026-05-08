@@ -232,24 +232,23 @@ UI expectations:
 
 ### Phase 4: Add Dashboard Trust Strip
 
-Goal: make trust visible at the moment the user asks "where do I stand?"
+Status: **shipped 2026-05-07.** See
+`docs/reliability/implementation-plan.md` § Phase 5 for the detailed
+status block. (README and implementation-plan use different phase
+numbering — README Phase 4 = plan Phase 5. The plan is canonical.)
 
-Likely files:
+What landed:
 
-- `src/app/(app)/dashboard/page.tsx`
-- `src/lib/db/queries/dashboard.ts`
-- New dashboard component under `src/components/dashboard/`
-
-Possible strip states:
-
-- All sources fresh.
-- Some sources stale.
-- A source is degraded.
-- User action required.
-- Sync currently running.
-
-Keep it compact. This should reassure or warn, not become another
-dashboard.
+- `<TrustStrip>` above the hero card in `/dashboard`.
+- Pure helper `summarizeTrustStrip` reduces `SourceHealth[]` into one
+  of three view-models: `healthy` (muted "Fresh X ago" line),
+  `no_signal` (muted "Sync pending" line), `elevated` (amber-bordered
+  block with sentence-at-N=1 / mini-list-at-N≥2 + "Open settings"
+  CTA). Stale and unknown per-source states are intentionally silent —
+  same restraint rule as the `<StatePill>` in `<SourceHealthRow>`.
+- 10 new pure tests (`trust-strip.test.ts`); full vitest 447/447.
+- Browser UAT pending — agent-session constraint (dev server needs
+  authenticated magic-link).
 
 ### Phase 5: Annotate Headline Numbers
 

@@ -804,6 +804,30 @@ plan at `docs/superpowers/plans/2026-05-07-phase-3-pt3-goal-detail.md`)
   `docs/reliability/implementation-plan.md` § Phase 4 Status
   (MobileList is for dense scrolling lists with single tap targets;
   settings has multi-button rows).
+- **Phase 5 (Dashboard trust strip) — shipped; browser UAT pending.**
+  `/dashboard` is the second UI consumer of `getSourceHealth()`. New
+  `<TrustStrip>` server component at `src/components/sync/` renders
+  above `<HeroCard>`. Three branches via pure helper
+  `summarizeTrustStrip`: `healthy` → muted single line ("Fresh 5m
+  ago · 5 sources"); `no_signal` (every source pre-first-sync) →
+  muted "Sync pending"; `elevated` (any source `degraded` / `failed`
+  / `needs_reconnect`) → amber-bordered block with sentence-at-N=1 /
+  mini-list-at-N≥2 + "Open settings" CTA. Stale + unknown per-source
+  states are intentionally silent — same restraint rule as the
+  `<StatePill>` in `<SourceHealthRow>`. **Conservative-anchor decision**:
+  `freshAt` in healthy is the OLDEST among per-source
+  `lastSuccessfulSyncAt`, not the newest — flattering the freshest
+  source while others are 12h old would undercut the initiative's
+  honest-freshness North Star. Reuses classifier `reason` strings
+  verbatim (same pattern as Phase 4's `summarizeSourceHealth`) so
+  /settings and /dashboard speak the same language; tighten copy in
+  one place if either reads weirdly. 10 new pure tests
+  (`trust-strip.test.ts`); full vitest 447/447. Locked design via
+  `AskUserQuestion` before implementation: always-visible-muted
+  (rejected silent-unless-elevated), placement above hero (rejected
+  inside-hero contamination + top-bar chip), sentence-at-N=1/list-at-
+  N≥2 (rejected always-rollup + count-only chevron). Browser UAT
+  pending — same constraint as Phase 4 (auth-gated dev server).
 
 ### Next up
 - **Plaid Production access review** for Fidelity (deprioritized) —
@@ -817,6 +841,12 @@ plan at `docs/superpowers/plans/2026-05-07-phase-3-pt3-goal-detail.md`)
   source; design in `docs/reliability/implementation-plan.md` § 5–6.
 - **Phase 4-pt2** — investment what-if simulator (deferred from Phase
   4 by design; needs its own brainstorm focused on modeling depth).
+- **Reliability Phase 6** — freshness annotations on headline numbers
+  (dashboard hero, investments summary, forecast baseline, goals pace,
+  recurring monthly total). Pulls per-number "as of when / from which
+  sources / cached or live" context from the same `getSourceHealth()`
+  query the trust strip uses. Spec at
+  `docs/reliability/implementation-plan.md` § Phase 6.
 
 ---
 
