@@ -293,8 +293,10 @@ Architecture note (or a code-level guard, e.g., a lint rule).
 - Server components by default; `"use client"` only when interaction
   requires it.
 - Imports: `@/...` always — no relative imports across `src/`.
-- Currency: `formatCurrency()` in [utils.ts](src/lib/utils.ts), never
-  `toFixed` by hand.
+- Currency: `formatCurrency()` in [utils.ts](src/lib/utils.ts) for tables /
+  column-aligned numbers ($50.00 — preserves cent column);
+  `formatCurrencyCompact()` for narrative prose ($50 — drops trailing zeros
+  on whole-dollar amounts). Never `toFixed` by hand.
 
 ---
 
@@ -541,6 +543,41 @@ plumbing with no testable predicates).
   Fixed via `<FlagHistoryList>` client wrapper. See Lessons learned >
   "Don't pass functions across the server→client boundary in config props."
 
+**Phase 3-pt3 — Per-goal coaching detail page** (2026-05-07 evening; spec
+at `docs/superpowers/specs/2026-05-07-phase-3-pt3-goal-detail-design.md`,
+plan at `docs/superpowers/plans/2026-05-07-phase-3-pt3-goal-detail.md`)
+- New route `/goals/[id]` with 5 sections: header (name, status pill,
+  edit/delete), projection card (type+verdict-branched headline copy),
+  trajectory chart (Recharts: cumulative actual + ideal pace + reference
+  at target/cap), contributing-data feed (spend-cap top-20 sorted by
+  amount OR savings weekly net deltas), coaching card (italic status +
+  optional muted action sentence). Server-rendered except for the chart
+  client island.
+- **Pure predicates extracted for testability** (matches Phase 5 pattern):
+  `walkBackTrajectory` in `src/lib/goals/trajectory.ts` (mirrors W-06
+  dashboard sparkline post-fix; UTC date math, today's delta is folded
+  into anchor); `composeCoaching` in `src/lib/goals/coaching.ts`
+  (deterministic two-sentence producer, six-arm discriminated union by
+  `kind × verdict`, no LLM in MVP); `pickTopDiscretionaryCategory` in
+  `src/lib/goals/discretionary.ts` (zero-filled trailing-3-complete-month
+  median, drops zero-median picks so a one-off purchase can't become a
+  steady-discretionary recommendation).
+- **Coaching action source for behind-savings**:
+  `getTopDiscretionaryCategory(userId)` in `src/lib/db/queries/goal-detail.ts`
+  — largest non-recurring outflow category by trailing-3-complete-month
+  median (excludes `TRANSFER_IN`/`TRANSFER_OUT`/`LOAN_PAYMENTS`,
+  EXCLUDES partial current month). Drift query as primary source is
+  deferred to 3-pt3.b.
+- **Drilldown rewire**: both savings AND spend-cap rows on `/goals` now
+  drill to `/goals/${id}` (was: spend-cap-only drill to filtered
+  `/transactions`). Symmetric.
+- Test count delta: +20 (10 from `walkBackTrajectory` + `composeCoaching`,
+  3 from `formatCurrencyCompact`, 7 from `pickTopDiscretionaryCategory`;
+  query layer integration-tested via UAT). Two-stage in-loop review +
+  external review caught 1 bug-class issue (`pickTopDiscretionaryCategory`
+  median-of-present-buckets) and 4 spec-vs-plan-drift items now deferred
+  to 3-pt3.b.
+
 **Observability + W-06 sparkline + SnapTrade inline sync** (2026-05-07 evening)
 - **Logger axios capture** (`05c12de`) — `logError` duck-types
   axios-shaped errors and persists `httpStatus` + `responseBody` to
@@ -676,13 +713,16 @@ plumbing with no testable predicates).
   Plaid has no OAuth integration with Fidelity in production; filing
   doesn't help. Re-check Plaid Dashboard > OAuth institutions every
   few months in case the situation changes.
-- **Provider-neutral column rename** (cleanup) — `plaid_account_id`
-  / `plaid_security_id` / `plaid_investment_transaction_id` columns
-  are reused for SnapTrade IDs (UUIDs don't collide). Renaming to
-  `provider_*_id` is honest but not load-bearing.
-- **Phase 3-pt3** — per-goal coaching detail page. Real data is
-  flowing now (was the original gating constraint); needs brainstorm
-  + spec to define drilldown shape.
+- **Phase 3-pt3.b** — four spec-vs-plan-drift items deferred from
+  Phase 3-pt3 (see spec § 9 / plan "Out of scope"): drift query as
+  primary source for behind-savings coaching action (MVP uses the
+  trailing-3-complete-month median fallback only); projected
+  continuation line on trajectory chart (chart ships actual + ideal,
+  not the third projected line); archived goals (`isActive=false`)
+  rendering with muted "Archived" eyebrow (currently 404 because
+  `getGoalDetail` reuses `getGoalsWithProgress`'s `isActive=true`
+  filter); mobile tap-to-edit on spend-cap-feed rows via
+  `<TransactionDetailSheet>`.
 - **Phase 4-pt2** — investment what-if simulator (deferred from Phase
   4 by design; needs its own brainstorm focused on modeling depth).
 
