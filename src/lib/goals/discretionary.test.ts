@@ -65,8 +65,9 @@ describe('pickTopDiscretionaryCategory', () => {
       ],
       buckets,
     );
-    // Only March counted: [0, 0, 100] → median 0. So returned, but at 0.
-    expect(result).toEqual({ name: 'X', monthlyAmount: 0 });
+    // Only March counted: [0, 0, 100] → median 0 → not returned (a single
+    // month of activity isn't "steady discretionary").
+    expect(result).toBeNull();
   });
 
   it('skips rows with null category', () => {
@@ -76,5 +77,19 @@ describe('pickTopDiscretionaryCategory', () => {
         buckets,
       ),
     ).toBeNull();
+  });
+
+  it('returns null when every category is a one-off (all medians = 0)', () => {
+    // Each category appears in exactly one bucket — all medians are 0.
+    // No category qualifies as "steady discretionary." Returning a $0/mo
+    // category here would produce "Trim X at $0/mo" — explicitly avoided.
+    const result = pickTopDiscretionaryCategory(
+      [
+        { category: 'FURNITURE', ym: '2026-03', monthTotal: 900 },
+        { category: 'TRAVEL', ym: '2026-04', monthTotal: 500 },
+      ],
+      buckets,
+    );
+    expect(result).toBeNull();
   });
 });

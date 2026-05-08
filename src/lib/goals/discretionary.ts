@@ -50,7 +50,11 @@ export function pickTopDiscretionaryCategory(
       m % 2 === 1
         ? sorted[(m - 1) / 2]
         : (sorted[m / 2 - 1] + sorted[m / 2]) / 2;
-    if (!best || median > best.monthlyAmount) {
+    // Only consider categories with positive median — a category whose
+    // zero-filled median is 0 means it had spend in <half the buckets,
+    // which doesn't qualify as "steady discretionary." Returning it would
+    // produce nonsense coaching like "Trim X at $0/mo by $213 to recover."
+    if (median > 0 && (!best || median > best.monthlyAmount)) {
       best = { name, monthlyAmount: median };
     }
   }
