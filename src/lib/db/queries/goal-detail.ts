@@ -354,3 +354,83 @@ async function getSavingsFeed(
     }),
   };
 }
+
+export type TopDiscretionaryCategory = {
+  /** PFC enum, humanized form expected by composeCoaching's action template. */
+  name: string;
+  /** Trailing-3-month median, scaled to monthly. */
+  monthlyAmount: number;
+};
+
+/**
+ * Largest non-recurring outflow category by trailing-3-month median, excluding
+ * transfers and loan payments. Used as the source for behind-savings coaching
+ * actions ("Trim Dining by $213/mo to recover").
+ *
+ * Spec § 5.5 says drift's top elevated category is the primary source; this
+ * function is the fallback. Drift integration is a follow-on — for MVP we
+ * always use this trailing-3-month-median path because it's the spec's floor
+ * and always returns something for an active user.
+ *
+ * Median across the 3 month buckets (not mean) so a single big-ticket month
+ * doesn't dominate. Returns null if the user has no qualifying transactions.
+ */
+export async function getTopDiscretionaryCategory(
+  userId: string,
+): Promise<TopDiscretionaryCategory | null> {
+  const today = new Date();
+  // Window: 3 months back from start-of-this-month, inclusive.
+  const windowStart = new Date(today.getFullYear(), today.getMonth() - 3, 1)
+    .toISOString()
+    .slice(0, 10);
+
+  // Sum positive (outflow) amounts per (category, year-month) — gives us
+  // 3 month-totals per category. Then take the median across those 3 months
+  // and surface the highest median.
+  const rows = await db
+    .select({
+      category: transactions.primaryCategory,
+      ym: sql<string>`to_char(${transactions.date}::date, 'YYYY-MM')`,
+      monthTotal: sql<string>`SUM(${transactions.amount}::numeric)`,
+    })
+    .from(transactions)
+    .innerJoin(
+      financialAccounts,
+      eq(financialAccounts.id, transactions.accountId),
+    )
+    .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
+    .where(
+      and(
+        eq(externalItems.userId, userId),
+        gte(transactions.date, windowStart),
+        sql`${transactions.amount}::numeric > 0`,
+        sql`COALESCE(${transactions.primaryCategory}, '') NOT IN ('TRANSFER_IN', 'TRANSFER_OUT', 'LOAN_PAYMENTS')`,
+      ),
+    )
+    .groupBy(transactions.primaryCategory, sql`to_char(${transactions.date}::date, 'YYYY-MM')`);
+
+  if (rows.length === 0) return null;
+
+  // Group month-totals by category, take median per category, pick max.
+  const byCategory = new Map<string, number[]>();
+  for (const r of rows) {
+    if (!r.category) continue;
+    const arr = byCategory.get(r.category) ?? [];
+    arr.push(Number(r.monthTotal));
+    byCategory.set(r.category, arr);
+  }
+  let best: { name: string; monthlyAmount: number } | null = null;
+  for (const [name, totals] of byCategory) {
+    const sorted = [...totals].sort((a, b) => a - b);
+    const median =
+      sorted.length === 0
+        ? 0
+        : sorted.length % 2 === 1
+          ? sorted[Math.floor(sorted.length / 2)]
+          : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2;
+    if (!best || median > best.monthlyAmount) {
+      best = { name, monthlyAmount: median };
+    }
+  }
+  return best;
+}

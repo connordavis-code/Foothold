@@ -62,7 +62,7 @@ function StatusPill({
   const cls = {
     over: 'bg-destructive/10 text-destructive border-destructive/30',
     warning: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30',
-    positive: 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30',
+    positive: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30',
     neutral: 'bg-accent text-foreground border-border',
   } as const;
   return (

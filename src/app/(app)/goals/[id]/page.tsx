@@ -12,7 +12,9 @@ import {
   getContributingFeed,
   getGoalDetail,
   getGoalTrajectory,
+  getTopDiscretionaryCategory,
 } from '@/lib/db/queries/goal-detail';
+import { humanizeCategory } from '@/lib/format/category';
 import { composeCoaching, type CoachingInput } from '@/lib/goals/coaching';
 import { paceVerdict } from '@/lib/goals/pace';
 
@@ -29,13 +31,16 @@ export default async function GoalDetailPage({ params }: Props) {
   const goal = await getGoalDetail(params.id, userId);
   if (!goal) notFound();
 
-  const [trajectory, feed] = await Promise.all([
+  const [trajectory, feed, topCategory] = await Promise.all([
     getGoalTrajectory(params.id, userId),
     getContributingFeed(params.id, userId),
+    getTopDiscretionaryCategory(userId),
   ]);
 
   const verdict = paceVerdict(goal);
-  const coaching = composeCoaching(buildCoachingInput(goal, verdict, feed));
+  const coaching = composeCoaching(
+    buildCoachingInput(goal, verdict, feed, topCategory),
+  );
 
   const target =
     goal.progress.type === 'savings' ? goal.progress.target : goal.progress.cap;
@@ -68,7 +73,9 @@ export default async function GoalDetailPage({ params }: Props) {
       {feed.kind === 'spend_cap' && (
         <SpendCapFeed
           rows={feed.rows}
-          categoryHref={goal.categoryFilter?.[0] ?? null}
+          categoryHref={
+            goal.categoryFilter?.length === 1 ? goal.categoryFilter[0] : null
+          }
         />
       )}
       {feed.kind === 'savings' && <SavingsFeed rows={feed.rows} />}
@@ -81,15 +88,16 @@ export default async function GoalDetailPage({ params }: Props) {
  * Bridges the DB shape (GoalWithProgress + feed) to the coaching predicate's
  * discriminated union. Keeps composeCoaching pure of database concerns.
  *
- * topDiscretionaryCategory is null in MVP — drift integration is a follow-on
- * (would call getDriftAnalysis for the user's top elevated category here).
- * Behind-savings still gets the status sentence; the action sentence just
- * stays null until that wiring lands.
+ * topDiscretionaryCategory feeds behind-savings' action sentence ("Trim
+ * Dining by $213/mo to recover"). Source is the trailing-3-month-median
+ * fallback per spec § 5.5; drift integration as the primary source is a
+ * follow-on polish pass — the action sentence still lands either way.
  */
 function buildCoachingInput(
   goal: GoalWithProgress,
   verdict: ReturnType<typeof paceVerdict>,
   feed: Awaited<ReturnType<typeof getContributingFeed>>,
+  topCategory: Awaited<ReturnType<typeof getTopDiscretionaryCategory>>,
 ): CoachingInput {
   const p = goal.progress;
   if (p.type === 'savings') {
@@ -119,8 +127,12 @@ function buildCoachingInput(
       verdict: 'behind',
       monthlyVelocity: p.monthlyVelocity,
       requiredMonthlyVelocity: required,
-      // TODO follow-on: pull from getDriftAnalysis; for now no action.
-      topDiscretionaryCategory: null,
+      topDiscretionaryCategory: topCategory
+        ? {
+            name: humanizeCategory(topCategory.name),
+            monthlyAmount: topCategory.monthlyAmount,
+          }
+        : null,
     };
   }
   // spend_cap
