@@ -150,6 +150,30 @@ SnapTrade activity amounts are **flipped** at the sync boundary
 ([snaptrade/sync.ts](src/lib/snaptrade/sync.ts)) so the codebase's
 "positive = cash OUT" invariant holds across providers.
 
+**SnapTrade activities HTTP 410 is a permanent N/A signal, not a
+failure.** Some SnapTrade brokerages (Fidelity IRA/Roth/401k subtypes
+canonically) don't expose transaction history through the data
+partnership — `getActivities` returns 410 Gone, forever. Treating
+that as a failure floods error_log + the digest + the trust strip
+with un-actionable noise. Pattern:
+
+  - sync layer ([snaptrade/sync.ts]) catches 410 specifically, skips
+    `logError`, sets `result.activitiesUnsupported`. When EVERY account
+    in the item is 410-marked, writes one item-level info row
+    `snaptrade.sync.activities.unsupported`.
+  - health-query layer ([db/queries/health.ts]) fetches that op as the
+    9th parallel lookup (now 1 + 9N queries). Pure helper
+    `isSnaptradeTransactionsUnsupported(ops)` returns true iff the
+    marker is newer than the latest success or failure for that
+    capability — self-healing via timestamp precedence.
+  - `inferCapabilities('snaptrade', _, { transactionsUnsupported })`
+    drops `transactions` from the tracked set when the flag is true.
+    Item resolves to investments-only health tracking.
+
+Reusable pattern for any upstream limitation that's account-subtype-
+specific and permanent. Don't blanket-disable a capability at the
+provider level — let the data signal drive the classifier.
+
 UI gating: `snaptradeConfigured()` from
 [snaptrade/client.ts](src/lib/snaptrade/client.ts) is server-evaluated
 and passed as `snaptradeEnabled` into
