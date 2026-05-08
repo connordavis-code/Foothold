@@ -54,6 +54,23 @@ export function TrustStrip({
     );
   }
 
+  if (summary.kind === 'quiet') {
+    // "Synced" verb (not "Fresh") — at least one source is stale or
+    // not yet reporting, so claiming "fresh" would contradict the
+    // per-source classifier on /settings.
+    const { sourceCount, reportingCount, syncedAt } = summary;
+    const sourceLabel = sourceCount === 1 ? 'source' : 'sources';
+    const countText =
+      reportingCount < sourceCount
+        ? `${reportingCount} of ${sourceCount} ${sourceLabel} reporting`
+        : `${sourceCount} ${sourceLabel}`;
+    return (
+      <p className="px-1 text-xs text-muted-foreground">
+        Synced {formatRelative(syncedAt, now)} · {countText}
+      </p>
+    );
+  }
+
   if (summary.kind === 'no_signal') {
     const sourceLabel = summary.sourceCount === 1 ? 'source' : 'sources';
     return (
@@ -81,7 +98,7 @@ export function TrustStrip({
           {n === 1 ? (
             <p className="break-words text-sm">
               <span className="font-medium">1 source needs attention:</span>{' '}
-              {summary.elevated[0].institutionName} —{' '}
+              {summary.elevated[0].institutionName},{' '}
               <span className="text-muted-foreground">
                 {summary.elevated[0].reason}
               </span>
@@ -94,7 +111,7 @@ export function TrustStrip({
               <ul className="mt-1 space-y-0.5 text-sm">
                 {summary.elevated.map((row) => (
                   <li key={row.itemId} className="break-words">
-                    <span>{row.institutionName}</span> —{' '}
+                    <span>{row.institutionName}</span>,{' '}
                     <span className="text-muted-foreground">{row.reason}</span>
                   </li>
                 ))}

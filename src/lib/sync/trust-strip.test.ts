@@ -46,7 +46,22 @@ describe('summarizeTrustStrip — healthy', () => {
     expect(r.freshAt.toISOString()).toBe('2026-05-07T13:00:00.000Z');
   });
 
-  it('healthy + stale + unknown → still kind=healthy (silent for non-elevated)', () => {
+  it('single healthy source with lastSuccessfulSyncAt → freshAt is that timestamp', () => {
+    const r = summarizeTrustStrip([wf()]);
+    expect(r.kind).toBe('healthy');
+    if (r.kind !== 'healthy') return;
+    expect(r.sourceCount).toBe(1);
+    expect(r.freshAt.toISOString()).toBe('2026-05-07T15:00:00.000Z');
+  });
+});
+
+describe('summarizeTrustStrip — quiet (mixed silent, not all healthy)', () => {
+  // Regression: previously this case returned kind=healthy and the
+  // component rendered "Fresh 30m ago · 3 sources" even though one
+  // source was stale and one had never synced. The strip claimed
+  // "fresh" while the classifier called the stale source stale —
+  // dishonest by the trust-strip's own North Star.
+  it('healthy + stale + unknown → kind=quiet, reportingCount excludes the unknown', () => {
     const r = summarizeTrustStrip([
       wf(),
       amex({ state: 'stale', reason: '1 of 3 capabilities not fresh' }),
@@ -56,19 +71,51 @@ describe('summarizeTrustStrip — healthy', () => {
         lastSuccessfulSyncAt: null,
       }),
     ]);
-    expect(r.kind).toBe('healthy');
-    if (r.kind !== 'healthy') return;
+    expect(r.kind).toBe('quiet');
+    if (r.kind !== 'quiet') return;
     expect(r.sourceCount).toBe(3);
-    // Only sources with non-null lastSuccessfulSyncAt anchor freshAt
-    expect(r.freshAt.toISOString()).toBe('2026-05-07T14:30:00.000Z');
+    expect(r.reportingCount).toBe(2);
+    // Same conservative anchor as freshAt: oldest of the reporting timestamps
+    expect(r.syncedAt.toISOString()).toBe('2026-05-07T14:30:00.000Z');
   });
 
-  it('single healthy source with lastSuccessfulSyncAt → freshAt is that timestamp', () => {
-    const r = summarizeTrustStrip([wf()]);
-    expect(r.kind).toBe('healthy');
-    if (r.kind !== 'healthy') return;
+  it('lone stale source → kind=quiet with reportingCount === sourceCount', () => {
+    // Even a single stale source is quiet, not healthy — "Fresh"
+    // would directly contradict the per-source `stale` classification.
+    const r = summarizeTrustStrip([
+      amex({ state: 'stale', reason: '1 of 3 capabilities not fresh' }),
+    ]);
+    expect(r.kind).toBe('quiet');
+    if (r.kind !== 'quiet') return;
     expect(r.sourceCount).toBe(1);
-    expect(r.freshAt.toISOString()).toBe('2026-05-07T15:00:00.000Z');
+    expect(r.reportingCount).toBe(1);
+    expect(r.syncedAt.toISOString()).toBe('2026-05-07T14:30:00.000Z');
+  });
+
+  it('healthy + unknown → kind=quiet (one source not yet reporting)', () => {
+    const r = summarizeTrustStrip([
+      wf(),
+      amex({
+        state: 'unknown',
+        reason: 'No sync data yet',
+        lastSuccessfulSyncAt: null,
+      }),
+    ]);
+    expect(r.kind).toBe('quiet');
+    if (r.kind !== 'quiet') return;
+    expect(r.sourceCount).toBe(2);
+    expect(r.reportingCount).toBe(1);
+  });
+
+  it('all stale (every source has reported, none currently fresh) → quiet, reportingCount === sourceCount', () => {
+    const r = summarizeTrustStrip([
+      wf({ state: 'stale', reason: '1 of 3 capabilities not fresh' }),
+      amex({ state: 'stale', reason: '1 of 3 capabilities not fresh' }),
+    ]);
+    expect(r.kind).toBe('quiet');
+    if (r.kind !== 'quiet') return;
+    expect(r.sourceCount).toBe(2);
+    expect(r.reportingCount).toBe(2);
   });
 });
 
