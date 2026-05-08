@@ -6,6 +6,7 @@ import {
   goals,
   transactions,
 } from '@/lib/db/schema';
+import { pickTopDiscretionaryCategory } from '@/lib/goals/discretionary';
 import {
   walkBackTrajectory,
   type TrajectoryPoint,
@@ -358,35 +359,42 @@ async function getSavingsFeed(
 export type TopDiscretionaryCategory = {
   /** PFC enum, humanized form expected by composeCoaching's action template. */
   name: string;
-  /** Trailing-3-month median, scaled to monthly. */
+  /** Median across 3 complete trailing months (zero-filled). */
   monthlyAmount: number;
 };
 
 /**
- * Largest non-recurring outflow category by trailing-3-month median, excluding
- * transfers and loan payments. Used as the source for behind-savings coaching
- * actions ("Trim Dining by $213/mo to recover").
+ * Largest non-recurring outflow category by median across the 3 complete
+ * trailing months, excluding transfers and loan payments. Used as the source
+ * for behind-savings coaching actions ("Trim Dining by $213/mo to recover").
  *
  * Spec § 5.5 says drift's top elevated category is the primary source; this
- * function is the fallback. Drift integration is a follow-on — for MVP we
- * always use this trailing-3-month-median path because it's the spec's floor
+ * function is the fallback. Drift integration is a follow-on (3-pt3.b) — for
+ * MVP we always use this trailing-median path because it's the spec's floor
  * and always returns something for an active user.
  *
- * Median across the 3 month buckets (not mean) so a single big-ticket month
- * doesn't dominate. Returns null if the user has no qualifying transactions.
+ * Window deliberately EXCLUDES the partial current month — a half-month of
+ * spending shouldn't compete with full-month historical buckets. Median-not-
+ * mean across the 3 month buckets so a single big-ticket month doesn't
+ * dominate. Pure bucketing/median math lives in pickTopDiscretionaryCategory.
  */
 export async function getTopDiscretionaryCategory(
   userId: string,
 ): Promise<TopDiscretionaryCategory | null> {
   const today = new Date();
-  // Window: 3 months back from start-of-this-month, inclusive.
-  const windowStart = new Date(today.getFullYear(), today.getMonth() - 3, 1)
-    .toISOString()
-    .slice(0, 10);
+  // 3 complete trailing months, e.g. for a today in May 2026: Feb, Mar, Apr.
+  const monthStartFor = (offset: number) =>
+    new Date(today.getFullYear(), today.getMonth() - offset, 1);
+  const windowStart = monthStartFor(3).toISOString().slice(0, 10);
+  const windowEnd = monthStartFor(0).toISOString().slice(0, 10); // exclusive
+  const monthBuckets = [
+    monthStartFor(3),
+    monthStartFor(2),
+    monthStartFor(1),
+  ].map(
+    (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+  );
 
-  // Sum positive (outflow) amounts per (category, year-month) — gives us
-  // 3 month-totals per category. Then take the median across those 3 months
-  // and surface the highest median.
   const rows = await db
     .select({
       category: transactions.primaryCategory,
@@ -403,34 +411,22 @@ export async function getTopDiscretionaryCategory(
       and(
         eq(externalItems.userId, userId),
         gte(transactions.date, windowStart),
+        sql`${transactions.date} < ${windowEnd}`,
         sql`${transactions.amount}::numeric > 0`,
         sql`COALESCE(${transactions.primaryCategory}, '') NOT IN ('TRANSFER_IN', 'TRANSFER_OUT', 'LOAN_PAYMENTS')`,
       ),
     )
-    .groupBy(transactions.primaryCategory, sql`to_char(${transactions.date}::date, 'YYYY-MM')`);
+    .groupBy(
+      transactions.primaryCategory,
+      sql`to_char(${transactions.date}::date, 'YYYY-MM')`,
+    );
 
-  if (rows.length === 0) return null;
-
-  // Group month-totals by category, take median per category, pick max.
-  const byCategory = new Map<string, number[]>();
-  for (const r of rows) {
-    if (!r.category) continue;
-    const arr = byCategory.get(r.category) ?? [];
-    arr.push(Number(r.monthTotal));
-    byCategory.set(r.category, arr);
-  }
-  let best: { name: string; monthlyAmount: number } | null = null;
-  for (const [name, totals] of byCategory) {
-    const sorted = [...totals].sort((a, b) => a - b);
-    const median =
-      sorted.length === 0
-        ? 0
-        : sorted.length % 2 === 1
-          ? sorted[Math.floor(sorted.length / 2)]
-          : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2;
-    if (!best || median > best.monthlyAmount) {
-      best = { name, monthlyAmount: median };
-    }
-  }
-  return best;
+  return pickTopDiscretionaryCategory(
+    rows.map((r) => ({
+      category: r.category,
+      ym: r.ym,
+      monthTotal: Number(r.monthTotal),
+    })),
+    monthBuckets,
+  );
 }
