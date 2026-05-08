@@ -143,6 +143,25 @@ function mostRecentFailure(
 }
 
 /**
+ * SnapTrade per-capability success resolution. Three branches:
+ *
+ *   1. info row present → authoritative
+ *   2. info row absent BUT error row present → null (the orchestrator
+ *      suppressed the info row because of a per-account failure;
+ *      falling back to lastSyncedAt would mask that failure)
+ *   3. neither signal present → backward-compat fallback
+ */
+function resolveSnaptradeCapabilitySuccess(
+  perCapabilitySuccessAt: Date | null,
+  perCapabilityFailureAt: Date | null,
+  fallback: Date | null,
+): Date | null {
+  if (perCapabilitySuccessAt !== null) return perCapabilitySuccessAt;
+  if (perCapabilityFailureAt !== null) return null;
+  return fallback;
+}
+
+/**
  * Pure: translate raw op-class log lookups + `external_item.lastSyncedAt`
  * + provider into per-capability resolved success/failure timestamps.
  *
@@ -230,15 +249,28 @@ export function resolveCapabilityTimestamps(
     };
   }
 
-  // SnapTrade — per-capability info row is authoritative when present.
-  const txSuccess =
-    ops.snaptradeActivitiesSuccessAt !== null
-      ? ops.snaptradeActivitiesSuccessAt
-      : nightlySuccessFallback;
-  const invSuccess =
-    ops.snaptradePositionsSuccessAt !== null
-      ? ops.snaptradePositionsSuccessAt
-      : nightlySuccessFallback;
+  // SnapTrade — three-branch resolution per capability:
+  //   1. per-capability info row exists → authoritative success
+  //   2. per-capability ERROR exists without a corresponding info
+  //      row → success is null. Critically, do NOT fall back to
+  //      cron.nightly_sync.item or lastSyncedAt: the orchestrator
+  //      updates lastSyncedAt at the end of every sync regardless
+  //      of per-account failures, so falling back would mask the
+  //      partial failure (success > failure → classifier says fresh).
+  //   3. neither per-capability signal exists → backward-compat
+  //      fallback to nightly + lastSyncedAt (used by items synced
+  //      before per-capability info logging shipped, until the
+  //      first post-deploy sync writes the new info rows).
+  const txSuccess = resolveSnaptradeCapabilitySuccess(
+    ops.snaptradeActivitiesSuccessAt,
+    ops.snaptradeActivitiesFailureAt,
+    nightlySuccessFallback,
+  );
+  const invSuccess = resolveSnaptradeCapabilitySuccess(
+    ops.snaptradePositionsSuccessAt,
+    ops.snaptradePositionsFailureAt,
+    nightlySuccessFallback,
+  );
 
   // Per-capability errors merge with cron + dispatcher errors.
   const txFailure = mostRecentFailure(

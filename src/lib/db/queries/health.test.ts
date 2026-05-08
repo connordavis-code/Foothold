@@ -326,31 +326,36 @@ describe('resolveCapabilityTimestamps — SnapTrade per-capability info rows are
     expect(out.investments.lastSuccessAt).toEqual(ts(10));
   });
 
-  // The acute case: activities failed mid-sync, rollup succeeded,
-  // BUT no activities info row was written (because the per-
-  // capability success guard suppressed it). Result: activities
-  // success = null, failure = T1. failure > success (no success
-  // means -Infinity) → failed_recent at the classifier layer.
-  it('partial activities failure: no info row → failure dominates', () => {
-    const out = resolveCapabilityTimestamps('snaptrade', ts(1), {
+  // Regression for second review of 5790050. The acute partial-failure
+  // case: activities fails mid-sync at T1, syncSnaptradeItem suppresses
+  // the activities info row (per-capability success guard), but
+  // STILL updates external_item.lastSyncedAt at T2 > T1 because the
+  // orchestrator otherwise completed. Without the three-branch
+  // resolution, fallback would set transactions success = T2 and
+  // the classifier would say fresh (T2 > T1) — masking the per-
+  // capability failure entirely.
+  //
+  // Correct behavior: when a per-capability error exists and no
+  // overriding success info row exists, transactions.lastSuccessAt
+  // must be null. Failure timestamp dominates regardless of
+  // lastSyncedAt.
+  it('partial activities failure: lastSyncedAt newer than error → success suppressed, failure surfaces', () => {
+    const lastSynced = ts(0.5); // 30 minutes ago — newer than the failure
+    const out = resolveCapabilityTimestamps('snaptrade', lastSynced, {
       ...EMPTY_OPS,
       // No snaptradeActivitiesSuccessAt — partial failure suppressed it
-      snaptradeActivitiesFailureAt: ts(1),
+      snaptradeActivitiesFailureAt: ts(2), // failed 2h ago
       snaptradeActivitiesFailureMessage: 'rate_limit',
-      // Positions DID succeed for all accounts
-      snaptradePositionsSuccessAt: ts(1),
+      // Positions DID succeed for all accounts in the same sync
+      snaptradePositionsSuccessAt: lastSynced,
     });
-    // Transactions: no info row, lastSyncedAt is the fallback —
-    // this is the previously-broken behavior. After this fix the
-    // rule changes: if there's no per-capability info row, we still
-    // fall back to the orchestrator path (backward-compat for items
-    // pre-deploy) BUT the per-capability error timestamp dominates
-    // when it's the most recent signal. Verify failure surfaces
-    // even though lastSyncedAt is at the same instant.
-    expect(out.transactions.lastFailureAt).toEqual(ts(1));
+    // Transactions: lastSuccessAt MUST be null (do not fall back to
+    // lastSyncedAt despite it being newer than the failure).
+    expect(out.transactions.lastSuccessAt).toBeNull();
+    expect(out.transactions.lastFailureAt).toEqual(ts(2));
     expect(out.transactions.lastFailureMessage).toBe('rate_limit');
-    // Positions: info row exists → used as success
-    expect(out.investments.lastSuccessAt).toEqual(ts(1));
+    // Positions: info row exists → used as authoritative success
+    expect(out.investments.lastSuccessAt).toEqual(lastSynced);
     expect(out.investments.lastFailureAt).toBeNull();
   });
 
@@ -389,6 +394,77 @@ describe('resolveCapabilityTimestamps — SnapTrade per-capability info rows are
     });
     expect(out.transactions.lastSuccessAt).toEqual(ts(50));
     expect(out.transactions.lastFailureAt).toEqual(ts(1));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// Resolver + classifier round-trip regression
+// ─────────────────────────────────────────────────────────────────────
+
+describe('SnapTrade partial-failure end-to-end (resolver + classifier)', () => {
+  // The reviewer's exact regression ask: prove that
+  //   "activities error + no activities success row + newer lastSyncedAt"
+  // produces byCapability.transactions === 'failed_recent' all the
+  // way through buildCapabilityStates → classifyItemHealth. Asserting
+  // resolver-layer values alone (lastSuccessAt null, lastFailureAt set)
+  // is necessary but not sufficient — the classifier still has to
+  // translate that into a failed_recent verdict.
+  it('classifies transactions as failed_recent even when lastSyncedAt is newer than the activities error', async () => {
+    const { classifyItemHealth } = await import('@/lib/sync/health');
+
+    const lastSynced = ts(0.5); // 30 minutes ago
+    const resolved = resolveCapabilityTimestamps('snaptrade', lastSynced, {
+      ...EMPTY_OPS,
+      snaptradeActivitiesFailureAt: ts(2),
+      snaptradeActivitiesFailureMessage: 'rate_limit',
+      snaptradePositionsSuccessAt: lastSynced,
+    });
+    const capabilities = buildCapabilityStates(
+      ['transactions', 'investments'],
+      resolved,
+    );
+    const verdict = classifyItemHealth({
+      provider: 'snaptrade',
+      itemStatus: 'active',
+      capabilities,
+      now: NOW,
+    });
+
+    expect(verdict.byCapability.transactions).toBe('failed_recent');
+    expect(verdict.byCapability.investments).toBe('fresh');
+    // Source-level: one capability working, one failing → degraded
+    expect(verdict.state).toBe('degraded');
+  });
+
+  // Counter-test: if both activities AND positions failed mid-sync
+  // (no per-cap info rows for either), and lastSyncedAt is newer
+  // than both errors, source classifies as failed (no success-backed
+  // capability remains).
+  it('classifies as failed when both per-cap errors exist with no overriding info rows', async () => {
+    const { classifyItemHealth } = await import('@/lib/sync/health');
+
+    const lastSynced = ts(0.5);
+    const resolved = resolveCapabilityTimestamps('snaptrade', lastSynced, {
+      ...EMPTY_OPS,
+      snaptradeActivitiesFailureAt: ts(2),
+      snaptradeActivitiesFailureMessage: 'rate_limit_a',
+      snaptradePositionsFailureAt: ts(2),
+      snaptradePositionsFailureMessage: 'rate_limit_p',
+    });
+    const capabilities = buildCapabilityStates(
+      ['transactions', 'investments'],
+      resolved,
+    );
+    const verdict = classifyItemHealth({
+      provider: 'snaptrade',
+      itemStatus: 'active',
+      capabilities,
+      now: NOW,
+    });
+
+    expect(verdict.byCapability.transactions).toBe('failed_recent');
+    expect(verdict.byCapability.investments).toBe('failed_recent');
+    expect(verdict.state).toBe('failed');
   });
 });
 

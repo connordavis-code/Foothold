@@ -383,20 +383,32 @@ now resolved by per-capability success logging in `syncSnaptradeItem`:
   account succeeded for activities. Any per-account error suppresses
   the success info row.
 - `snaptrade.sync.positions` info row written under the same rule.
-- `resolveCapabilityTimestamps` treats per-capability info rows as
-  AUTHORITATIVE for SnapTrade — when present, they override both
-  the orchestrator-level rollup AND the lastSyncedAt fallback for
-  that capability. So a sync where activities failed but positions
-  succeeded yields: positions info row exists (investments fresh),
-  activities info row absent (transactions has no overriding
-  success → activities-error timestamp dominates → failed_recent).
+- `resolveCapabilityTimestamps` runs a three-branch resolution per
+  SnapTrade capability (corrected after second review of `5790050`):
+  1. **info row present** → authoritative success
+  2. **info row absent BUT error row present** → success is null.
+     **Critically, do NOT fall back to lastSyncedAt or
+     `cron.nightly_sync.item`** — the orchestrator updates
+     lastSyncedAt at the end of every sync regardless of per-account
+     failures. Falling back would set the success timestamp to T2
+     (after the failure at T1), which is newer than T1, which means
+     `classifyCapability` says `fresh` even though the capability's
+     work in this sync demonstrably failed.
+  3. **neither signal present** → backward-compat fallback to nightly
+     + lastSyncedAt (used by items synced before per-capability info
+     logging shipped, until the first post-deploy sync writes the new
+     rows).
+
+The branch (2) bug was the real residual issue — branch (1)
+authoritativeness alone isn't enough because the absence of an info
+row is ambiguous between "post-deploy partial failure" and "pre-
+deploy backward-compat." The error column disambiguates.
 
 Backward compatibility: items synced before per-capability info
-logging shipped have no info rows yet. Until the next post-deploy
-sync writes them, those items fall back to the prior rule
-(max of cron info row + lastSyncedAt). After one full sync cycle
-post-deploy, all SnapTrade items have authoritative per-capability
-info rows.
+logging shipped have no info rows AND no per-capability errors
+yet → branch (3) → fall back to prior rule. After one full sync
+cycle post-deploy, all SnapTrade items have authoritative
+per-capability signals.
 
 #### Manual sync failure surfacing (also resolved post-second-review)
 

@@ -650,12 +650,14 @@ plumbing with no testable predicates).
   (2) SnapTrade per-capability error ops merge into the relevant
   capability's failure timestamp — `snaptrade.sync.activities` →
   transactions, `snaptrade.sync.positions` → investments;
-  (3) **SnapTrade per-capability success info rows are
-  AUTHORITATIVE** — `syncSnaptradeItem` writes
-  `snaptrade.sync.{activities,positions}` info rows ONLY when EVERY
-  account succeeded for that capability; when present they override
-  the orchestrator's lastSyncedAt rollup, so partial failures no
-  longer mask as `fresh`; (4) `sync.dispatcher` errors apply to all
+  (3) **SnapTrade per-capability resolution is three-branch**:
+  if a per-capability info row exists, use it as authoritative
+  success; else if a per-capability error row exists, success is
+  null (do NOT fall back to lastSyncedAt — the orchestrator updates
+  lastSyncedAt at the end of every sync regardless of partial
+  failures, so falling back would mask them as `fresh`); else
+  fall back to nightly + lastSyncedAt (backward-compat for items
+  pre-deploy); (4) `sync.dispatcher` errors apply to all
   nightly-backed capabilities for both providers (manual sync
   failures previously vanished from health). Composite index added
   to schema — **`npm run db:push` required** to apply
