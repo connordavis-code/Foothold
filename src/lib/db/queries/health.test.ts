@@ -29,10 +29,14 @@ const EMPTY_OPS: RawOpTimestamps = {
   nightlySuccessAt: null,
   nightlyFailureAt: null,
   nightlyFailureMessage: null,
+  snaptradeActivitiesSuccessAt: null,
+  snaptradePositionsSuccessAt: null,
   snaptradeActivitiesFailureAt: null,
   snaptradeActivitiesFailureMessage: null,
   snaptradePositionsFailureAt: null,
   snaptradePositionsFailureMessage: null,
+  dispatcherFailureAt: null,
+  dispatcherFailureMessage: null,
 };
 
 const EMPTY_RESOLVED: ResolvedCapabilityTimestamps = {
@@ -286,6 +290,191 @@ describe('resolveCapabilityTimestamps — SnapTrade', () => {
     });
     expect(out.transactions.lastFailureMessage).toBe('activities oops');
     expect(out.investments.lastFailureMessage).toBe('positions oops');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// SnapTrade per-capability info rows (post-review fix)
+// ─────────────────────────────────────────────────────────────────────
+
+describe('resolveCapabilityTimestamps — SnapTrade per-capability info rows are authoritative', () => {
+  // Regression for review of 4fd02ef. The "partial-failure-then-success"
+  // case: activities fails inside a sync at T1, orchestrator rolls
+  // up successfully at T2, lastSyncedAt updates at T2. Without
+  // per-capability info logging, success > failure → fresh, masking
+  // the per-capability failure. With it, the activities-info row
+  // would only be written if ALL accounts succeeded — its absence
+  // means we fall back to the cron+lastSyncedAt path AND the
+  // activities-error timestamp wins because there's no overriding
+  // success info row.
+  it('activities info row overrides lastSyncedAt fallback', () => {
+    // Activities info row is at T=10h ago; lastSyncedAt is fresher
+    // (T=2h ago, would normally win the fallback). Per-capability
+    // info row is authoritative and uses its own timestamp.
+    const out = resolveCapabilityTimestamps('snaptrade', ts(2), {
+      ...EMPTY_OPS,
+      snaptradeActivitiesSuccessAt: ts(10),
+    });
+    expect(out.transactions.lastSuccessAt).toEqual(ts(10));
+  });
+
+  it('positions info row overrides lastSyncedAt fallback', () => {
+    const out = resolveCapabilityTimestamps('snaptrade', ts(2), {
+      ...EMPTY_OPS,
+      snaptradePositionsSuccessAt: ts(10),
+    });
+    expect(out.investments.lastSuccessAt).toEqual(ts(10));
+  });
+
+  // The acute case: activities failed mid-sync, rollup succeeded,
+  // BUT no activities info row was written (because the per-
+  // capability success guard suppressed it). Result: activities
+  // success = null, failure = T1. failure > success (no success
+  // means -Infinity) → failed_recent at the classifier layer.
+  it('partial activities failure: no info row → failure dominates', () => {
+    const out = resolveCapabilityTimestamps('snaptrade', ts(1), {
+      ...EMPTY_OPS,
+      // No snaptradeActivitiesSuccessAt — partial failure suppressed it
+      snaptradeActivitiesFailureAt: ts(1),
+      snaptradeActivitiesFailureMessage: 'rate_limit',
+      // Positions DID succeed for all accounts
+      snaptradePositionsSuccessAt: ts(1),
+    });
+    // Transactions: no info row, lastSyncedAt is the fallback —
+    // this is the previously-broken behavior. After this fix the
+    // rule changes: if there's no per-capability info row, we still
+    // fall back to the orchestrator path (backward-compat for items
+    // pre-deploy) BUT the per-capability error timestamp dominates
+    // when it's the most recent signal. Verify failure surfaces
+    // even though lastSyncedAt is at the same instant.
+    expect(out.transactions.lastFailureAt).toEqual(ts(1));
+    expect(out.transactions.lastFailureMessage).toBe('rate_limit');
+    // Positions: info row exists → used as success
+    expect(out.investments.lastSuccessAt).toEqual(ts(1));
+    expect(out.investments.lastFailureAt).toBeNull();
+  });
+
+  // Backward-compat: items synced before per-capability info logging
+  // shipped have no info rows yet. Resolution falls back to the
+  // pre-existing rule (max of cron + lastSyncedAt).
+  it('no per-capability info rows → falls back to nightly + lastSyncedAt', () => {
+    const out = resolveCapabilityTimestamps('snaptrade', ts(2), {
+      ...EMPTY_OPS,
+      nightlySuccessAt: ts(8),
+    });
+    expect(out.transactions.lastSuccessAt).toEqual(ts(2)); // lastSyncedAt wins
+    expect(out.investments.lastSuccessAt).toEqual(ts(2));
+  });
+
+  // Recovery case: activities failed at T1, then succeeded at T2 < T1
+  // (stale failure, fresh success). Info row drives success, error
+  // row remains. success > failure → fresh.
+  it('activities info newer than activities error → fresh', () => {
+    const out = resolveCapabilityTimestamps('snaptrade', null, {
+      ...EMPTY_OPS,
+      snaptradeActivitiesSuccessAt: ts(1), // recent recovery
+      snaptradeActivitiesFailureAt: ts(50), // old failure
+      snaptradeActivitiesFailureMessage: 'old',
+    });
+    expect(out.transactions.lastSuccessAt).toEqual(ts(1));
+    expect(out.transactions.lastFailureAt).toEqual(ts(50));
+  });
+
+  it('activities error newer than activities info → failure surfaces', () => {
+    const out = resolveCapabilityTimestamps('snaptrade', null, {
+      ...EMPTY_OPS,
+      snaptradeActivitiesSuccessAt: ts(50),
+      snaptradeActivitiesFailureAt: ts(1),
+      snaptradeActivitiesFailureMessage: 'fresh failure',
+    });
+    expect(out.transactions.lastSuccessAt).toEqual(ts(50));
+    expect(out.transactions.lastFailureAt).toEqual(ts(1));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// sync.dispatcher errors (post-review fix)
+// ─────────────────────────────────────────────────────────────────────
+
+describe('resolveCapabilityTimestamps — sync.dispatcher errors', () => {
+  // Regression for review of 4fd02ef Medium. Manual `syncItemAction`
+  // failures log under `op = 'sync.dispatcher'`. Phase 3 must surface
+  // these or a user can click "Sync now," see it fail, and the
+  // health row stays healthy from the last cron.
+
+  it('Plaid: dispatcher error applies to all 3 nightly capabilities', () => {
+    const out = resolveCapabilityTimestamps('plaid', null, {
+      ...EMPTY_OPS,
+      dispatcherFailureAt: ts(1),
+      dispatcherFailureMessage: 'manual sync threw',
+    });
+    expect(out.transactions.lastFailureAt).toEqual(ts(1));
+    expect(out.investments.lastFailureAt).toEqual(ts(1));
+    expect(out.recurring.lastFailureAt).toEqual(ts(1));
+    expect(out.transactions.lastFailureMessage).toBe('manual sync threw');
+  });
+
+  it('SnapTrade: dispatcher error applies to transactions + investments', () => {
+    const out = resolveCapabilityTimestamps('snaptrade', null, {
+      ...EMPTY_OPS,
+      dispatcherFailureAt: ts(1),
+      dispatcherFailureMessage: 'manual sync threw',
+    });
+    expect(out.transactions.lastFailureAt).toEqual(ts(1));
+    expect(out.investments.lastFailureAt).toEqual(ts(1));
+  });
+
+  it('dispatcher error newer than cron error → dispatcher wins', () => {
+    const out = resolveCapabilityTimestamps('plaid', null, {
+      ...EMPTY_OPS,
+      nightlyFailureAt: ts(10),
+      nightlyFailureMessage: 'cron error',
+      dispatcherFailureAt: ts(2),
+      dispatcherFailureMessage: 'manual error',
+    });
+    expect(out.transactions.lastFailureAt).toEqual(ts(2));
+    expect(out.transactions.lastFailureMessage).toBe('manual error');
+  });
+
+  it('cron error newer than dispatcher error → cron wins', () => {
+    const out = resolveCapabilityTimestamps('plaid', null, {
+      ...EMPTY_OPS,
+      nightlyFailureAt: ts(2),
+      nightlyFailureMessage: 'cron error',
+      dispatcherFailureAt: ts(10),
+      dispatcherFailureMessage: 'old manual error',
+    });
+    expect(out.transactions.lastFailureAt).toEqual(ts(2));
+    expect(out.transactions.lastFailureMessage).toBe('cron error');
+  });
+
+  it('dispatcher error does NOT apply to balances (separate cron)', () => {
+    const out = resolveCapabilityTimestamps('plaid', null, {
+      ...EMPTY_OPS,
+      dispatcherFailureAt: ts(1),
+      dispatcherFailureMessage: 'manual error',
+    });
+    // Balances reads only from the balance cron — dispatcher errors
+    // don't refresh balances. Balance cron is independent.
+    expect(out.balances.lastFailureAt).toBeNull();
+  });
+
+  it('SnapTrade: dispatcher error + per-capability error → most recent wins per capability', () => {
+    const out = resolveCapabilityTimestamps('snaptrade', null, {
+      ...EMPTY_OPS,
+      dispatcherFailureAt: ts(5),
+      dispatcherFailureMessage: 'older dispatcher',
+      snaptradeActivitiesFailureAt: ts(1),
+      snaptradeActivitiesFailureMessage: 'newer activities',
+      snaptradePositionsFailureAt: ts(20),
+      snaptradePositionsFailureMessage: 'old positions',
+    });
+    // Transactions: activities (T1) > dispatcher (T5)
+    expect(out.transactions.lastFailureAt).toEqual(ts(1));
+    expect(out.transactions.lastFailureMessage).toBe('newer activities');
+    // Investments: dispatcher (T5) > positions (T20)
+    expect(out.investments.lastFailureAt).toEqual(ts(5));
+    expect(out.investments.lastFailureMessage).toBe('older dispatcher');
   });
 });
 

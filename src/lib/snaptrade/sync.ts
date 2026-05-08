@@ -9,7 +9,7 @@ import {
   securities,
   snaptradeUsers,
 } from '@/lib/db/schema';
-import { logError } from '@/lib/logger';
+import { logError, logRun } from '@/lib/logger';
 import { snaptrade } from './client';
 
 const num = (n: number | null | undefined): string | null =>
@@ -173,6 +173,15 @@ export async function syncSnaptradeItem(
           providerAccountId: acc.providerAccountId,
           positions: [] as unknown[],
           activities: [] as unknown[],
+          // Per-account success flags so the post-loop aggregator can
+          // emit per-capability info rows only when ALL accounts
+          // succeeded for that capability. Phase 3's sync-health query
+          // reads these to distinguish a partial-failure-rolled-up-as-
+          // success from a true success — without per-capability info
+          // logging the orchestrator's lastSyncedAt was masking
+          // per-capability errors.
+          positionsOk: false,
+          activitiesOk: false,
         };
         try {
           const posRes =
@@ -182,6 +191,7 @@ export async function syncSnaptradeItem(
               accountId: acc.providerAccountId,
             });
           result.positions = posRes.data ?? [];
+          result.positionsOk = true;
         } catch (err) {
           await logError('snaptrade.sync.positions', err, {
             externalItemId: item.id,
@@ -197,6 +207,7 @@ export async function syncSnaptradeItem(
             endDate: endStr,
           });
           result.activities = actRes.data ?? [];
+          result.activitiesOk = true;
         } catch (err) {
           await logError('snaptrade.sync.activities', err, {
             externalItemId: item.id,
@@ -389,6 +400,41 @@ export async function syncSnaptradeItem(
             })
         : Promise.resolve(),
     ]);
+
+    // Per-capability success info rows. Only emitted when EVERY
+    // account succeeded for that capability — any per-account error
+    // (already logged at level='error' inside the loop) suppresses
+    // the success info row so Phase 3 health classification can
+    // distinguish partial failures from true successes. Without these
+    // info rows, the orchestrator's lastSyncedAt update masked
+    // per-capability failures (the cron rolled up as success,
+    // lastSyncedAt advanced, classifier said `fresh`).
+    const positionsAllOk =
+      perAccountResults.length > 0 &&
+      perAccountResults.every((r) => r.positionsOk);
+    const activitiesAllOk =
+      perAccountResults.length > 0 &&
+      perAccountResults.every((r) => r.activitiesOk);
+    if (positionsAllOk) {
+      await logRun(
+        'snaptrade.sync.positions',
+        `${perAccountResults.length} accounts synced positions`,
+        {
+          externalItemId: item.id,
+          accountCount: perAccountResults.length,
+        },
+      );
+    }
+    if (activitiesAllOk) {
+      await logRun(
+        'snaptrade.sync.activities',
+        `${perAccountResults.length} accounts synced activities`,
+        {
+          externalItemId: item.id,
+          accountCount: perAccountResults.length,
+        },
+      );
+    }
 
     await db
       .update(externalItems)

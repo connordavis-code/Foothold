@@ -373,33 +373,61 @@ supplementary to the cron schedule — a failed webhook doesn't break
 the next nightly sync. If observability needs them, they can be
 surfaced separately as a "reliability events" feed.
 
-#### Residual limitation (SnapTrade partial-failure-then-success)
+#### Residual limitation (resolved 2026-05-07 post-second-review)
 
-When a SnapTrade per-capability error fires *during* a sync that
-ultimately rolls up as success (e.g. `snaptrade.sync.activities`
-error at T1, `cron.nightly_sync.item` info at T2 > T1), the
-classifier currently sees `lastSuccess > lastFailure` and classifies
-the capability as `fresh`. The capability-level failure context is
-preserved in `lastFailureSummary`, but the state classification
-is optimistic. Fully resolving this requires per-capability success
-logging in `syncSnaptradeItem` (so positions / activities each write
-their own `level='info'` row only when they actually succeed).
-That's broader scope — deferred to a follow-up phase. For now,
-Phase 4 UI consumers can layer the failure summary onto the row
-even when the source classifies as healthy.
+The "partial-failure-then-success" case (SnapTrade per-capability
+error fires inside a sync that ultimately rolls up as success) is
+now resolved by per-capability success logging in `syncSnaptradeItem`:
+
+- `snaptrade.sync.activities` info row written only when EVERY
+  account succeeded for activities. Any per-account error suppresses
+  the success info row.
+- `snaptrade.sync.positions` info row written under the same rule.
+- `resolveCapabilityTimestamps` treats per-capability info rows as
+  AUTHORITATIVE for SnapTrade — when present, they override both
+  the orchestrator-level rollup AND the lastSyncedAt fallback for
+  that capability. So a sync where activities failed but positions
+  succeeded yields: positions info row exists (investments fresh),
+  activities info row absent (transactions has no overriding
+  success → activities-error timestamp dominates → failed_recent).
+
+Backward compatibility: items synced before per-capability info
+logging shipped have no info rows yet. Until the next post-deploy
+sync writes them, those items fall back to the prior rule
+(max of cron info row + lastSyncedAt). After one full sync cycle
+post-deploy, all SnapTrade items have authoritative per-capability
+info rows.
+
+#### Manual sync failure surfacing (also resolved post-second-review)
+
+`syncExternalItem` (the dispatcher) wraps both providers and logs
+`op = 'sync.dispatcher'` on uncaught errors. Previously not read by
+Phase 3, so a failed manual sync left the health row showing
+"healthy from last cron" — misleading. `resolveCapabilityTimestamps`
+now folds dispatcher errors into the nightly-side failure for both
+providers (dispatcher errors don't apply to balances — that's a
+separate cron).
 
 #### Query shape
 
 1 typed Drizzle query for items + aggregated `financial_account.type[]`
 via `ARRAY_AGG(DISTINCT type) FILTER (WHERE type IS NOT NULL)`,
-followed by 6 parallel `error_log` lookups per item (success+failure
-× balance+nightly, plus snaptrade.sync.activities and
-snaptrade.sync.positions error rows). Total: `1 + 6N` queries for
-`N` sources. The composite index keeps each lookup at an index seek
-+ LIMIT 1; for typical N=2–5 the round-trip is negligible. The
-snaptrade-specific queries run for Plaid items too (returning empty
-results) — branching to skip them saves at most 2 queries × N items,
-not worth the conditional complexity.
+followed by 9 parallel `error_log` lookups per item:
+- balance success (`cron.balance_refresh.item` info)
+- balance failure (`cron.balance_refresh%` error)
+- nightly success (`cron.nightly_sync.item` info)
+- nightly failure (`cron.nightly_sync%` error)
+- snaptrade activities success (`snaptrade.sync.activities` info)
+- snaptrade activities failure (`snaptrade.sync.activities` error)
+- snaptrade positions success (`snaptrade.sync.positions` info)
+- snaptrade positions failure (`snaptrade.sync.positions` error)
+- dispatcher failure (`sync.dispatcher` error)
+
+Total: `1 + 9N` queries for `N` sources. The composite index keeps
+each lookup at an index seek + LIMIT 1; for typical N=2–5 the
+round-trip is negligible. SnapTrade-specific queries run for Plaid
+items too (returning empty) — branching to skip saves at most 4
+queries × N items, not worth the conditional complexity.
 
 #### Security
 

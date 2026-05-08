@@ -90,11 +90,29 @@ export type RawOpTimestamps = {
   nightlySuccessAt: Date | null;
   nightlyFailureAt: Date | null;
   nightlyFailureMessage: string | null;
-  /** SnapTrade per-capability errors. Plaid items will have null here. */
+  /**
+   * SnapTrade per-capability *success* info rows. Authoritative for
+   * the corresponding capability when present (overrides the
+   * orchestrator-level rollup). Written by `syncSnaptradeItem` only
+   * when EVERY account succeeded for that capability. Plaid items
+   * have null here (Plaid doesn't write per-capability info rows).
+   */
+  snaptradeActivitiesSuccessAt: Date | null;
+  snaptradePositionsSuccessAt: Date | null;
+  /** SnapTrade per-capability errors. Plaid items have null here. */
   snaptradeActivitiesFailureAt: Date | null;
   snaptradeActivitiesFailureMessage: string | null;
   snaptradePositionsFailureAt: Date | null;
   snaptradePositionsFailureMessage: string | null;
+  /**
+   * Dispatcher-level failure (`syncExternalItem` wraps both providers
+   * and logs `op = 'sync.dispatcher'` on uncaught errors). Counts as
+   * a nightly-side failure for both providers — covers the case
+   * where the manual `syncItemAction` path failed before reaching
+   * provider-specific logging.
+   */
+  dispatcherFailureAt: Date | null;
+  dispatcherFailureMessage: string | null;
 };
 
 /** Per-capability resolved timestamps. Output of `resolveCapabilityTimestamps`. */
@@ -129,36 +147,42 @@ function mostRecentFailure(
  * + provider into per-capability resolved success/failure timestamps.
  *
  * This helper owns the load-bearing op-class-to-capability mapping
- * rules. Two non-obvious considerations:
+ * rules. Three non-obvious considerations:
  *
  *   - **lastSyncedAt as fallback for nightly success.** Both manual
  *     and cron syncs update `external_item.lastSyncedAt`, but only
  *     the cron writes `cron.nightly_sync.item` info rows. Without the
  *     fallback, a freshly connected source has lastSyncedAt set but
- *     no info row → health classifies as `unknown`/`never_synced`
- *     until the next nightly cron, which is misleading UX. We take
- *     `max(nightly info row, lastSyncedAt)` so manual / initial syncs
- *     count toward freshness too.
+ *     no info row → health classifies as `unknown`/`never_synced`.
+ *     We take `max(nightly info row, lastSyncedAt)` so manual /
+ *     initial syncs count.
  *
- *   - **SnapTrade per-capability errors.** `syncSnaptradeItem`
- *     intentionally catches per-account position/activity failures
- *     and logs `snaptrade.sync.positions` / `snaptrade.sync.activities`
- *     while the orchestrator-level `cron.nightly_sync.item` still rolls
- *     up as success. Without merging those per-capability errors into
- *     the relevant capability's failure timestamp, partial SnapTrade
- *     failures would silently disappear from source health. We merge
- *     `activities` errors into `transactions` and `positions` errors
- *     into `investments`, taking the most-recent of (cron-level error,
- *     SnapTrade-specific error). Residual limitation: when a partial
- *     failure precedes a successful cron rollup, the success timestamp
- *     is slightly newer and the classifier will say "fresh." Fully
- *     solving that requires per-capability success logging in
- *     `syncSnaptradeItem` (broader scope, deferred).
+ *   - **SnapTrade per-capability info rows are AUTHORITATIVE.**
+ *     `syncSnaptradeItem` writes `snaptrade.sync.activities` / `.positions`
+ *     info rows only when ALL accounts succeeded for that capability.
+ *     When such a row exists, it overrides the orchestrator-level
+ *     rollup AND the lastSyncedAt fallback for that capability —
+ *     because the orchestrator marks itself successful even when a
+ *     per-capability error fired earlier in the same sync. Without
+ *     this override, a partial failure followed by a successful
+ *     orchestrator rollup would mask the per-capability error.
+ *     Backward-compat: items synced before per-capability success
+ *     logging shipped have no info rows yet; we fall back to the
+ *     orchestrator-level rollup until the first post-deploy sync
+ *     runs.
  *
- * Balance refresh is provider-agnostic at this layer — only the cron
- * writes balance signals and `lastSyncedAt` doesn't reflect balance
- * refreshes. So balances reads straight through from the cron op
- * regardless of provider; for SnapTrade `balances` is N/A anyway.
+ *   - **Dispatcher-level errors apply to nightly capabilities.**
+ *     `syncExternalItem` wraps the provider-specific orchestrators;
+ *     uncaught errors there log `op = 'sync.dispatcher'`. Counts as
+ *     a nightly-side failure for both providers (covers the case
+ *     where a manual `syncItemAction` failed before provider-specific
+ *     logging fired).
+ *
+ * Balance refresh is provider-agnostic at this layer — only the
+ * balance cron writes balance signals; `lastSyncedAt` and dispatcher
+ * errors don't reflect balance refresh state. So balances reads
+ * straight through from the balance cron op regardless of provider;
+ * for SnapTrade `balances` is N/A anyway.
  */
 export function resolveCapabilityTimestamps(
   provider: Provider,
@@ -171,17 +195,32 @@ export function resolveCapabilityTimestamps(
     lastFailureMessage: ops.balanceFailureMessage,
   };
 
-  // Nightly success: max(cron info row, item.lastSyncedAt). The
-  // fallback lets manual / initial syncs count.
-  const nightlySuccess = mostRecent(ops.nightlySuccessAt, itemLastSyncedAt);
+  // Nightly success fallback: max(cron info, lastSyncedAt). The
+  // fallback lets manual / initial syncs count when no cron info row
+  // exists yet.
+  const nightlySuccessFallback = mostRecent(
+    ops.nightlySuccessAt,
+    itemLastSyncedAt,
+  );
+
+  // Dispatcher errors apply to all nightly-backed capabilities for
+  // both providers.
+  const dispatcherFailure = {
+    at: ops.dispatcherFailureAt,
+    message: ops.dispatcherFailureMessage,
+  };
+  const nightlyOrDispatcherFailure = mostRecentFailure(
+    { at: ops.nightlyFailureAt, message: ops.nightlyFailureMessage },
+    dispatcherFailure,
+  );
 
   if (provider === 'plaid') {
     // Plaid nightly is atomic. One failure source covers all nightly
     // capabilities.
     const nightly: CapabilityTimestamps = {
-      lastSuccessAt: nightlySuccess,
-      lastFailureAt: ops.nightlyFailureAt,
-      lastFailureMessage: ops.nightlyFailureMessage,
+      lastSuccessAt: nightlySuccessFallback,
+      lastFailureAt: nightlyOrDispatcherFailure.at,
+      lastFailureMessage: nightlyOrDispatcherFailure.message,
     };
     return {
       balances,
@@ -191,17 +230,26 @@ export function resolveCapabilityTimestamps(
     };
   }
 
-  // SnapTrade: merge per-capability errors with orchestrator-level
-  // failures. activities → transactions; positions → investments.
+  // SnapTrade — per-capability info row is authoritative when present.
+  const txSuccess =
+    ops.snaptradeActivitiesSuccessAt !== null
+      ? ops.snaptradeActivitiesSuccessAt
+      : nightlySuccessFallback;
+  const invSuccess =
+    ops.snaptradePositionsSuccessAt !== null
+      ? ops.snaptradePositionsSuccessAt
+      : nightlySuccessFallback;
+
+  // Per-capability errors merge with cron + dispatcher errors.
   const txFailure = mostRecentFailure(
-    { at: ops.nightlyFailureAt, message: ops.nightlyFailureMessage },
+    nightlyOrDispatcherFailure,
     {
       at: ops.snaptradeActivitiesFailureAt,
       message: ops.snaptradeActivitiesFailureMessage,
     },
   );
   const invFailure = mostRecentFailure(
-    { at: ops.nightlyFailureAt, message: ops.nightlyFailureMessage },
+    nightlyOrDispatcherFailure,
     {
       at: ops.snaptradePositionsFailureAt,
       message: ops.snaptradePositionsFailureMessage,
@@ -211,12 +259,12 @@ export function resolveCapabilityTimestamps(
   return {
     balances, // N/A for SnapTrade — buildCapabilityStates emits not_applicable
     transactions: {
-      lastSuccessAt: nightlySuccess,
+      lastSuccessAt: txSuccess,
       lastFailureAt: txFailure.at,
       lastFailureMessage: txFailure.message,
     },
     investments: {
-      lastSuccessAt: nightlySuccess,
+      lastSuccessAt: invSuccess,
       lastFailureAt: invFailure.at,
       lastFailureMessage: invFailure.message,
     },
@@ -313,8 +361,11 @@ async function loadOpTimestamps(itemId: string): Promise<RawOpTimestamps> {
     balFail,
     nightSucc,
     nightFail,
+    stActSucc,
     stActFail,
+    stPosSucc,
     stPosFail,
+    dispatchFail,
   ] = await Promise.all([
     db
       .select({ at: errorLog.occurredAt })
@@ -365,6 +416,18 @@ async function loadOpTimestamps(itemId: string): Promise<RawOpTimestamps> {
       .orderBy(desc(errorLog.occurredAt))
       .limit(1),
     db
+      .select({ at: errorLog.occurredAt })
+      .from(errorLog)
+      .where(
+        and(
+          eq(errorLog.externalItemId, itemId),
+          eq(errorLog.op, 'snaptrade.sync.activities'),
+          eq(errorLog.level, 'info'),
+        ),
+      )
+      .orderBy(desc(errorLog.occurredAt))
+      .limit(1),
+    db
       .select({ at: errorLog.occurredAt, message: errorLog.message })
       .from(errorLog)
       .where(
@@ -372,6 +435,18 @@ async function loadOpTimestamps(itemId: string): Promise<RawOpTimestamps> {
           eq(errorLog.externalItemId, itemId),
           eq(errorLog.op, 'snaptrade.sync.activities'),
           eq(errorLog.level, 'error'),
+        ),
+      )
+      .orderBy(desc(errorLog.occurredAt))
+      .limit(1),
+    db
+      .select({ at: errorLog.occurredAt })
+      .from(errorLog)
+      .where(
+        and(
+          eq(errorLog.externalItemId, itemId),
+          eq(errorLog.op, 'snaptrade.sync.positions'),
+          eq(errorLog.level, 'info'),
         ),
       )
       .orderBy(desc(errorLog.occurredAt))
@@ -388,6 +463,18 @@ async function loadOpTimestamps(itemId: string): Promise<RawOpTimestamps> {
       )
       .orderBy(desc(errorLog.occurredAt))
       .limit(1),
+    db
+      .select({ at: errorLog.occurredAt, message: errorLog.message })
+      .from(errorLog)
+      .where(
+        and(
+          eq(errorLog.externalItemId, itemId),
+          eq(errorLog.op, 'sync.dispatcher'),
+          eq(errorLog.level, 'error'),
+        ),
+      )
+      .orderBy(desc(errorLog.occurredAt))
+      .limit(1),
   ]);
 
   return {
@@ -397,10 +484,14 @@ async function loadOpTimestamps(itemId: string): Promise<RawOpTimestamps> {
     nightlySuccessAt: nightSucc[0]?.at ?? null,
     nightlyFailureAt: nightFail[0]?.at ?? null,
     nightlyFailureMessage: nightFail[0]?.message ?? null,
+    snaptradeActivitiesSuccessAt: stActSucc[0]?.at ?? null,
+    snaptradePositionsSuccessAt: stPosSucc[0]?.at ?? null,
     snaptradeActivitiesFailureAt: stActFail[0]?.at ?? null,
     snaptradeActivitiesFailureMessage: stActFail[0]?.message ?? null,
     snaptradePositionsFailureAt: stPosFail[0]?.at ?? null,
     snaptradePositionsFailureMessage: stPosFail[0]?.message ?? null,
+    dispatcherFailureAt: dispatchFail[0]?.at ?? null,
+    dispatcherFailureMessage: dispatchFail[0]?.message ?? null,
   };
 }
 

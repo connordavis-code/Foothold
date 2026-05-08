@@ -643,28 +643,31 @@ plumbing with no testable predicates).
   fixed-shape for SnapTrade (`transactions + investments` always).
   Log → CapabilityState mapping handled by pure helper
   `resolveCapabilityTimestamps(provider, lastSyncedAt, ops)` which owns
-  the op-class → capability translation rules. Two load-bearing
-  resolutions added after review of `118fefd`: (1) `external_item
-  .lastSyncedAt` is a fallback success signal for nightly-backed
-  capabilities (manual sync writes lastSyncedAt but no info row, so
-  freshly connected sources would otherwise classify as
-  unknown/never_synced); (2) SnapTrade per-capability error ops
-  merge into the relevant capability's failure timestamp —
-  `snaptrade.sync.activities` → transactions failure,
-  `snaptrade.sync.positions` → investments failure (the cron-level
-  rollup logs success even when these per-capability errors fire
-  inside a sync). Composite index added to schema — **`npm run
-  db:push` required** to apply
+  the op-class → capability translation rules. Four load-bearing
+  resolutions: (1) `external_item.lastSyncedAt` fallback for nightly-
+  backed capabilities (manual / initial sync writes lastSyncedAt but
+  no info row, so freshly connected sources count as fresh);
+  (2) SnapTrade per-capability error ops merge into the relevant
+  capability's failure timestamp — `snaptrade.sync.activities` →
+  transactions, `snaptrade.sync.positions` → investments;
+  (3) **SnapTrade per-capability success info rows are
+  AUTHORITATIVE** — `syncSnaptradeItem` writes
+  `snaptrade.sync.{activities,positions}` info rows ONLY when EVERY
+  account succeeded for that capability; when present they override
+  the orchestrator's lastSyncedAt rollup, so partial failures no
+  longer mask as `fresh`; (4) `sync.dispatcher` errors apply to all
+  nightly-backed capabilities for both providers (manual sync
+  failures previously vanished from health). Composite index added
+  to schema — **`npm run db:push` required** to apply
   `error_log_item_op_occurred_idx (external_item_id, op, occurred_at)`.
-  Query shape is 1 + 6N (1 typed Drizzle for items+account-types
-  array_agg, 6 parallel error_log lookups per item). No
-  `external_item.secret` selected; `WHERE external_item.user_id = $1`
-  scopes per-user. Residual limitation documented: when a SnapTrade
-  per-capability error precedes a successful cron rollup within the
-  same sync window, the success timestamp wins and classifier shows
-  fresh; full fix needs per-capability success logging in
-  `syncSnaptradeItem` (deferred). No UI wired (per scope) — Phase 4
-  (Settings) and Phase 5 (Dashboard trust strip) are the consumers.
+  Query shape is 1 + 9N (1 typed Drizzle for items+account-types
+  array_agg, 9 parallel error_log lookups per item: balance
+  success/failure, nightly success/failure, snaptrade activities
+  success/failure, snaptrade positions success/failure, dispatcher
+  failure). No `external_item.secret` selected; `WHERE
+  external_item.user_id = $1` scopes per-user. No UI wired (per
+  scope) — Phase 4 (Settings) and Phase 5 (Dashboard trust strip)
+  are the consumers.
 
 ### Next up
 - **Plaid Production access review** for Fidelity (deprioritized) —
