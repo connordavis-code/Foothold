@@ -1,6 +1,7 @@
 import { and, eq, gte, inArray, lte, sql, type SQL } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
+  categories,
   externalItems,
   financialAccounts,
   goals,
@@ -11,6 +12,7 @@ import {
   walkBackTrajectory,
   type TrajectoryPoint,
 } from '@/lib/goals/trajectory';
+import { getDriftAnalysis } from './drift';
 import {
   getGoalsWithProgress,
   type GoalWithProgress,
@@ -39,7 +41,8 @@ export async function getGoalDetail(
   // Compute the user's full goal set with progress, then pick out this one.
   // Reused for shape parity with /goals; if N grows large enough that this
   // is a perf concern, factor out the per-goal progress computation.
-  const all = await getGoalsWithProgress(userId);
+  // includeInactive: archived goals must render here too (3-pt3.b § archived).
+  const all = await getGoalsWithProgress(userId, { includeInactive: true });
   return all.find((g) => g.id === goalId) ?? null;
 }
 
@@ -215,6 +218,10 @@ export type SpendCapFeedRow = {
   amount: number;
   category: string | null;
   accountName: string;
+  /** For TransactionDetailSheet's DetailRow shape. */
+  pending: boolean;
+  accountMask: string | null;
+  overrideCategoryName: string | null;
 };
 
 export type SavingsFeedRow = {
@@ -277,7 +284,10 @@ async function getSpendCapFeed(
       merchantName: transactions.merchantName,
       amount: transactions.amount,
       category: transactions.primaryCategory,
+      pending: transactions.pending,
       accountName: financialAccounts.name,
+      accountMask: financialAccounts.mask,
+      overrideCategoryName: categories.name,
     })
     .from(transactions)
     .innerJoin(
@@ -285,6 +295,7 @@ async function getSpendCapFeed(
       eq(financialAccounts.id, transactions.accountId),
     )
     .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
+    .leftJoin(categories, eq(categories.id, transactions.categoryOverrideId))
     .where(and(...conditions))
     .orderBy(sql`${transactions.amount}::numeric DESC`)
     .limit(20);
@@ -299,6 +310,9 @@ async function getSpendCapFeed(
       amount: Number(r.amount),
       category: r.category,
       accountName: r.accountName,
+      pending: r.pending,
+      accountMask: r.accountMask,
+      overrideCategoryName: r.overrideCategoryName,
     })),
   };
 }
@@ -429,4 +443,32 @@ export async function getTopDiscretionaryCategory(
     })),
     monthBuckets,
   );
+}
+
+/** Weeks per month (52 / 12). Used to convert weekly drift totals into a
+ * monthly equivalent for the coaching action sentence. */
+const WEEKS_PER_MONTH = 52 / 12;
+
+/**
+ * Coaching-action category for behind-savings goals. Spec § 5.5: pull
+ * /drift's top elevated category first; fall back to the 3-month-median
+ * picker when drift has nothing flagged.
+ *
+ * The drift path quotes the spike rate (currentTotal × 4.33) rather than
+ * the baseline so the sentence ("Trim ${cat} at $X/mo") reflects the
+ * user's CURRENT behavior — what they'd actually be cutting from. The
+ * median fallback returns its own monthly figure unchanged.
+ */
+export async function getBehindSavingsCoachingCategory(
+  userId: string,
+): Promise<TopDiscretionaryCategory | null> {
+  const drift = await getDriftAnalysis(userId);
+  const top = drift.currentlyElevated[0];
+  if (top) {
+    return {
+      name: top.category,
+      monthlyAmount: top.currentTotal * WEEKS_PER_MONTH,
+    };
+  }
+  return getTopDiscretionaryCategory(userId);
 }

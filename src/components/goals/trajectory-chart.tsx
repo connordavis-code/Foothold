@@ -23,6 +23,11 @@ type Props = {
   target: number;
   /** Behind/over → amber fill; on-pace → foreground hue. */
   isBehind: boolean;
+  /** Optional projected continuation (today → windowEnd at current
+   * velocity). Two endpoints; rendered as a dashed line in the same hue
+   * as `isBehind` selects. Null when projection isn't meaningful (post-
+   * target savings, end-of-month spend caps). */
+  projection: { startDate: string; startValue: number; endDate: string; endValue: number } | null;
 };
 
 /**
@@ -41,6 +46,7 @@ export function GoalTrajectoryChart({
   windowEnd,
   target,
   isBehind,
+  projection,
 }: Props) {
   // Compute the ideal-pace line as a synthetic series of just two points
   // (start at $0, end at $target across the window). Recharts plots a
@@ -49,10 +55,18 @@ export function GoalTrajectoryChart({
     { date: windowStart, ideal: 0 },
     { date: windowEnd, ideal: target },
   ];
-  // Merge actual + ideal into a unified data array keyed by date. Any date
-  // missing one half renders as a gap which Recharts handles with
-  // connectNulls.
-  const data = mergeByDate(series, idealPace);
+  // Projected continuation — same shape: two endpoints from "today" to
+  // window end at current velocity. Null collapses to no extra series.
+  const projected = projection
+    ? [
+        { date: projection.startDate, projected: projection.startValue },
+        { date: projection.endDate, projected: projection.endValue },
+      ]
+    : [];
+  // Merge actual + ideal + projected into a unified data array keyed by
+  // date. Any date missing a series renders as a gap which Recharts
+  // handles with connectNulls.
+  const data = mergeByDate(series, idealPace, projected);
 
   const lineColor = isBehind ? 'hsl(var(--chart-3))' : 'hsl(var(--foreground))';
   const fillColor = isBehind ? 'hsl(var(--chart-3))' : 'hsl(var(--foreground))';
@@ -114,6 +128,19 @@ export function GoalTrajectoryChart({
             dot={false}
             connectNulls
           />
+          {projection && (
+            <Line
+              type="linear"
+              dataKey="projected"
+              name="Projected"
+              stroke={lineColor}
+              strokeDasharray="4 3"
+              strokeOpacity={0.6}
+              strokeWidth={1.5}
+              dot={false}
+              connectNulls
+            />
+          )}
         </AreaChart>
       </ResponsiveContainer>
     </div>
@@ -124,21 +151,25 @@ type MergedRow = {
   date: string;
   cumulative?: number;
   ideal?: number;
+  projected?: number;
 };
 
 function mergeByDate(
   actual: TrajectoryPoint[],
   ideal: { date: string; ideal: number }[],
+  projected: { date: string; projected: number }[],
 ): MergedRow[] {
   const map = new Map<string, MergedRow>();
-  for (const p of actual) {
-    map.set(p.date, { date: p.date, cumulative: p.cumulative });
-  }
-  for (const p of ideal) {
-    const existing = map.get(p.date);
-    if (existing) existing.ideal = p.ideal;
-    else map.set(p.date, { date: p.date, ideal: p.ideal });
-  }
+  const upsert = (date: string): MergedRow => {
+    const existing = map.get(date);
+    if (existing) return existing;
+    const fresh: MergedRow = { date };
+    map.set(date, fresh);
+    return fresh;
+  };
+  for (const p of actual) upsert(p.date).cumulative = p.cumulative;
+  for (const p of ideal) upsert(p.date).ideal = p.ideal;
+  for (const p of projected) upsert(p.date).projected = p.projected;
   return Array.from(map.values()).sort((a, b) =>
     a.date < b.date ? -1 : a.date > b.date ? 1 : 0,
   );

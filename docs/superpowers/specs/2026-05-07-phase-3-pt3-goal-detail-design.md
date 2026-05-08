@@ -183,13 +183,16 @@ DB query layer (`goal-detail.ts`) is unit-light; integration via existing /goals
 > Updated 2026-05-07 evening — the four bolded entries below were originally
 > unmarked as deferred but turned out to be plan→spec drift. External review
 > caught them; documented here as Phase 3-pt3.b candidates.
+>
+> Updated 2026-05-08 — the four bolded entries are now SHIPPED. See CLAUDE.md
+> > Roadmap > Done > "Phase 3-pt3.b" for the implementation summary.
 
 - **LLM coaching narrative** — replace static template with Anthropic Haiku 4.5 call. Cache strategy TBD: stale-tolerant per-goal cache (matches `/simulator` `<NarrativePanel>`) or on-demand button (matches `/insights`).
 - **Investment-account drift in savings trajectory** — Approach B `goal_progress_snapshot` table.
-- **Drift query as primary source for behind-savings coaching action** — § 5.5 calls for "pull `/drift`'s top elevated category" first, with the trailing-3-month-median fallback. MVP ships only the fallback (`getTopDiscretionaryCategory` in `src/lib/db/queries/goal-detail.ts`); upgrade calls `getDriftAnalysis` first.
-- **Projected continuation line on trajectory chart** — § 5.3 specifies three lines (actual, ideal pace, projected continuation in the foreground hue extending from "today" forward at current velocity). MVP ships only the first two; the chart still tells the pace story without the projected segment.
-- **Archived goals (`isActive: false`) rendering with muted "Archived" eyebrow** — § 7 edge-case row promises this. `getGoalDetail` currently reuses `getGoalsWithProgress` which filters `isActive=true`, so archived goals return null and 404. Fix path: either add an `includeInactive` flag to `getGoalsWithProgress` OR factor out per-goal progress computation in `goal-detail.ts`.
-- **Mobile tap-to-edit on spend-cap-feed rows via `<TransactionDetailSheet>`** — § 5.4 mobile section. MVP rows are presentational on both desktop and mobile.
+- ~~**Drift query as primary source for behind-savings coaching action**~~ — SHIPPED 2026-05-08. `getBehindSavingsCoachingCategory` in `src/lib/db/queries/goal-detail.ts` calls `getDriftAnalysis` first (currentTotal × 52/12 → monthly), falls back to `getTopDiscretionaryCategory` when drift has nothing flagged.
+- ~~**Projected continuation line on trajectory chart**~~ — SHIPPED 2026-05-08. Third dashed `<Line>` on `<GoalTrajectoryChart>` in foreground/amber hue; `computeProjection` in `goals/[id]/page.tsx` derives endValue from `monthlyVelocity / 30.5` (savings, floored at 0) or `projectedMonthly` (spend-cap).
+- ~~**Archived goals (`isActive: false`) rendering with muted "Archived" eyebrow**~~ — SHIPPED 2026-05-08. `getGoalsWithProgress(userId, { includeInactive })` flag, `getGoalDetail` passes true. The pre-existing `· Archived` eyebrow on `<GoalDetailHeader>` is now live; `/goals` leaderboard adds an `Archived` section beneath Behind/On pace (opacity-70, sorted by createdAt desc).
+- ~~**Mobile tap-to-edit on spend-cap-feed rows via `<TransactionDetailSheet>`**~~ — SHIPPED 2026-05-08. `<SpendCapFeed>` is now a client component holding active-row state; query extended to select `pending`, `accountMask`, `overrideCategoryName` (left join `categories` on `categoryOverrideId`); `categoryOptions` plumbed through from page. Desktop stays presentational via `md:pointer-events-none`.
 - **Goal templates / duplicate-from-existing affordance** — UI only, not load-bearing.
 - **Coaching subscription / weekly digest hooks** — would surface the same `composeCoaching` output in the Mon AM email digest.
 - **Per-goal historical narrative archive** — track narratives over time the way `/insights` archives weekly reads.

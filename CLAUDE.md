@@ -600,6 +600,42 @@ plan at `docs/superpowers/plans/2026-05-07-phase-3-pt3-goal-detail.md`)
   median-of-present-buckets) and 4 spec-vs-plan-drift items now deferred
   to 3-pt3.b.
 
+**Phase 3-pt3.b — close the four 3-pt3 deferrals** (2026-05-08)
+- **Drift query as primary coaching source**:
+  `getBehindSavingsCoachingCategory` in
+  [goal-detail.ts](src/lib/db/queries/goal-detail.ts) calls
+  `getDriftAnalysis` first, picks `currentlyElevated[0]`, converts
+  `currentTotal × 52/12 → monthlyAmount` (spike rate, not baseline —
+  the action sentence reads "trim X at $Y/mo" so Y should reflect the
+  user's CURRENT behavior). Falls back to `getTopDiscretionaryCategory`
+  when drift has nothing flagged.
+- **Projected continuation line** on
+  [trajectory-chart.tsx](src/components/goals/trajectory-chart.tsx):
+  third `<Line>` from today→windowEnd, dashed, hue follows `isBehind`.
+  `computeProjection` in [page.tsx](src/app/(app)/goals/[id]/page.tsx)
+  derives endValue from `monthlyVelocity / 30.5` (savings, floored at
+  0) or `projectedMonthly` (spend-cap). Returns null when daysRemaining
+  ≤ 0 (post-target savings, end-of-month caps).
+- **Archived goals reachable**: `getGoalsWithProgress(userId, opts?:
+  { includeInactive?: boolean })` defaults false; `/goals/[id]` passes
+  true so archived URLs stop 404-ing. The "· Archived" eyebrow on
+  `<GoalDetailHeader>` is now live (was dead branch). `/goals` page
+  also passes true; `<PaceLeaderboard>` partitions on `isActive`
+  first, then verdict — adds a third "Archived" section beneath
+  Behind/On pace, sorted by `createdAt` desc, with `opacity-70`
+  wrapper. Drizzle typing detail: conditional where-shapes need
+  explicit `: SQL` annotation + `and(...)!` non-null assertion to
+  preserve row-type inference (cf. `buildWhere(...)` pattern in
+  [transactions.ts](src/lib/db/queries/transactions.ts)).
+- **Mobile tap-to-edit on spend-cap feed**: `<SpendCapFeed>` is now
+  a client component holding active-row state; mounts
+  `<TransactionDetailSheet>` (same picker /transactions and
+  `<RecentActivityCard>` use). Query extended to select `pending`,
+  `accountMask`, and `overrideCategoryName` (left join to
+  `categories` on `categoryOverrideId`, mirroring `getTransactions`).
+  `categoryOptions` plumbed through from the page's `Promise.all`.
+  Desktop stays presentational via `md:pointer-events-none`.
+
 **Observability + W-06 sparkline + SnapTrade inline sync** (2026-05-07 evening)
 - **Logger axios capture** (`05c12de`) — `logError` duck-types
   axios-shaped errors and persists `httpStatus` + `responseBody` to
@@ -774,16 +810,11 @@ plan at `docs/superpowers/plans/2026-05-07-phase-3-pt3-goal-detail.md`)
   Plaid has no OAuth integration with Fidelity in production; filing
   doesn't help. Re-check Plaid Dashboard > OAuth institutions every
   few months in case the situation changes.
-- **Phase 3-pt3.b** — four spec-vs-plan-drift items deferred from
-  Phase 3-pt3 (see spec § 9 / plan "Out of scope"): drift query as
-  primary source for behind-savings coaching action (MVP uses the
-  trailing-3-complete-month median fallback only); projected
-  continuation line on trajectory chart (chart ships actual + ideal,
-  not the third projected line); archived goals (`isActive=false`)
-  rendering with muted "Archived" eyebrow (currently 404 because
-  `getGoalDetail` reuses `getGoalsWithProgress`'s `isActive=true`
-  filter); mobile tap-to-edit on spend-cap-feed rows via
-  `<TransactionDetailSheet>`.
+- **Reliability Phases 5 + 6** — Phase 5 dashboard trust strip
+  (aggregated source-health sentence above the headline summary) and
+  Phase 6 freshness context on key numbers (net worth / investments /
+  forecast baseline). `getSourceHealth()` from Phase 3 is the data
+  source; design in `docs/reliability/implementation-plan.md` § 5–6.
 - **Phase 4-pt2** — investment what-if simulator (deferred from Phase
   4 by design; needs its own brainstorm focused on modeling depth).
 
