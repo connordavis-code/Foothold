@@ -751,8 +751,19 @@ plan at `docs/superpowers/plans/2026-05-07-phase-3-pt3-goal-detail.md`)
   `<SnaptradeReconnectButton>`. `<DisconnectItemButton>` takes a
   `provider` prop so the confirmation copy reads correctly for both.
   Provider name renders as a prefix on the secondary line ("Plaid ·
-  Synced 5m ago"). 26 new pure tests; full vitest 428/428. Mobile
-  uses single responsive component rather than literal
+  Synced 5m ago"). **SnapTrade reconcile now repairs broken rows**:
+  `syncSnaptradeBrokeragesAction` was insert-only — a user reconnecting
+  a `login_required` SnapTrade row would route through the portal
+  successfully but the row would stay broken (the auth's
+  providerItemId was treated as "known" and skipped). Now uses pure
+  helper `partitionSnaptradeAuthsForReconcile` to partition incoming
+  auths into insert/repair/no-op; repairs flip status to active +
+  refresh metadata, with a `statusChanged` flag so metadata-only
+  refreshes don't inflate the "reconnected" tally.
+  /snaptrade-redirect syncs both new + repaired item IDs and renders
+  distinct copy. 35 new pure tests across Phase 4; full vitest
+  437/437. Mobile uses single responsive component rather than
+  literal
   `<MobileList>` — rationale in
   `docs/reliability/implementation-plan.md` § Phase 4 Status
   (MobileList is for dense scrolling lists with single tap targets;

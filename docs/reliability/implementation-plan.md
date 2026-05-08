@@ -579,6 +579,31 @@ Code review of `3d43316` flagged three real issues. All addressed:
   institution name + state pill so the institution remains the
   visual anchor.
 
+#### Post-review-2 correction (2026-05-07)
+
+Second-round review of `eaca263` flagged that the SnapTrade reconnect
+button now opens the right flow but the *return path* didn't repair
+existing rows. `syncSnaptradeBrokeragesAction` was insert-only —
+authorizations whose providerItemId already existed were skipped as
+"known" without re-checking status. So a user could click Reconnect
+on a `login_required` row, complete the Connection Portal re-auth,
+land on /snaptrade-redirect, see "No new brokerages added," and the
+row would still say `needs_reconnect`. The button routed the right
+way but never repaired anything.
+
+Fix: new pure helper `partitionSnaptradeAuthsForReconcile` at
+`src/lib/snaptrade/reconcile.ts` partitions incoming auths into
+three classes (insert / repair / no-op), with a `statusChanged: bool`
+flag on each repair so metadata-only refreshes don't inflate the
+"reconnected" count. `syncSnaptradeBrokeragesAction` consumes the
+helper, runs the inserts + repairs, and returns
+`{ added, repaired, total, newItemIds, repairedItemIds }`.
+/snaptrade-redirect now syncs both newItemIds AND repairedItemIds
+(repaired items had stale holdings while broken — eager sync gives
+the user up-to-date positions immediately) and renders distinct
+copy: "Connected X" / "Reconnected X" / "Connected X · Reconnected
+Y" / "No changes". 9 new partition-helper tests; full vitest 437/437.
+
 ## Phase 5: Dashboard Trust Strip
 
 ### Problem
