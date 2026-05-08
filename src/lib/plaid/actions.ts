@@ -132,7 +132,16 @@ export async function syncItemAction(
     throw new Error('Item not found');
   }
 
-  return syncExternalItem(item.id);
+  const result = await syncExternalItem(item.id);
+  // RSC cache invalidation: <SyncButton>'s router.refresh() only
+  // re-renders the current route, so a sync triggered from /settings
+  // won't propagate to /dashboard (trust strip) or anywhere else
+  // reading source-health. Invalidate the surfaces that consume
+  // getSourceHealth + transaction/holding data so post-sync state
+  // surfaces immediately.
+  revalidatePath('/settings');
+  revalidatePath('/dashboard');
+  return result;
 }
 
 /**
