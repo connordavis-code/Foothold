@@ -1816,9 +1816,16 @@ Expected: clean working tree (all task commits landed; no stray modifications).
 
 ## Out of scope (future Phase 3-pt3.b)
 
-- LLM coaching narrative (Anthropic Haiku 4.5)
+> Updated 2026-05-07 evening after external code review surfaced spec-vs-plan
+> drift on four items the original plan didn't list. Those four are now
+> documented here so the gap doesn't drift back into "lost work."
+
+- LLM coaching narrative (Anthropic Haiku 4.5) — replace static template + heuristics
 - Investment-account drift in savings trajectory (Approach B `goal_progress_snapshot` table)
-- Drift integration for `topDiscretionaryCategory` in savings coaching (currently always `null` so action sentence is omitted on behind-savings)
+- **Drift query (`getDriftAnalysis`) as primary source for `topDiscretionaryCategory`** — spec § 5.5 calls for "pull `/drift`'s top elevated category" first, with the trailing-3-month-median fallback. MVP shipped only the fallback (`getTopDiscretionaryCategory` in `src/lib/db/queries/goal-detail.ts`); upgrade is to call `getDriftAnalysis` first and use the trailing-median path only when nothing is flagged.
+- **Projected continuation line on trajectory chart** — spec § 5.3 specifies three lines (actual, ideal pace, AND projected continuation in the foreground hue extending from "today" forward at current velocity). MVP ships only actual + ideal; the chart still tells the pace story without the projected segment.
+- **Archived goals (`isActive: false`) rendering with muted "Archived" eyebrow** — spec § 7 edge-case row promises this. `getGoalDetail` reuses `getGoalsWithProgress` which filters `isActive=true`, so archived goals return null and 404. Fix path: either add an `includeInactive` flag to `getGoalsWithProgress` OR factor out per-goal progress computation in `goal-detail.ts`.
+- **Mobile tap-to-edit on spend-cap-feed rows via `<TransactionDetailSheet>`** — spec § 5.4 mobile section. MVP rows are presentational on both desktop and mobile.
 - Goal templates / duplicate-from-existing
 - Coaching subscription / weekly digest hooks
 - Per-goal historical narrative archive

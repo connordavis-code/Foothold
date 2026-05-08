@@ -180,8 +180,16 @@ DB query layer (`goal-detail.ts`) is unit-light; integration via existing /goals
 
 ## 9. Out of scope (Phase 3-pt3.b candidates)
 
+> Updated 2026-05-07 evening — the four bolded entries below were originally
+> unmarked as deferred but turned out to be plan→spec drift. External review
+> caught them; documented here as Phase 3-pt3.b candidates.
+
 - **LLM coaching narrative** — replace static template with Anthropic Haiku 4.5 call. Cache strategy TBD: stale-tolerant per-goal cache (matches `/simulator` `<NarrativePanel>`) or on-demand button (matches `/insights`).
 - **Investment-account drift in savings trajectory** — Approach B `goal_progress_snapshot` table.
+- **Drift query as primary source for behind-savings coaching action** — § 5.5 calls for "pull `/drift`'s top elevated category" first, with the trailing-3-month-median fallback. MVP ships only the fallback (`getTopDiscretionaryCategory` in `src/lib/db/queries/goal-detail.ts`); upgrade calls `getDriftAnalysis` first.
+- **Projected continuation line on trajectory chart** — § 5.3 specifies three lines (actual, ideal pace, projected continuation in the foreground hue extending from "today" forward at current velocity). MVP ships only the first two; the chart still tells the pace story without the projected segment.
+- **Archived goals (`isActive: false`) rendering with muted "Archived" eyebrow** — § 7 edge-case row promises this. `getGoalDetail` currently reuses `getGoalsWithProgress` which filters `isActive=true`, so archived goals return null and 404. Fix path: either add an `includeInactive` flag to `getGoalsWithProgress` OR factor out per-goal progress computation in `goal-detail.ts`.
+- **Mobile tap-to-edit on spend-cap-feed rows via `<TransactionDetailSheet>`** — § 5.4 mobile section. MVP rows are presentational on both desktop and mobile.
 - **Goal templates / duplicate-from-existing affordance** — UI only, not load-bearing.
 - **Coaching subscription / weekly digest hooks** — would surface the same `composeCoaching` output in the Mon AM email digest.
 - **Per-goal historical narrative archive** — track narratives over time the way `/insights` archives weekly reads.
