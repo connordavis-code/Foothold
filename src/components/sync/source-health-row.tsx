@@ -50,7 +50,7 @@ export function SourceHealthRow({
           </span>
           <StatePill state={source.state} />
         </p>
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="mt-1 line-clamp-2 break-words text-xs text-muted-foreground">
           {providerLabel} · {summary}
         </p>
         {source.state !== 'healthy' && source.lastSuccessfulSyncAt && (

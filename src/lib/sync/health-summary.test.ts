@@ -115,4 +115,38 @@ describe('summarizeSourceHealth', () => {
       ),
     ).toBe('No sync data yet');
   });
+
+  // Regression: SnapTrade SDK errors include a response-headers dump
+  // in err.message. Without truncation that floods the row and
+  // breaks layout. Full text still lives in error_log for diagnostics.
+  it('truncates very long reason strings with ellipsis', () => {
+    const verboseReason =
+      '1 of 2 capabilities failing — transactions: Request failed with status code 410 RESPONSE HEADERS: { "date": "Fri, 08 May 2026 15:22:51 GMT", "content-type": "application/json", "content-length": "67", "connection": "keep-alive", "server": "gunicorn", "allow": "GET, HEAD, OPTIONS", "x-frame-options": "DENY" }';
+    const out = summarizeSourceHealth(
+      {
+        state: 'degraded',
+        reason: verboseReason,
+        lastSuccessfulSyncAt: new Date(NOW.getTime() - MINUTE),
+      },
+      NOW,
+    );
+    expect(out.length).toBeLessThanOrEqual(140);
+    expect(out.endsWith('…')).toBe(true);
+    // Most-informative prefix preserved — operator can still see
+    // the failing capability + status code at a glance.
+    expect(out).toContain('transactions: Request failed with status code 410');
+  });
+
+  it('does NOT truncate short reasons', () => {
+    expect(
+      summarizeSourceHealth(
+        {
+          state: 'degraded',
+          reason: '1 of 3 capabilities failing — transactions: rate_limit',
+          lastSuccessfulSyncAt: new Date(NOW.getTime() - MINUTE),
+        },
+        NOW,
+      ),
+    ).toBe('1 of 3 capabilities failing — transactions: rate_limit');
+  });
 });
