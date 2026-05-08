@@ -336,20 +336,32 @@ sync activities + holdings; account types are not consulted.
 
 #### Log → CapabilityState mapping
 
-| Capability    | Success log query | Failure log query |
-|---------------|-------------------|--------------------|
+| Capability    | Success signal | Failure signal |
+|---------------|----------------|----------------|
 | balances      | `op = 'cron.balance_refresh.item' AND level = 'info'` | `op LIKE 'cron.balance_refresh%' AND level = 'error'` |
-| transactions  | `op = 'cron.nightly_sync.item' AND level = 'info'` | `op LIKE 'cron.nightly_sync%' AND level = 'error'` |
-| investments   | (shares nightly_sync.item) | (shares nightly_sync) |
-| recurring     | (shares nightly_sync.item) | (shares nightly_sync) |
+| transactions (Plaid) | `max(cron.nightly_sync.item info, external_item.lastSyncedAt)` | `op LIKE 'cron.nightly_sync%' AND level = 'error'` |
+| investments (Plaid)  | (shares Plaid transactions success) | (shares Plaid transactions failure) |
+| recurring (Plaid)    | (shares Plaid transactions success) | (shares Plaid transactions failure) |
+| transactions (SnapTrade) | `max(cron.nightly_sync.item info, external_item.lastSyncedAt)` | `max(cron.nightly_sync%, snaptrade.sync.activities) error` |
+| investments (SnapTrade)  | (shares SnapTrade transactions success) | `max(cron.nightly_sync%, snaptrade.sync.positions) error` |
 
-Three capabilities (transactions, investments, recurring) share the
-nightly cron's per-item info row today because the nightly sync
-processes all three as a unit. They appear as separate fields in
-`SourceHealth` so Phase 4 UI can render them independently when
-per-capability success-logging splits in a future phase.
+Two non-obvious mapping rules — both arose from review of `118fefd`:
 
-`cron.balance_refresh.skipped` rows are NOT read here — capability
+- **`external_item.lastSyncedAt` is a fallback success signal.** Both
+  manual sync (`syncItemAction`) and the nightly cron update this
+  column, but only the cron writes `cron.nightly_sync.item` info
+  rows. Without the fallback, freshly connected sources show
+  `unknown`/`never_synced` in health UI right after a successful
+  connect — misleading because the sync DID run, just via the manual
+  path. The resolution helper takes `max(cron info, lastSyncedAt)`.
+- **SnapTrade per-capability errors merge into their respective
+  capability.** `syncSnaptradeItem` catches per-account failures and
+  logs `snaptrade.sync.positions` (→ investments) and
+  `snaptrade.sync.activities` (→ transactions) while the
+  orchestrator-level `cron.nightly_sync.item` rolls up as success.
+  Without merging, partial SnapTrade failures vanish from health.
+
+`cron.balance_refresh.skipped` rows are NOT read — capability
 applicability is already inferred from `account_types`, so an item
 that legitimately skips refresh (zero depository/credit accounts)
 will already have `balances` classified as `not_applicable` by the
@@ -361,14 +373,33 @@ supplementary to the cron schedule — a failed webhook doesn't break
 the next nightly sync. If observability needs them, they can be
 surfaced separately as a "reliability events" feed.
 
+#### Residual limitation (SnapTrade partial-failure-then-success)
+
+When a SnapTrade per-capability error fires *during* a sync that
+ultimately rolls up as success (e.g. `snaptrade.sync.activities`
+error at T1, `cron.nightly_sync.item` info at T2 > T1), the
+classifier currently sees `lastSuccess > lastFailure` and classifies
+the capability as `fresh`. The capability-level failure context is
+preserved in `lastFailureSummary`, but the state classification
+is optimistic. Fully resolving this requires per-capability success
+logging in `syncSnaptradeItem` (so positions / activities each write
+their own `level='info'` row only when they actually succeed).
+That's broader scope — deferred to a follow-up phase. For now,
+Phase 4 UI consumers can layer the failure summary onto the row
+even when the source classifies as healthy.
+
 #### Query shape
 
 1 typed Drizzle query for items + aggregated `financial_account.type[]`
 via `ARRAY_AGG(DISTINCT type) FILTER (WHERE type IS NOT NULL)`,
-followed by 4 parallel `error_log` lookups per item (success+failure
-× balance+nightly). Total: `1 + 4N` queries for `N` sources. The
-composite index keeps each lookup at an index seek + LIMIT 1; for
-typical N=2–5 the round-trip is negligible.
+followed by 6 parallel `error_log` lookups per item (success+failure
+× balance+nightly, plus snaptrade.sync.activities and
+snaptrade.sync.positions error rows). Total: `1 + 6N` queries for
+`N` sources. The composite index keeps each lookup at an index seek
++ LIMIT 1; for typical N=2–5 the round-trip is negligible. The
+snaptrade-specific queries run for Plaid items too (returning empty
+results) — branching to skip them saves at most 2 queries × N items,
+not worth the conditional complexity.
 
 #### Security
 

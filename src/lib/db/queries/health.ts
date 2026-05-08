@@ -31,23 +31,16 @@ export type SourceHealth = {
   capabilities: SyncCapability[];
   /** Per-capability classification including `not_applicable` keys. */
   byCapability: Record<SyncCapability, CapabilityClassification>;
-  /** Most recent successful sync of any kind across all op classes. */
+  /** Most recent successful sync of any kind across all capabilities. */
   lastSuccessfulSyncAt: Date | null;
   /** Latest `cron.balance_refresh.item` info row. Null if never run. */
   lastBalanceRefreshAt: Date | null;
-  /** Latest `cron.nightly_sync.item` info row (transactions side). */
+  /** Resolved per-capability success — see `resolveCapabilityTimestamps`. */
   lastTransactionSyncAt: Date | null;
-  /**
-   * Latest `cron.nightly_sync.item` info row (investments side). Today
-   * identical to `lastTransactionSyncAt` because transactions and
-   * investments share the nightly cron's per-item op; preserved as a
-   * separate field so a future per-capability success log split
-   * doesn't break consumers.
-   */
   lastInvestmentSyncAt: Date | null;
-  /** Most recent failure of any kind across all op classes. */
+  /** Most recent failure of any kind across all capabilities. */
   lastFailureAt: Date | null;
-  /** Message of the most-recent failure (across all op classes). */
+  /** Message of the most-recent failure (across all capabilities). */
   lastFailureSummary: string | null;
 };
 
@@ -57,19 +50,14 @@ export type SourceHealth = {
  *
  * Plaid:
  *   - balances:     depository OR credit (matches Phase 1's
- *                   `selectRefreshableAccounts` filter — investments
- *                   refresh via holdings, loans not supported today)
- *   - transactions: depository OR credit (regular transactions stream)
- *   - investments:  investment (holdings + investment_transactions)
- *   - recurring:    depository OR credit (Plaid's recurring detector
- *                   runs on regular transactions)
+ *                   `selectRefreshableAccounts` filter)
+ *   - transactions: depository OR credit
+ *   - investments:  investment
+ *   - recurring:    depository OR credit
  *
  * SnapTrade:
- *   - transactions + investments always (brokerages always sync
- *     accounts → positions → activities). Account types are not used
- *     because SnapTrade brokerages map onto a fixed capability set.
- *   - balances + recurring never (no separate balance refresh path;
- *     brokerages don't have recurring streams).
+ *   - transactions + investments always
+ *   - balances + recurring never
  */
 export function inferCapabilities(
   provider: Provider,
@@ -91,111 +79,225 @@ export function inferCapabilities(
 }
 
 /**
- * Raw per-item timestamps assembled from `error_log` lookups.
- *
- * Today's mapping:
- *   balance success: `op = 'cron.balance_refresh.item' AND level='info'`
- *   balance failure: `op LIKE 'cron.balance_refresh%' AND level='error'`
- *   nightly success: `op = 'cron.nightly_sync.item' AND level='info'`
- *   nightly failure: `op LIKE 'cron.nightly_sync%' AND level='error'`
- *
- * `cron.balance_refresh.skipped` rows (Phase 1) are intentionally NOT
- * read here. Capability applicability is already inferred from
- * `financial_account.type`, so an item that legitimately skips refresh
- * (zero depository/credit accounts) will have `balances` classified as
- * `not_applicable` regardless of skipped-log presence.
+ * Raw per-op-class lookups from `error_log`, plus the item's
+ * `lastSyncedAt` column. Consumed only by `resolveCapabilityTimestamps`
+ * — every other helper works on the resolved per-capability shape.
  */
-export type RawTimestamps = {
-  lastBalanceSuccessAt: Date | null;
-  lastBalanceFailureAt: Date | null;
-  lastBalanceFailureMessage: string | null;
-  lastNightlySuccessAt: Date | null;
-  lastNightlyFailureAt: Date | null;
-  lastNightlyFailureMessage: string | null;
+export type RawOpTimestamps = {
+  balanceSuccessAt: Date | null;
+  balanceFailureAt: Date | null;
+  balanceFailureMessage: string | null;
+  nightlySuccessAt: Date | null;
+  nightlyFailureAt: Date | null;
+  nightlyFailureMessage: string | null;
+  /** SnapTrade per-capability errors. Plaid items will have null here. */
+  snaptradeActivitiesFailureAt: Date | null;
+  snaptradeActivitiesFailureMessage: string | null;
+  snaptradePositionsFailureAt: Date | null;
+  snaptradePositionsFailureMessage: string | null;
 };
 
+/** Per-capability resolved timestamps. Output of `resolveCapabilityTimestamps`. */
+export type CapabilityTimestamps = {
+  lastSuccessAt: Date | null;
+  lastFailureAt: Date | null;
+  lastFailureMessage: string | null;
+};
+
+export type ResolvedCapabilityTimestamps = Record<
+  SyncCapability,
+  CapabilityTimestamps
+>;
+
+function mostRecent(a: Date | null, b: Date | null): Date | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  return a.getTime() >= b.getTime() ? a : b;
+}
+
+function mostRecentFailure(
+  a: { at: Date | null; message: string | null },
+  b: { at: Date | null; message: string | null },
+): { at: Date | null; message: string | null } {
+  if (a.at === null) return b;
+  if (b.at === null) return a;
+  return a.at.getTime() >= b.at.getTime() ? a : b;
+}
+
 /**
- * Pure: translate raw per-op-class timestamps into the per-capability
- * `CapabilityState` record consumed by `classifyItemHealth`.
+ * Pure: translate raw op-class log lookups + `external_item.lastSyncedAt`
+ * + provider into per-capability resolved success/failure timestamps.
  *
- * - `balances` reads from balance-refresh timestamps
- * - `transactions`, `investments`, `recurring` share nightly-sync
- *   timestamps (single per-item info row covers all three until
- *   per-capability success logs are added)
- * - capabilities not in `applicable` are emitted as `not_applicable`
+ * This helper owns the load-bearing op-class-to-capability mapping
+ * rules. Two non-obvious considerations:
+ *
+ *   - **lastSyncedAt as fallback for nightly success.** Both manual
+ *     and cron syncs update `external_item.lastSyncedAt`, but only
+ *     the cron writes `cron.nightly_sync.item` info rows. Without the
+ *     fallback, a freshly connected source has lastSyncedAt set but
+ *     no info row → health classifies as `unknown`/`never_synced`
+ *     until the next nightly cron, which is misleading UX. We take
+ *     `max(nightly info row, lastSyncedAt)` so manual / initial syncs
+ *     count toward freshness too.
+ *
+ *   - **SnapTrade per-capability errors.** `syncSnaptradeItem`
+ *     intentionally catches per-account position/activity failures
+ *     and logs `snaptrade.sync.positions` / `snaptrade.sync.activities`
+ *     while the orchestrator-level `cron.nightly_sync.item` still rolls
+ *     up as success. Without merging those per-capability errors into
+ *     the relevant capability's failure timestamp, partial SnapTrade
+ *     failures would silently disappear from source health. We merge
+ *     `activities` errors into `transactions` and `positions` errors
+ *     into `investments`, taking the most-recent of (cron-level error,
+ *     SnapTrade-specific error). Residual limitation: when a partial
+ *     failure precedes a successful cron rollup, the success timestamp
+ *     is slightly newer and the classifier will say "fresh." Fully
+ *     solving that requires per-capability success logging in
+ *     `syncSnaptradeItem` (broader scope, deferred).
+ *
+ * Balance refresh is provider-agnostic at this layer — only the cron
+ * writes balance signals and `lastSyncedAt` doesn't reflect balance
+ * refreshes. So balances reads straight through from the cron op
+ * regardless of provider; for SnapTrade `balances` is N/A anyway.
  */
-export function buildCapabilityStates(
-  applicable: SyncCapability[],
-  raw: RawTimestamps,
-): Record<SyncCapability, CapabilityState> {
-  const set = new Set(applicable);
-
-  const balancesState: CapabilityState = set.has('balances')
-    ? {
-        kind: 'tracked',
-        lastSuccessAt: raw.lastBalanceSuccessAt,
-        lastFailureAt: raw.lastBalanceFailureAt,
-        lastFailureSummary: raw.lastBalanceFailureMessage,
-      }
-    : { kind: 'not_applicable' };
-
-  const nightlyTracked: CapabilityState = {
-    kind: 'tracked',
-    lastSuccessAt: raw.lastNightlySuccessAt,
-    lastFailureAt: raw.lastNightlyFailureAt,
-    lastFailureSummary: raw.lastNightlyFailureMessage,
+export function resolveCapabilityTimestamps(
+  provider: Provider,
+  itemLastSyncedAt: Date | null,
+  ops: RawOpTimestamps,
+): ResolvedCapabilityTimestamps {
+  const balances: CapabilityTimestamps = {
+    lastSuccessAt: ops.balanceSuccessAt,
+    lastFailureAt: ops.balanceFailureAt,
+    lastFailureMessage: ops.balanceFailureMessage,
   };
 
+  // Nightly success: max(cron info row, item.lastSyncedAt). The
+  // fallback lets manual / initial syncs count.
+  const nightlySuccess = mostRecent(ops.nightlySuccessAt, itemLastSyncedAt);
+
+  if (provider === 'plaid') {
+    // Plaid nightly is atomic. One failure source covers all nightly
+    // capabilities.
+    const nightly: CapabilityTimestamps = {
+      lastSuccessAt: nightlySuccess,
+      lastFailureAt: ops.nightlyFailureAt,
+      lastFailureMessage: ops.nightlyFailureMessage,
+    };
+    return {
+      balances,
+      transactions: nightly,
+      investments: nightly,
+      recurring: nightly,
+    };
+  }
+
+  // SnapTrade: merge per-capability errors with orchestrator-level
+  // failures. activities → transactions; positions → investments.
+  const txFailure = mostRecentFailure(
+    { at: ops.nightlyFailureAt, message: ops.nightlyFailureMessage },
+    {
+      at: ops.snaptradeActivitiesFailureAt,
+      message: ops.snaptradeActivitiesFailureMessage,
+    },
+  );
+  const invFailure = mostRecentFailure(
+    { at: ops.nightlyFailureAt, message: ops.nightlyFailureMessage },
+    {
+      at: ops.snaptradePositionsFailureAt,
+      message: ops.snaptradePositionsFailureMessage,
+    },
+  );
+
   return {
-    balances: balancesState,
-    transactions: set.has('transactions')
-      ? nightlyTracked
-      : { kind: 'not_applicable' },
-    investments: set.has('investments')
-      ? nightlyTracked
-      : { kind: 'not_applicable' },
-    recurring: set.has('recurring')
-      ? nightlyTracked
-      : { kind: 'not_applicable' },
+    balances, // N/A for SnapTrade — buildCapabilityStates emits not_applicable
+    transactions: {
+      lastSuccessAt: nightlySuccess,
+      lastFailureAt: txFailure.at,
+      lastFailureMessage: txFailure.message,
+    },
+    investments: {
+      lastSuccessAt: nightlySuccess,
+      lastFailureAt: invFailure.at,
+      lastFailureMessage: invFailure.message,
+    },
+    recurring: {
+      lastSuccessAt: null,
+      lastFailureAt: null,
+      lastFailureMessage: null,
+    }, // N/A for SnapTrade
   };
 }
 
 /**
- * Pure: aggregate top-level "last success" and "last failure" from
- * the raw per-op-class timestamps. `lastFailureSummary` carries the
- * message of whichever failure is more recent.
+ * Pure: translate per-capability resolved timestamps into the
+ * `Record<SyncCapability, CapabilityState>` shape consumed by
+ * `classifyItemHealth`. Capabilities not in `applicable` are emitted
+ * as `not_applicable` regardless of incoming timestamps.
  */
-export function aggregateTopLevelTimestamps(raw: RawTimestamps): {
+export function buildCapabilityStates(
+  applicable: SyncCapability[],
+  resolved: ResolvedCapabilityTimestamps,
+): Record<SyncCapability, CapabilityState> {
+  const set = new Set(applicable);
+  const out: Record<SyncCapability, CapabilityState> = {
+    balances: { kind: 'not_applicable' },
+    transactions: { kind: 'not_applicable' },
+    investments: { kind: 'not_applicable' },
+    recurring: { kind: 'not_applicable' },
+  };
+  for (const cap of [
+    'balances',
+    'transactions',
+    'investments',
+    'recurring',
+  ] as const) {
+    if (!set.has(cap)) continue;
+    const r = resolved[cap];
+    out[cap] = {
+      kind: 'tracked',
+      lastSuccessAt: r.lastSuccessAt,
+      lastFailureAt: r.lastFailureAt,
+      lastFailureSummary: r.lastFailureMessage,
+    };
+  }
+  return out;
+}
+
+/**
+ * Pure: aggregate per-capability resolved timestamps into top-level
+ * "last success" and "last failure" scalars. `lastFailureSummary`
+ * carries the message of whichever failure is most recent across
+ * all capabilities.
+ */
+export function aggregateTopLevelTimestamps(
+  resolved: ResolvedCapabilityTimestamps,
+): {
   lastSuccessfulSyncAt: Date | null;
   lastFailureAt: Date | null;
   lastFailureSummary: string | null;
 } {
-  const successCandidates = [
-    raw.lastBalanceSuccessAt,
-    raw.lastNightlySuccessAt,
-  ].filter((d): d is Date => d !== null);
+  const successCandidates = Object.values(resolved)
+    .map((r) => r.lastSuccessAt)
+    .filter((d): d is Date => d !== null);
   const lastSuccessfulSyncAt =
     successCandidates.length === 0
       ? null
       : new Date(Math.max(...successCandidates.map((d) => d.getTime())));
 
-  const failureCandidates = [
-    raw.lastBalanceFailureAt
-      ? {
-          at: raw.lastBalanceFailureAt,
-          message: raw.lastBalanceFailureMessage,
-        }
-      : null,
-    raw.lastNightlyFailureAt
-      ? {
-          at: raw.lastNightlyFailureAt,
-          message: raw.lastNightlyFailureMessage,
-        }
-      : null,
-  ].filter(
-    (f): f is { at: Date; message: string | null } => f !== null,
-  );
+  const failureCandidates = Object.values(resolved)
+    .map((r) =>
+      r.lastFailureAt
+        ? { at: r.lastFailureAt, message: r.lastFailureMessage }
+        : null,
+    )
+    .filter(
+      (f): f is { at: Date; message: string | null } => f !== null,
+    );
   failureCandidates.sort((a, b) => b.at.getTime() - a.at.getTime());
+
+  // Dedup identical (at, message) tuples that arise when Plaid's
+  // single nightly failure shows up across transactions/investments/
+  // recurring — we still want a single top-level failure entry.
   const lastFailure = failureCandidates[0] ?? null;
 
   return {
@@ -205,8 +307,15 @@ export function aggregateTopLevelTimestamps(raw: RawTimestamps): {
   };
 }
 
-async function loadItemTimestamps(itemId: string): Promise<RawTimestamps> {
-  const [balSucc, balFail, nightSucc, nightFail] = await Promise.all([
+async function loadOpTimestamps(itemId: string): Promise<RawOpTimestamps> {
+  const [
+    balSucc,
+    balFail,
+    nightSucc,
+    nightFail,
+    stActFail,
+    stPosFail,
+  ] = await Promise.all([
     db
       .select({ at: errorLog.occurredAt })
       .from(errorLog)
@@ -255,15 +364,43 @@ async function loadItemTimestamps(itemId: string): Promise<RawTimestamps> {
       )
       .orderBy(desc(errorLog.occurredAt))
       .limit(1),
+    db
+      .select({ at: errorLog.occurredAt, message: errorLog.message })
+      .from(errorLog)
+      .where(
+        and(
+          eq(errorLog.externalItemId, itemId),
+          eq(errorLog.op, 'snaptrade.sync.activities'),
+          eq(errorLog.level, 'error'),
+        ),
+      )
+      .orderBy(desc(errorLog.occurredAt))
+      .limit(1),
+    db
+      .select({ at: errorLog.occurredAt, message: errorLog.message })
+      .from(errorLog)
+      .where(
+        and(
+          eq(errorLog.externalItemId, itemId),
+          eq(errorLog.op, 'snaptrade.sync.positions'),
+          eq(errorLog.level, 'error'),
+        ),
+      )
+      .orderBy(desc(errorLog.occurredAt))
+      .limit(1),
   ]);
 
   return {
-    lastBalanceSuccessAt: balSucc[0]?.at ?? null,
-    lastBalanceFailureAt: balFail[0]?.at ?? null,
-    lastBalanceFailureMessage: balFail[0]?.message ?? null,
-    lastNightlySuccessAt: nightSucc[0]?.at ?? null,
-    lastNightlyFailureAt: nightFail[0]?.at ?? null,
-    lastNightlyFailureMessage: nightFail[0]?.message ?? null,
+    balanceSuccessAt: balSucc[0]?.at ?? null,
+    balanceFailureAt: balFail[0]?.at ?? null,
+    balanceFailureMessage: balFail[0]?.message ?? null,
+    nightlySuccessAt: nightSucc[0]?.at ?? null,
+    nightlyFailureAt: nightFail[0]?.at ?? null,
+    nightlyFailureMessage: nightFail[0]?.message ?? null,
+    snaptradeActivitiesFailureAt: stActFail[0]?.at ?? null,
+    snaptradeActivitiesFailureMessage: stActFail[0]?.message ?? null,
+    snaptradePositionsFailureAt: stPosFail[0]?.at ?? null,
+    snaptradePositionsFailureMessage: stPosFail[0]?.message ?? null,
   };
 }
 
@@ -273,11 +410,10 @@ async function loadItemTimestamps(itemId: string): Promise<RawTimestamps> {
  * stable across reloads.
  *
  * Query shape: 1 typed Drizzle query for items+aggregated account
- * types, then 4 parallel `error_log` lookups per item. Composite
- * index on `error_log(external_item_id, op, occurred_at)` keeps each
- * lookup at O(log N) index seek + LIMIT 1. For typical N=2–5 sources
- * per user, total round-trip is negligible against the page-load
- * budget.
+ * types, then 6 parallel `error_log` lookups per item (success+failure
+ * for balance + nightly, plus snaptrade per-capability error ops).
+ * Composite index on `error_log(external_item_id, op, occurred_at)`
+ * keeps each lookup at O(log N) index seek + LIMIT 1.
  *
  * No secret material is exposed — `external_item.secret` is never
  * selected.
@@ -318,15 +454,20 @@ export async function getSourceHealth(userId: string): Promise<SourceHealth[]> {
       const provider = item.provider as Provider;
       const accountTypes = item.accountTypes ?? [];
       const applicable = inferCapabilities(provider, accountTypes);
-      const raw = await loadItemTimestamps(item.id);
-      const capabilities = buildCapabilityStates(applicable, raw);
+      const ops = await loadOpTimestamps(item.id);
+      const resolved = resolveCapabilityTimestamps(
+        provider,
+        item.lastSyncedAt,
+        ops,
+      );
+      const capabilities = buildCapabilityStates(applicable, resolved);
       const verdict = classifyItemHealth({
         provider,
         itemStatus: item.status,
         capabilities,
         now,
       });
-      const aggregate = aggregateTopLevelTimestamps(raw);
+      const aggregate = aggregateTopLevelTimestamps(resolved);
 
       return {
         itemId: item.id,
@@ -338,9 +479,9 @@ export async function getSourceHealth(userId: string): Promise<SourceHealth[]> {
         capabilities: applicable,
         byCapability: verdict.byCapability,
         lastSuccessfulSyncAt: aggregate.lastSuccessfulSyncAt,
-        lastBalanceRefreshAt: raw.lastBalanceSuccessAt,
-        lastTransactionSyncAt: raw.lastNightlySuccessAt,
-        lastInvestmentSyncAt: raw.lastNightlySuccessAt,
+        lastBalanceRefreshAt: resolved.balances.lastSuccessAt,
+        lastTransactionSyncAt: resolved.transactions.lastSuccessAt,
+        lastInvestmentSyncAt: resolved.investments.lastSuccessAt,
         lastFailureAt: aggregate.lastFailureAt,
         lastFailureSummary: aggregate.lastFailureSummary,
       };

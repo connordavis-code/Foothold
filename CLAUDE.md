@@ -641,19 +641,30 @@ plumbing with no testable predicates).
   and account-types-driven for Plaid (`balances`/`transactions`/`recurring`
   gate on depository+credit; `investments` gates on investment),
   fixed-shape for SnapTrade (`transactions + investments` always).
-  Log → CapabilityState mapping: balances reads
-  `cron.balance_refresh.item` info rows (the success log Phase 1 added);
-  transactions/investments/recurring share `cron.nightly_sync.item`
-  info rows. Failure queries use `LIKE 'cron.<class>%'` to be
-  future-proof against per-capability sub-ops; success uses exact
-  match to filter out `.skipped`. Composite index added to schema —
-  **`npm run db:push` required** to apply
+  Log → CapabilityState mapping handled by pure helper
+  `resolveCapabilityTimestamps(provider, lastSyncedAt, ops)` which owns
+  the op-class → capability translation rules. Two load-bearing
+  resolutions added after review of `118fefd`: (1) `external_item
+  .lastSyncedAt` is a fallback success signal for nightly-backed
+  capabilities (manual sync writes lastSyncedAt but no info row, so
+  freshly connected sources would otherwise classify as
+  unknown/never_synced); (2) SnapTrade per-capability error ops
+  merge into the relevant capability's failure timestamp —
+  `snaptrade.sync.activities` → transactions failure,
+  `snaptrade.sync.positions` → investments failure (the cron-level
+  rollup logs success even when these per-capability errors fire
+  inside a sync). Composite index added to schema — **`npm run
+  db:push` required** to apply
   `error_log_item_op_occurred_idx (external_item_id, op, occurred_at)`.
-  Query shape is 1 + 4N (1 typed Drizzle for items+account-types
-  array_agg, 4 parallel error_log lookups per item). No
+  Query shape is 1 + 6N (1 typed Drizzle for items+account-types
+  array_agg, 6 parallel error_log lookups per item). No
   `external_item.secret` selected; `WHERE external_item.user_id = $1`
-  scopes per-user. No UI wired (per scope) — Phase 4 (Settings) and
-  Phase 5 (Dashboard trust strip) are the consumers.
+  scopes per-user. Residual limitation documented: when a SnapTrade
+  per-capability error precedes a successful cron rollup within the
+  same sync window, the success timestamp wins and classifier shows
+  fresh; full fix needs per-capability success logging in
+  `syncSnaptradeItem` (deferred). No UI wired (per scope) — Phase 4
+  (Settings) and Phase 5 (Dashboard trust strip) are the consumers.
 
 ### Next up
 - **Plaid Production access review** for Fidelity (deprioritized) —
