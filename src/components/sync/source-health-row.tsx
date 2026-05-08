@@ -1,0 +1,103 @@
+import type { SourceHealth } from '@/lib/db/queries/health';
+import { formatRelative } from '@/lib/format/date';
+import { summarizeSourceHealth } from '@/lib/sync/health-summary';
+import { cn } from '@/lib/utils';
+import { DisconnectItemButton } from '@/components/plaid/disconnect-item-button';
+import { ReconnectButton } from '@/components/plaid/reconnect-button';
+import { SyncButton } from '@/components/plaid/sync-button';
+
+/**
+ * Header row for a connected source on /settings.
+ *
+ * Renders institution name + (optional) state pill + a secondary
+ * line summarizing health, then the action buttons. The per-account
+ * list rendered below each row is owned by the parent page — this
+ * component is the institution-level header only.
+ *
+ * Visual restraint per DESIGN.md "Single-Hue Elevated Rule":
+ * pills appear only for states that genuinely demand attention.
+ * Healthy / stale / unknown / syncing render with no pill — the
+ * secondary line carries enough signal. Amber for `degraded` and
+ * `needs_reconnect`; destructive for hard `failed`.
+ *
+ * Action picker driven by `requiresUserAction` rather than raw
+ * itemStatus: the health model is the source of truth for whether
+ * the user must reconnect, so the button shape follows from it.
+ */
+export function SourceHealthRow({
+  source,
+  now = new Date(),
+}: {
+  source: SourceHealth;
+  now?: Date;
+}) {
+  const summary = summarizeSourceHealth(source, now);
+
+  return (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+      <div className="min-w-0 flex-1">
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium">
+          <span className="truncate">
+            {source.institutionName ?? 'Unknown institution'}
+          </span>
+          <StatePill state={source.state} />
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">{summary}</p>
+        {source.state !== 'healthy' && source.lastSuccessfulSyncAt && (
+          // For elevated states, also show "last successful X ago" so
+          // the operator knows how stale the underlying numbers are
+          // without computing it from the reason string.
+          <p className="mt-0.5 text-[11px] text-muted-foreground/70">
+            Last successful sync {formatRelative(source.lastSuccessfulSyncAt, now)}
+          </p>
+        )}
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        {source.requiresUserAction ? (
+          <ReconnectButton itemId={source.itemId} />
+        ) : (
+          <SyncButton itemId={source.itemId} />
+        )}
+        <DisconnectItemButton
+          itemId={source.itemId}
+          institutionName={source.institutionName ?? 'this institution'}
+        />
+      </div>
+    </div>
+  );
+}
+
+function StatePill({ state }: { state: SourceHealth['state'] }) {
+  // healthy / syncing / stale / unknown render as no-pill (the
+  // secondary line carries the signal for stale + unknown; healthy
+  // earns silence per the operator-tier intent).
+  if (state === 'degraded' || state === 'needs_reconnect') {
+    return (
+      <span
+        className={cn(
+          'inline-flex items-center rounded-full',
+          'border border-amber-500/50 bg-amber-500/10',
+          'px-2 py-0.5 text-xs font-medium',
+          'text-amber-700 dark:text-amber-400',
+        )}
+      >
+        {state === 'degraded' ? 'Partial' : 'Reconnect'}
+      </span>
+    );
+  }
+  if (state === 'failed') {
+    return (
+      <span
+        className={cn(
+          'inline-flex items-center rounded-full',
+          'border border-destructive/50 bg-destructive/10',
+          'px-2 py-0.5 text-xs font-medium',
+          'text-destructive',
+        )}
+      >
+        Failed
+      </span>
+    );
+  }
+  return null;
+}

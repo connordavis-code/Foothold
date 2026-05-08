@@ -644,14 +644,14 @@ plan at `docs/superpowers/plans/2026-05-07-phase-3-pt3-goal-detail.md`)
   `docs/reliability/README.md`. Principle: important financial
   numbers should carry freshness/health context (fresh, stale,
   partial, failed, unverifiable).
-- **Phase 1 (balance refresh + W-05) — implemented; production
-  verification pending the next 00:00 UTC cron.** Three changes in
-  `src/app/api/cron/balances/route.ts` + new pure helpers in
-  `src/lib/plaid/balance-refresh.{ts,test.ts}` (13 tests):
+- **Phase 1 (balance refresh + W-05) — shipped + verified + Path B
+  applied (`c8f49a1`).** Three structural changes in
+  `src/app/api/cron/balances/route.ts` (`c4293e4`) + new pure helpers
+  in `src/lib/plaid/balance-refresh.{ts,test.ts}` (13 tests):
   (a) capability filter — pre-fetch per-item `financial_account` rows,
-  retain only `depository`+`credit`, pass explicit `account_ids` to
-  `accountsBalanceGet`. Items with zero capable accounts → `continue`
-  + info log `cron.balance_refresh.skipped`, not a 4xx.
+  retain only `depository`+`credit`, pass explicit `account_ids`.
+  Items with zero capable accounts → `continue` + info log
+  `cron.balance_refresh.skipped`.
   (b) W-05 — UPDATE WHERE now scoped on `(itemId, providerAccountId)`
   to survive disconnect+reconnect re-use scenarios.
   (c) null-clobber guard — `buildBalanceUpdate` only includes a balance
@@ -660,19 +660,25 @@ plan at `docs/superpowers/plans/2026-05-07-phase-3-pt3-goal-detail.md`)
   real data (read surfaces in `dashboard.ts`, `forecast.ts`,
   `goals.ts` treat null as zero, so silent null-writes were worse
   than a 4xx).
-  Per-item success now writes `cron.balance_refresh.item` info row
-  carrying `accountCount` + `updatedCount` — Phase 3's health query
-  reads this `op` to derive last-successful-balance-refresh per item.
-  Aggregate response + summary log gain a `skipped` counter.
-  **Verification protocol** (after deploy): `node
-  scripts/diagnose-balance-refresh.mjs` after 00:00 UTC and confirm
-  (a) `cron.balance_refresh.item` info rows exist for both WF + AmEx,
-  (b) zero new HTTP 400 rows, (c) WF depository + AmEx credit balances
-  updated; nothing else touched. **If AmEx still 400s**, root cause is
-  institution/product-capability-specific (not the bare-call shape) —
-  read `error_log.context.responseBody` for the structured Plaid
-  `error_code` and iterate. Phase 1 then ships only the depository
-  path.
+  Per-item success writes `cron.balance_refresh.item` info row carrying
+  `accountCount` + `updatedCount` — Phase 3's health query reads this
+  `op` to derive last-successful-balance-refresh per item.
+  **Verification outcome** (00:00 UTC 2026-05-08 cron): both items
+  still 400'd. New `error_log.context.responseBody` from logger
+  `05c12de` revealed `INVALID_PRODUCT: client is not authorized to
+  access ["balance"]` — Plaid app-level auth issue, not per-item or
+  per-account. Capability filter cannot fix it (gate is upstream).
+  See Lessons learned > "Don't ship a Plaid endpoint without verifying
+  its product authorization" for the full diagnosis.
+  **Path B shipped** (`c8f49a1`): swapped `accountsBalanceGet` →
+  `accountsGet` in `src/app/api/cron/balances/route.ts`. Cached
+  balances (no `balance` product gate); Plaid refreshes the cache
+  opportunistically so the 6h cron still gives hours-fresh values for
+  active institutions. Phase 2/3 reliability UI labels "as of X hours
+  ago" honestly. **Path A (real intraday freshness)** remains
+  available: enable `balance` in Plaid Dashboard, add to
+  `PLAID_PRODUCTS` env, reconnect existing items via Link update mode,
+  swap the endpoint back.
 - **Phase 2 (sync health classification, pure) — shipped.**
   `src/lib/sync/health.{ts,test.ts}` (39 tests). Discriminated-union
   `CapabilityState` (`not_applicable` vs `tracked` with success/failure
@@ -726,9 +732,25 @@ plan at `docs/superpowers/plans/2026-05-07-phase-3-pt3-goal-detail.md`)
   success/failure, nightly success/failure, snaptrade activities
   success/failure, snaptrade positions success/failure, dispatcher
   failure). No `external_item.secret` selected; `WHERE
-  external_item.user_id = $1` scopes per-user. No UI wired (per
-  scope) — Phase 4 (Settings) and Phase 5 (Dashboard trust strip)
-  are the consumers.
+  external_item.user_id = $1` scopes per-user.
+- **Phase 4 (Settings health panel) — shipped; browser UAT pending.**
+  `/settings` is the first UI consumer of `getSourceHealth()`. New
+  `<SourceHealthRow>` server component at `src/components/sync/`
+  renders institution + state pill + secondary line + action
+  buttons; per-account sub-list preserved as-is. State pill follows
+  DESIGN.md restraint: amber for `degraded` (Partial) /
+  `needs_reconnect` (Reconnect), destructive for `failed`,
+  silent for `healthy` / `stale` / `unknown`. Action picker driven
+  by `requiresUserAction` (not raw itemStatus). Pure helpers:
+  `summarizeSourceHealth(source, now)` for the secondary line
+  (healthy → "Synced 5m ago"; elevated → classifier reason
+  verbatim); `formatRelative(d, now)` promoted from
+  `settings/page.tsx` to `src/lib/format/date.ts` for cross-page
+  reuse. 26 new pure tests; full vitest 428/428. Mobile uses single
+  responsive component rather than literal `<MobileList>` —
+  rationale in `docs/reliability/implementation-plan.md` § Phase 4
+  Status (MobileList is for dense scrolling lists with single tap
+  targets; settings has multi-button rows).
 
 ### Next up
 - **Plaid Production access review** for Fidelity (deprioritized) —

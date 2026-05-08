@@ -489,6 +489,72 @@ managed.
 - Manual sync/reconnect paths remain available.
 - Mobile layout works.
 
+### Status (2026-05-07): shipped — first UI consumer of getSourceHealth
+
+`src/app/(app)/settings/page.tsx` rewired to fetch `getSourceHealth()`
+instead of joining `external_item` + `financial_account` inline. Per-
+institution header now rendered by new `<SourceHealthRow>`; the
+existing per-account sub-list stays as-is (separate concern).
+
+#### Files
+
+- new: `src/components/sync/source-health-row.tsx` — server
+  component, single responsive layout (flex column on `<sm`, row on
+  `sm+`). State pill + secondary line + action buttons.
+- new: `src/lib/sync/health-summary.ts` — pure helper
+  `summarizeSourceHealth(source, now)` produces the secondary line
+  ("Synced 5m ago" for healthy; classifier `reason` verbatim for
+  elevated states).
+- new: `src/lib/sync/health-summary.test.ts` — 7 tests covering all
+  states + null lastSuccessfulSyncAt edge.
+- updated: `src/lib/format/date.ts` — `formatRelative` promoted from
+  the inline helper at `settings/page.tsx`. Now used by settings,
+  source-health-row, and any future "as of X" annotations
+  (Phase 6 surfaces).
+- updated: `src/lib/format/date.test.ts` — 11 new tests for
+  `formatRelative` covering minute/hour/day boundaries + clock-skew
+  defensive return.
+- updated: `src/app/(app)/settings/page.tsx` — replaces inline rows
+  with `<SourceHealthRow>`. Per-account list preserved.
+
+#### Visual restraint (DESIGN.md "Single-Hue Elevated Rule")
+
+State pill shows ONLY for `degraded` (amber "Partial"),
+`needs_reconnect` (amber "Reconnect"), and `failed` (destructive
+"Failed"). `healthy` / `syncing` / `stale` / `unknown` render with no
+pill — the secondary line carries enough signal. Earns the
+attention budget for color only when state genuinely demands action.
+
+Action picker driven by `requiresUserAction` (not raw `itemStatus`):
+true → ReconnectButton; false → SyncButton. DisconnectItemButton
+always present. Wires to existing client-component buttons unchanged.
+
+#### Mobile pattern note
+
+Locked decision was "MobileList field-config (existing pattern)".
+Implementation deviates: SourceHealthRow is a single responsive
+component without literal MobileList. Reasoning: MobileList's design
+is for dense scrolling lists with date grouping (transactions,
+holdings, drift); rows are single-tap-target with `rowHref` OR
+`onRowTap` exclusively, not multi-button. Settings has 2–5
+institution rows max with multiple action buttons per row —
+forcing MobileList would require a vaul drawer for actions, which
+is interaction overhead the use case doesn't justify. The single
+responsive component honors operator-tier visual conventions
+(restrained color, monospace numerals via existing buttons,
+44px+ tap targets) without the literal primitive.
+
+#### Verification
+
+- typecheck clean
+- 26 new pure tests (formatRelative + summarizeSourceHealth) — full
+  vitest 428/428
+- **Browser UAT not performed** in this agent session — the dev
+  server requires authenticated access (magic-link flow) which the
+  agent can't complete. Manual UAT recommended at the next session
+  (live /settings page; verify pill rendering across all sources
+  and dark mode parity).
+
 ## Phase 5: Dashboard Trust Strip
 
 ### Problem
