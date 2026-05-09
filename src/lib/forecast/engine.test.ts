@@ -39,23 +39,14 @@ describe('projectCash — integration', () => {
       currentMonth: '2026-05',
     };
     const result = projectCash(input);
-    expect(result.projection).toHaveLength(12); // default horizon
+    expect(result.projection).toHaveLength(24);
     expect(result.goalImpacts).toHaveLength(1);
-  });
-
-  it('respects overrides.horizonMonths', () => {
-    const input: ProjectCashInput = {
-      history: baseHistory,
-      overrides: { horizonMonths: 3 },
-      currentMonth: '2026-05',
-    };
-    expect(projectCash(input).projection).toHaveLength(3);
   });
 
   it('baseline scenario: cash grows by salary − rent − dining − groceries each month', () => {
     const input: ProjectCashInput = {
       history: baseHistory,
-      overrides: { horizonMonths: 1 },
+      overrides: {},
       currentMonth: '2026-05',
     };
     const result = projectCash(input);
@@ -67,7 +58,6 @@ describe('projectCash — integration', () => {
     const input: ProjectCashInput = {
       history: baseHistory,
       overrides: {
-        horizonMonths: 12,
         categoryDeltas: [{ categoryId: 'dining', monthlyDelta: -200 }],
         incomeDelta: { monthlyDelta: 100 },
         recurringChanges: [{ streamId: 'rent', action: 'edit', amount: 1800 }],
@@ -81,7 +71,7 @@ describe('projectCash — integration', () => {
       currentMonth: '2026-05',
     };
     const result = projectCash(input);
-    expect(result.projection).toHaveLength(12);
+    expect(result.projection).toHaveLength(24);
 
     // Dining cut → byCategory.dining = 200 (was 400)
     expect(result.projection[0].byCategory.dining).toBe(200);
@@ -109,7 +99,7 @@ describe('projectCash — integration', () => {
       currentMonth: '2026-05',
     };
     const result = projectCash(input);
-    expect(result.projection).toHaveLength(12);
+    expect(result.projection).toHaveLength(24);
     expect(result.projection[0].endCash).toBe(0);
     expect(result.goalImpacts).toEqual([]);
   });
@@ -117,7 +107,7 @@ describe('projectCash — integration', () => {
   it('is deterministic — same input produces same output across calls', () => {
     const input: ProjectCashInput = {
       history: baseHistory,
-      overrides: { horizonMonths: 6, lumpSums: [{ id: 'x', label: 'x', amount: 100, month: '2026-07' }] },
+      overrides: { lumpSums: [{ id: 'x', label: 'x', amount: 100, month: '2026-07' }] },
       currentMonth: '2026-05',
     };
     const a = projectCash(input);

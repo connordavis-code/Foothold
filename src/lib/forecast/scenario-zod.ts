@@ -4,8 +4,6 @@ const monthString = z.string().regex(/^\d{4}-\d{2}$/, 'Expected YYYY-MM');
 const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD');
 
 export const scenarioOverridesSchema = z.object({
-  horizonMonths: z.number().int().positive().max(120).optional(),
-
   categoryDeltas: z.array(z.object({
     categoryId: z.string().uuid(),
     monthlyDelta: z.number(),
