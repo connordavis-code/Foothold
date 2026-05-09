@@ -204,14 +204,22 @@ export async function syncSnaptradeItem(
           });
         }
         try {
-          const actRes = await snaptrade().transactionsAndReporting.getActivities({
+          // SnapTrade deprecated `transactionsAndReporting.getActivities`
+          // — it returns 410 Gone for users registered after 2026-04-25
+          // (we registered post-cutoff during Phase B on 2026-05-07, so
+          // every call hit 410). The replacement is the account-level
+          // endpoint, which paginates `{ data, pagination }` rather than
+          // returning the array directly. limit defaults to 1000 — single
+          // page covers any realistic personal account window; bump to
+          // multi-page only if total > limit becomes a real complaint.
+          const actRes = await snaptrade().accountInformation.getAccountActivities({
             userId,
             userSecret,
-            accounts: acc.providerAccountId,
+            accountId: acc.providerAccountId,
             startDate: startStr,
             endDate: endStr,
           });
-          result.activities = actRes.data ?? [];
+          result.activities = actRes.data?.data ?? [];
           result.activitiesOk = true;
         } catch (err) {
           if (isHttp410(err)) {

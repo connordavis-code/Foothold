@@ -309,6 +309,34 @@ This is **strike two for non-serializable values across RSC** (count
 the forwardRef lesson). One more and it gets promoted from Lesson to
 Architecture note (or a code-level guard, e.g., a lint rule).
 
+### Don't use SnapTrade `transactionsAndReporting.getActivities` — it 410s for new users (2026-05-09)
+Endpoint deprecated 2026-04-25; returns HTTP 410 Gone for any
+SnapTrade user registered after that date. We registered during
+Phase B (2026-05-07), so every call from
+[snaptrade/sync.ts](src/lib/snaptrade/sync.ts) hit 410 — silently
+killed activities for all 3 Fidelity accounts on every nightly +
+manual sync. Existed in production for ~2 days before the daily
+digest email surfaced it. Detected only because the structured-
+axios logger from `05c12de` was already in place to capture the
+status code.
+
+Replacement: `accountInformation.getAccountActivities` (account-
+scoped, not user-scoped). Differences from the deprecated call:
+- param `accounts: <id>` → `accountId: <id>` (singular)
+- response wraps `{ data: UniversalActivity[], pagination }` instead
+  of returning the array directly — unwrap as `actRes.data?.data`
+- paginated, default + max `limit: 1000`; one page covers any
+  realistic personal account window. If a heavy trader joins,
+  add offset-loop pagination
+- "Data is cached and refreshed once a day" per docs — fine for
+  our nightly cron freshness model.
+
+**Whenever a SnapTrade endpoint emits 410, suspect deprecation
+first** — SnapTrade's pattern is to gate deprecated endpoints on
+user-registration-date rather than blanket-removing them, so the
+old code paths keep working in dev/older users while silently
+breaking for new ones.
+
 ### Don't ship a Plaid endpoint without verifying its product authorization (2026-05-07)
 `accounts/balance/get` requires the `balance` product authorized at
 the Plaid APP level — Dashboard + `PLAID_PRODUCTS` env — separate
