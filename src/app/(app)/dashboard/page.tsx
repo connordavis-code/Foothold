@@ -4,12 +4,12 @@ import { auth } from '@/auth';
 import { Button } from '@/components/ui/button';
 import { DriftModule } from '@/components/dashboard/drift-module';
 import { GoalsRow } from '@/components/dashboard/goals-row';
-import { InsightTeaserCard } from '@/components/dashboard/insight-teaser-card';
 import { Kpis } from '@/components/dashboard/kpis';
 import { NetWorthHero } from '@/components/dashboard/net-worth-hero';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { RecentActivityCard } from '@/components/dashboard/recent-activity-card';
 import { UpcomingRecurringCard } from '@/components/dashboard/upcoming-recurring-card';
+import { WeekInsightCard } from '@/components/dashboard/week-insight-card';
 import { MotionStack } from '@/components/motion/motion-stack';
 import { TrustStrip } from '@/components/sync/trust-strip';
 import { summarizeTrustStrip } from '@/lib/sync/trust-strip';
@@ -30,17 +30,34 @@ import { getDriftAnalysis } from '@/lib/db/queries/drift';
 import { getForecastHistory } from '@/lib/db/queries/forecast';
 import { getGoalsWithProgress } from '@/lib/db/queries/goals';
 import { getSourceHealth } from '@/lib/db/queries/health';
-import { getLatestInsight } from '@/lib/db/queries/insights';
+import {
+  getInsightForWeek,
+  getInsightSequenceNumber,
+  getLatestInsight,
+  getWeeklyBriefStats,
+} from '@/lib/db/queries/insights';
 import { getUpcomingRecurringOutflows } from '@/lib/db/queries/recurring';
 import { db } from '@/lib/db';
 import { financialAccounts, externalItems } from '@/lib/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { projectCash } from '@/lib/forecast/engine';
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: { week?: string };
+}) {
   const session = await auth();
   if (!session?.user) return null;
   const userId = session.user.id;
+
+  // Brief data source: when ?week=YYYY-MM-DD honored, show that specific
+  // week; otherwise default to latest. The /insights/[week] deep-link
+  // (deleted in R.2) redirects here with the param preserved.
+  const requestedWeek = searchParams?.week;
+  const insightPromise = requestedWeek
+    ? getInsightForWeek(userId, requestedWeek)
+    : getLatestInsight(userId);
 
   const [
     summary,
@@ -49,7 +66,7 @@ export default async function DashboardPage() {
     upcomingRecurring,
     goals,
     drift,
-    latestInsight,
+    insight,
     recent,
     liquidAccounts,
     forecastHistory,
@@ -62,13 +79,21 @@ export default async function DashboardPage() {
     getUpcomingRecurringOutflows(userId, 7),
     getGoalsWithProgress(userId),
     getDriftAnalysis(userId),
-    getLatestInsight(userId),
+    insightPromise,
     getRecentTransactions(userId, 5),
     countLiquidAccounts(userId),
     getForecastHistory(userId),
     getCategoryOptions(userId),
     getSourceHealth(userId),
   ]);
+
+  // Brief stats + sequence number depend on the resolved insight's week range.
+  const [briefStats, briefSeqNum] = insight
+    ? await Promise.all([
+        getWeeklyBriefStats(userId, insight.weekStart, insight.weekEnd),
+        getInsightSequenceNumber(userId, insight.weekStart),
+      ])
+    : [null, 0];
 
   if (!summary.hasAnyItem) {
     return <EmptyState />;
@@ -159,7 +184,11 @@ export default async function DashboardPage() {
 
         <UpcomingRecurringCard upcoming={upcomingRecurring} />
 
-        <InsightTeaserCard insight={latestInsight} />
+        <WeekInsightCard
+          insight={insight}
+          sequenceNumber={briefSeqNum}
+          stats={briefStats}
+        />
 
         <RecentActivityCard
           transactions={recent}
