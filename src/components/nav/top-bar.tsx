@@ -33,7 +33,7 @@ export async function TopBar({ userId, email }: Props) {
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-background/85 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/70 md:gap-3 md:px-6">
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-[var(--hairline)] bg-background/85 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/70 md:gap-3 md:px-6">
       <div className="flex shrink-0 items-center gap-2">
         <PageTitle />
       </div>
