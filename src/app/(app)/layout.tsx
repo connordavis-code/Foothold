@@ -5,6 +5,7 @@ import { CommandPaletteProvider } from '@/components/command-palette/palette-con
 import { CheatsheetDialog } from '@/components/keyboard/cheatsheet-dialog';
 import { AppSidebar } from '@/components/nav/app-sidebar';
 import { MobileTabBar } from '@/components/nav/mobile-tab-bar';
+import { SignatureFooter } from '@/components/nav/signature-footer';
 import { TopBar } from '@/components/nav/top-bar';
 import { Toaster } from '@/components/ui/sonner';
 
@@ -32,6 +33,7 @@ export default async function AppLayout({
           <TopBar userId={session.user.id} email={session.user.email} />
           <main className="flex-1 overflow-auto pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0">
             {children}
+            <SignatureFooter />
           </main>
         </div>
         <MobileTabBar />

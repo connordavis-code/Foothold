@@ -230,6 +230,76 @@
     letter-spacing: 0.08em;
     color: hsl(var(--muted-foreground) / 0.7);
   }
+
+  /* R.1 T4 cartographic signature footer. Renders below page content
+   * on every (app) route — quiet, mono, always on. Wraps to two lines
+   * on <720px viewports. Bundle ref: claude-design-context/styles.css
+   * .sig-footer block. */
+  .sig-footer {
+    margin: 56px clamp(20px, 4vw, 40px) 24px;
+    padding-top: 14px;
+    border-top: 1px solid var(--hairline);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-3);
+    letter-spacing: 0.04em;
+  }
+  .sig-left,
+  .sig-right {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .sig-sep {
+    opacity: 0.45;
+  }
+  .sig-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--text-2);
+  }
+  .sig-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 0 var(--accent-soft);
+    animation: sb-here-pulse 2.6s ease-out infinite;
+  }
+  @media (max-width: 720px) {
+    .sig-footer {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+    }
+  }
+}
+
+/* Pulsing-ring keyframe shared between <SignatureFooter>'s `.sig-dot`
+ * and (T6) the sidebar's active-route indicator. Single definition so
+ * the rhythm stays consistent across both surfaces. */
+@keyframes sb-here-pulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--accent-soft);
+  }
+  70% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sig-dot {
+    animation: none;
+  }
 }
 
 /* Hero-card loading shimmer. Plain animate-pulse looks anemic on the
