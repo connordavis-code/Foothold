@@ -276,11 +276,10 @@
     height: 6px;
     border-radius: 50%;
     background: var(--foothold-green);
-    /* Static + animated halo — same dual-shadow pattern as
-     * .sb-item-active::before (single keyframe drives both surfaces). */
-    box-shadow:
-      0 0 0 3px var(--dot-halo),
-      0 0 0 0 var(--dot-halo);
+    /* Pulse-only halo: no constant ring; the keyframe makes a halo
+     * burst outward from the dot and fade. Same shape as bundle's
+     * sb-here-pulse (sonar-ping rhythm). */
+    box-shadow: 0 0 0 0 var(--dot-halo);
     animation: sb-here-pulse 2.6s ease-out infinite;
   }
   @media (max-width: 720px) {
@@ -325,13 +324,10 @@
     height: 6px;
     border-radius: 50%;
     background: var(--foothold-green);
-    /* Dual-shadow: a constant 3px halo ring around the dot + a
-     * pulsing outward ring (animated via keyframe). The constant halo
-     * gives the active state visible weight at all times; the pulse
-     * adds rhythm without being the only signal. */
-    box-shadow:
-      0 0 0 3px var(--dot-halo),
-      0 0 0 0 var(--dot-halo);
+    /* Pulse-only halo: bursts outward from the dot every 2.6s and
+     * fades. No constant ring — the active state is signalled by the
+     * --surface pill background + the dot core itself. */
+    box-shadow: 0 0 0 0 var(--dot-halo);
     animation: sb-here-pulse 2.6s ease-out infinite;
   }
   .sb-brand-pulse svg {
@@ -343,21 +339,9 @@
  * and the sidebar's active-route indicator (.sb-item-active::before).
  * Single definition so the rhythm stays consistent across both. */
 @keyframes sb-here-pulse {
-  0% {
-    box-shadow:
-      0 0 0 3px var(--dot-halo),
-      0 0 0 0 var(--dot-halo);
-  }
-  70% {
-    box-shadow:
-      0 0 0 3px var(--dot-halo),
-      0 0 0 8px transparent;
-  }
-  100% {
-    box-shadow:
-      0 0 0 3px var(--dot-halo),
-      0 0 0 0 transparent;
-  }
+  0%   { box-shadow: 0 0 0 0 var(--dot-halo); }
+  70%  { box-shadow: 0 0 0 8px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
 }
 
 /* One-shot brand pulse triggered by clicking <SidebarBrand>. Class is
