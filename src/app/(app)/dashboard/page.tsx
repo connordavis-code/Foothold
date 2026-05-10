@@ -12,8 +12,7 @@ import { RecurringList } from '@/components/dashboard/recurring-list';
 import { WeekInsightCard } from '@/components/dashboard/week-insight-card';
 import { MotionStack } from '@/components/motion/motion-stack';
 import { TrustStrip } from '@/components/sync/trust-strip';
-import { summarizeTrustStrip } from '@/lib/sync/trust-strip';
-import { formatRelative } from '@/lib/format/date';
+import { formatFreshness } from '@/lib/format/freshness';
 import {
   forecastDailySeries,
   uncertaintyBand,
@@ -134,30 +133,24 @@ export default async function DashboardPage({
   });
   const runwayWeeks = computeRunway(liquidBalance, trailingMonths);
 
-  // T1 inline freshness approximation — T7 swaps this for formatFreshness().
   const todayLabel = `Today · ${new Date().toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
   })}`;
-  const trustSummary = summarizeTrustStrip(sourceHealth);
-  const freshnessHeadline =
-    trustSummary.kind === 'healthy'
-      ? `Fresh ${formatRelative(trustSummary.freshAt)} · ${trustSummary.sourceCount} ${
-          trustSummary.sourceCount === 1 ? 'source' : 'sources'
-        }`
-      : trustSummary.kind === 'no_signal'
-        ? `Sync pending · ${trustSummary.sourceCount} sources`
-        : trustSummary.kind === 'quiet'
-          ? `Synced ${formatRelative(trustSummary.syncedAt)} · ${trustSummary.sourceCount} sources`
-          : `${trustSummary.elevated.length} source${trustSummary.elevated.length === 1 ? '' : 's'} need attention`;
+  const freshness = formatFreshness({
+    sources: sourceHealth.map((s) => ({
+      name: s.institutionName ?? 'Source',
+      lastSyncAt: s.lastSuccessfulSyncAt,
+    })),
+  });
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:px-8 sm:py-10">
       <PageHeader
         todayLabel={todayLabel}
-        freshnessHeadline={freshnessHeadline}
-        freshnessCaveat={null}
+        freshnessHeadline={freshness.headline}
+        freshnessCaveat={freshness.caveat}
       />
       <MotionStack className="mt-6 space-y-5">
         <TrustStrip sources={sourceHealth} />
@@ -168,7 +161,8 @@ export default async function DashboardPage({
           historicalSeries={historicalSeries}
           forecastSeries={forecastSeries}
           band={band}
-          freshnessHeadline={freshnessHeadline}
+          freshnessHeadline={freshness.headline}
+          freshnessCaveat={freshness.caveat}
         />
 
         <Kpis
