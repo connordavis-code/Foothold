@@ -27,8 +27,14 @@ export function DriftModule({ elevated }: Props) {
     <section id="drift" className="rounded-card bg-[--surface] p-5">
       <header className="flex items-center gap-2 text-sm text-[--text-2]">
         <span
-          className="inline-block h-1.5 w-1.5 rounded-full bg-[--accent]"
           aria-hidden
+          style={{
+            display: 'inline-block',
+            width: 8,
+            height: 8,
+            borderRadius: 9999,
+            background: 'var(--accent)',
+          }}
         />
         <span>
           {hotCount} {label} running hot this week

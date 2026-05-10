@@ -47,10 +47,17 @@ export function NetWorthHero({
         <div className="text-[10px] uppercase tracking-[0.16em] text-[--text-3]">
           Net Worth
         </div>
-        <div className="flex items-center gap-1.5 text-xs text-[--text-2]">
+        <div className="flex items-center gap-2 text-xs text-[--text-2]">
           <span
-            className="inline-block h-1.5 w-1.5 rounded-full bg-[--accent]"
             aria-hidden
+            style={{
+              display: 'inline-block',
+              width: 8,
+              height: 8,
+              borderRadius: 9999,
+              background: 'var(--accent)',
+              boxShadow: '0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)',
+            }}
           />
           You are here ·{' '}
           {new Date().toLocaleDateString('en-US', {
