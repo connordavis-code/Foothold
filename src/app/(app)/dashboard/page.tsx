@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { ArrowRight, Mountain } from 'lucide-react';
 import { auth } from '@/auth';
 import { Button } from '@/components/ui/button';
-import { DriftFlagsCard } from '@/components/dashboard/drift-flags-card';
+import { DriftModule } from '@/components/dashboard/drift-module';
 import { GoalsRow } from '@/components/dashboard/goals-row';
 import { InsightTeaserCard } from '@/components/dashboard/insight-teaser-card';
 import { Kpis } from '@/components/dashboard/kpis';
@@ -153,7 +153,7 @@ export default async function DashboardPage() {
           runwayWeeks={runwayWeeks}
         />
 
-        <DriftFlagsCard flags={drift.currentlyElevated} />
+        <DriftModule elevated={drift.currentlyElevated} />
 
         <GoalsRow goals={goals} />
 
