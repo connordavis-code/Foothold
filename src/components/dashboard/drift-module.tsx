@@ -25,20 +25,44 @@ export function DriftModule({ elevated }: Props) {
 
   return (
     <section id="drift" className="rounded-card bg-[--surface] p-5">
-      <header className="flex items-center gap-2 text-sm text-[--text-2]">
-        <span
-          aria-hidden
-          style={{
-            display: 'inline-block',
-            width: 8,
-            height: 8,
-            borderRadius: 9999,
-            background: 'var(--semantic-success)',
-          }}
-        />
-        <span>
-          {hotCount} {label} running hot this week
-        </span>
+      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="flex items-center gap-2 text-sm text-[--text-2]">
+          <span
+            aria-hidden
+            style={{
+              display: 'inline-block',
+              width: 8,
+              height: 8,
+              borderRadius: 9999,
+              background: 'var(--semantic-success)',
+            }}
+          />
+          <span>
+            {hotCount} {label} running hot this week
+          </span>
+        </div>
+        <div className="flex items-center gap-3 text-[10px] uppercase tracking-[0.16em] text-[--text-3]">
+          <div className="flex items-center gap-1.5">
+            <span
+              aria-hidden
+              className="inline-block h-2 w-2 rounded-full bg-[--text-2] dark:bg-[--text-3]"
+            />
+            Typical
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span
+              aria-hidden
+              style={{
+                display: 'inline-block',
+                width: 8,
+                height: 8,
+                borderRadius: 9999,
+                background: 'var(--semantic-caution)',
+              }}
+            />
+            Drift
+          </div>
+        </div>
       </header>
       <ul className="mt-4 space-y-2">
         {sorted.map((row) => {
