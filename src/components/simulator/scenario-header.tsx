@@ -88,8 +88,10 @@ export function ScenarioHeader({
       if (result.ok) {
         toast.success(`Saved "${name.trim()}".`);
         setNameDraft(null);
-        onSelect(result.data.id);
-        router.refresh();
+        // Auto-redirect to compare with the new scenario pre-selected (Phase 1
+        // PR 3 decision): save = moment of payoff. The user immediately sees
+        // their new scenario overlaid on baseline.
+        router.push(`/simulator/compare?scenarios=${result.data.id}`);
       } else {
         toast.error(result.error);
       }

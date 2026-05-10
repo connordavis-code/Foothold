@@ -104,8 +104,9 @@ export function MobileScenarioSaveBar({
       if (result.ok) {
         toast.success(`Saved "${name}".`);
         setSaveAsOpen(false);
-        onSelect(result.data.id);
-        router.refresh();
+        // Auto-redirect to compare with the new scenario pre-selected (Phase 1
+        // PR 3 decision): save = moment of payoff. Same behavior as desktop.
+        router.push(`/simulator/compare?scenarios=${result.data.id}`);
       } else {
         toast.error(result.error);
       }
