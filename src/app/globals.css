@@ -4,42 +4,88 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 47.4% 11.2%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 47.4% 11.2%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 100% 50%;
-    --destructive-foreground: 210 40% 98%;
-    --ring: 215 20.2% 65.1%;
+    /* ============================================================
+     * R.1 redesign brand palette (bundle hex literals — theme-stable).
+     * Use directly via var(--foothold-green) for redesign-bundle
+     * components; existing components consume the rebound shadcn
+     * tokens further down. See docs/redesign/r1-foundation/PLAN.md § T2.
+     * ============================================================ */
+    --brg: #004225;             /* British Racing Green */
+    --deep-forest: #07150F;
+    --slate: #1f2a26;
+    --slate-2: #18241f;
+    --foothold-green: #6b8a5a;  /* THE accent */
+    --forest-squircle: #1a2e1f;
+
+    --bone: #f4f1ea;
+    --paper: #ebe6db;
+    --paper-2: #e3ddcd;
+
+    --bone-ink: #ecf2e6;
+    --slate-ink: #8c968a;
+    --warm-graphite: #1a201c;
+    --mute-graphite: #8a8d80;
+
+    --semantic-success: #6b8a5a;
+    --semantic-caution: #b07a2b;
+    --semantic-danger: #a24830;
+    --semantic-info: #687270;
+
+    /* Bundle theme-bound tokens (light, default) ===================
+     * R.2+ components consume these directly via var(--bg) etc. */
+    --bg: var(--bone);
+    --bg-2: #ece7da;
+    --surface: var(--paper);
+    --surface-2: var(--paper-2);
+    --hairline: rgba(26, 32, 28, 0.08);
+    --hairline-strong: rgba(26, 32, 28, 0.16);
+    --text: var(--warm-graphite);
+    --text-2: var(--mute-graphite);
+    --text-3: rgba(26, 32, 28, 0.45);
+    --accent-soft: rgba(107, 138, 90, 0.16);
+    --accent-strong: #557244;
+
+    /* shadcn semantic tokens (HSL tuples for hsl(var(--x) / N) alpha
+     * composition). Values rebound to Foothold palette so existing
+     * shadcn components feel native to the redesign without rewriting. */
+    --background: 42 31% 94%;        /* bone */
+    --foreground: 140 10% 11%;       /* warm-graphite */
+    --muted: 44 28% 85%;             /* paper-2 */
+    --muted-foreground: 74 5% 53%;   /* mute-graphite */
+    --popover: 41 29% 89%;           /* paper */
+    --popover-foreground: 140 10% 11%;
+    --card: 41 29% 89%;              /* paper */
+    --card-foreground: 140 10% 11%;
+    --border: 44 28% 85%;
+    --input: 44 28% 85%;
+    --primary: 99 21% 45%;           /* foothold-green */
+    --primary-foreground: 90 32% 93%;
+    --secondary: 44 28% 85%;
+    --secondary-foreground: 140 10% 11%;
+    --accent: 99 21% 45%;
+    --accent-foreground: 90 32% 93%;
+    --destructive: 13 54% 41%;       /* bundle danger */
+    --destructive-foreground: 90 32% 93%;
+    --ring: 99 21% 45%;
     --radius: 0.5rem;
 
-    /* Finance semantic colors — gains green, losses red, but muted-tasteful */
-    --positive: 142 71% 36%;
+    /* Finance semantic — bound to bundle success/danger */
+    --positive: 99 21% 45%;
     --positive-foreground: 0 0% 100%;
-    --negative: 0 72% 51%;
+    --negative: 13 54% 41%;
     --negative-foreground: 0 0% 100%;
 
-    /* Editorial surface scale — warm canvas behind card-feed pages */
-    --surface-paper: 60 33% 97%;
-    --surface-elevated: 0 0% 100%;
-    --surface-sunken: 60 20% 94%;
+    /* Editorial surface scale — rebound to bundle's bg/surface family */
+    --surface-paper: 42 31% 94%;     /* bone */
+    --surface-elevated: 41 29% 89%;  /* paper */
+    --surface-sunken: 44 28% 85%;    /* paper-2 */
+
     --gradient-hero: linear-gradient(
       135deg,
-      hsl(160 40% 18%) 0%,
-      hsl(160 30% 28%) 100%
+      var(--brg) 0%,
+      var(--slate) 100%
     );
+
     --radius-card: 0.75rem;
     --radius-pill: 9999px;
     --motion-fast: 100ms;
@@ -48,67 +94,106 @@
     --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
     --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
 
-    /* Chart palette — 3 brand-greens + 3 warm earth tones, all matte.
-     * Derived from the 160-hue gradient + 40-hue paper canvas families
-     * so multi-line charts read as Foothold, not as default Tailwind. */
-    --chart-1: 160 50% 30%;
-    --chart-2: 160 35% 50%;
-    --chart-3: 180 35% 40%;
-    --chart-4: 40 50% 50%;
-    --chart-5: 20 55% 55%;
-    --chart-6: 220 30% 55%;
+    /* Chart palette per R.1 PLAN T2 § 5: foothold-green, cool slate,
+     * warm copper, plus 3 derivatives. Recharts consumers read
+     * hsl(var(--chart-N)) so HSL-tuple format required. */
+    --chart-1: 99 21% 45%;           /* foothold-green */
+    --chart-2: 214 26% 69%;          /* cool slate */
+    --chart-3: 31 47% 53%;           /* warm copper */
+    --chart-4: 99 21% 60%;           /* foothold-green lighter */
+    --chart-5: 214 26% 50%;          /* cool slate darker */
+    --chart-6: 31 47% 38%;           /* warm copper darker */
 
-    /* R.1 redesign-bundle font aliases. --font-sans/-mono/-serif remain
-     * the canonical CSS variables (Tailwind utilities depend on them).
-     * Components introduced in R.2+ may reference --font-ui/-display per
-     * the bundle's naming; both resolve to the same next/font sources. */
+    /* Bundle spacing scale + radii — alongside existing --radius
+     * (Tailwind utilities depend on existing names). New components
+     * use --s-* / --r-*; existing components untouched. */
+    --s-1: 4px;
+    --s-2: 8px;
+    --s-3: 12px;
+    --s-4: 16px;
+    --s-5: 24px;
+    --s-6: 32px;
+    --s-7: 48px;
+    --s-8: 64px;
+    --s-9: 96px;
+
+    --r-card: 8px;
+    --r-btn: 6px;
+    --r-sm: 4px;
+
+    /* Density tokens (modifier below; per-user wiring deferred to R.3
+     * Settings phase per PLAN). */
+    --density-card-pad: 28px;
+    --density-row-h: 44px;
+    --density-stack: 24px;
+
+    /* T1 font aliases — bundle naming for R.2+ components */
     --font-ui: var(--font-sans);
     --font-display: var(--font-serif);
   }
 
   .dark {
-    --background: 224 71% 4%;
-    --foreground: 213 31% 91%;
-    --muted: 223 47% 11%;
-    --muted-foreground: 215.4 16.3% 56.9%;
-    --popover: 224 71% 4%;
-    --popover-foreground: 215 20.2% 65.1%;
-    --card: 224 71% 4%;
-    --card-foreground: 213 31% 91%;
-    --border: 216 34% 17%;
-    --input: 216 34% 17%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 1.2%;
-    --secondary: 222.2 47.4% 11.2%;
-    --secondary-foreground: 210 40% 98%;
-    --accent: 216 34% 17%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
-    --ring: 216 34% 17%;
+    --bg: var(--deep-forest);
+    --bg-2: #050f0a;
+    --surface: var(--slate);
+    --surface-2: #1a2521;
+    --hairline: rgba(236, 242, 230, 0.10);
+    --hairline-strong: rgba(236, 242, 230, 0.18);
+    --text: var(--bone-ink);
+    --text-2: var(--slate-ink);
+    --text-3: rgba(236, 242, 230, 0.58);
+    --accent-soft: rgba(107, 138, 90, 0.18);
+    --accent-strong: #8aa979;
 
-    --positive: 142 65% 50%;
+    --background: 154 50% 5%;        /* deep-forest */
+    --foreground: 90 32% 93%;        /* bone-ink */
+    --muted: 158 17% 12%;            /* surface-2 */
+    --muted-foreground: 110 5% 56%;  /* slate-ink */
+    --popover: 158 15% 14%;           /* slate */
+    --popover-foreground: 90 32% 93%;
+    --card: 158 15% 14%;             /* slate */
+    --card-foreground: 90 32% 93%;
+    --border: 158 17% 12%;
+    --input: 158 17% 12%;
+    --primary: 99 22% 57%;           /* foothold-green lifted for dark canvas */
+    --primary-foreground: 154 50% 5%;
+    --secondary: 158 17% 12%;
+    --secondary-foreground: 90 32% 93%;
+    --accent: 99 22% 57%;
+    --accent-foreground: 154 50% 5%;
+    --destructive: 13 54% 41%;
+    --destructive-foreground: 90 32% 93%;
+    --ring: 99 22% 57%;
+
+    --positive: 99 22% 57%;
     --positive-foreground: 0 0% 100%;
-    --negative: 0 70% 60%;
+    --negative: 13 54% 41%;
     --negative-foreground: 0 0% 100%;
 
-    --surface-paper: 224 30% 6%;
-    --surface-elevated: 224 30% 9%;
-    --surface-sunken: 224 25% 11%;
+    --surface-paper: 154 50% 5%;
+    --surface-elevated: 158 15% 14%;
+    --surface-sunken: 158 17% 12%;
+
     --gradient-hero: linear-gradient(
       135deg,
-      hsl(160 30% 22%) 0%,
-      hsl(160 25% 14%) 100%
+      var(--deep-forest) 0%,
+      var(--slate) 100%
     );
 
-    /* Chart palette — brightened for dark canvas, slightly desaturated
-     * to avoid neon-on-black. Hue values mirror :root. */
-    --chart-1: 160 50% 60%;
-    --chart-2: 160 35% 70%;
-    --chart-3: 180 35% 60%;
-    --chart-4: 40 50% 65%;
-    --chart-5: 20 55% 65%;
-    --chart-6: 220 30% 70%;
+    /* Chart palette brightened for dark canvas */
+    --chart-1: 99 22% 57%;
+    --chart-2: 214 26% 69%;
+    --chart-3: 31 47% 60%;
+    --chart-4: 99 22% 70%;
+    --chart-5: 214 26% 55%;
+    --chart-6: 31 47% 45%;
+  }
+
+  /* Density modifier — wiring deferred to R.3 Settings phase per PLAN. */
+  [data-density="compact"] {
+    --density-card-pad: 20px;
+    --density-row-h: 36px;
+    --density-stack: 16px;
   }
 }
 
@@ -150,7 +235,8 @@
 /* Hero-card loading shimmer. Plain animate-pulse looks anemic on the
  * deep-green gradient canvas; this swept highlight reads as "loading
  * something rich". Respects prefers-reduced-motion via the global
- * media query at the bottom of the file. */
+ * media query at the bottom of the file. R.2 hero-card phase will
+ * retune the shimmer hex literals to the BRG → slate gradient family. */
 @layer utilities {
   @keyframes hero-shimmer {
     0% {
