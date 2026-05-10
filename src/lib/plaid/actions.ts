@@ -132,7 +132,16 @@ export async function syncItemAction(
     throw new Error('Item not found');
   }
 
-  return syncExternalItem(item.id);
+  const result = await syncExternalItem(item.id);
+  // RSC cache invalidation: <SyncButton>'s router.refresh() only
+  // re-renders the current route, so a sync triggered from /settings
+  // won't propagate to /dashboard (trust strip) or anywhere else
+  // reading source-health. Invalidate the surfaces that consume
+  // getSourceHealth + transaction/holding data so post-sync state
+  // surfaces immediately.
+  revalidatePath('/settings');
+  revalidatePath('/dashboard');
+  return result;
 }
 
 /**
@@ -182,7 +191,13 @@ export async function syncAllItemsAction(): Promise<{
  * `markItemReconnected` action below handles the post-success state
  * flip + resync.
  *
- * Note: omit `products` in update mode (Plaid rejects it).
+ * `products` is omitted (Plaid rejects it in update mode — the existing
+ * item already carries its required products). `additional_consented_products`
+ * IS accepted in update mode, and is the *only* way to attach a newly-
+ * enabled product (e.g. `balance` after enabling it at the Plaid app
+ * level) to an existing item. Plaid is idempotent here: already-consented
+ * products are silent no-ops; new ones surface a re-consent screen during
+ * the update-mode Link flow.
  */
 export async function createLinkTokenForUpdate(itemId: string): Promise<string> {
   const session = await auth();
@@ -207,6 +222,15 @@ export async function createLinkTokenForUpdate(itemId: string): Promise<string> 
     throw new Error(`external_item ${itemId} (provider=plaid) has NULL secret`);
   }
 
+  // Mirrors createLinkToken's split: `transactions` is the implicit
+  // required minimum (already on the existing item in update mode);
+  // everything else in PLAID_PRODUCTS becomes optional consent. When a
+  // new product is added to the env (e.g. `balance`), reconnecting an
+  // existing item via this flow is what attaches the consent.
+  const optionalProducts = (plaidProducts as Products[]).filter(
+    (p) => p !== 'transactions',
+  );
+
   // Plaintext access_token passed inline so we don't hold an extra
   // userland reference. Plaid's SDK retains its own ref through the call;
   // there's no portable way to zero V8's underlying string allocation —
@@ -218,6 +242,8 @@ export async function createLinkTokenForUpdate(itemId: string): Promise<string> 
     country_codes: plaidCountryCodes as CountryCode[],
     language: 'en',
     access_token: decryptToken(item.secret),
+    additional_consented_products:
+      optionalProducts.length > 0 ? optionalProducts : undefined,
     webhook: `${env.NEXT_PUBLIC_APP_URL}/api/plaid/webhook`,
     // Update mode also redirects through the institution for OAuth banks
     // — same /oauth-redirect re-entry route, different intent (no

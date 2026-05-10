@@ -19,10 +19,15 @@ import { disconnectExternalItemAction } from '@/lib/sync/actions';
 import { cn } from '@/lib/utils';
 
 /**
- * Disconnect a Plaid item. Destructive — removes the institution from
- * Plaid AND deletes every local row tied to it (accounts, transactions,
- * holdings, investment txns, recurring streams). Cascade chain in
- * schema.ts handles the dependent rows.
+ * Disconnect a connected source. Destructive — removes the connection
+ * from the upstream provider AND deletes every local row tied to it
+ * (accounts, transactions, holdings, investment txns, recurring
+ * streams). Cascade chain in schema.ts handles the dependent rows.
+ *
+ * Path is historical (file lives under /plaid/) but the action
+ * `disconnectExternalItemAction` is provider-neutral and dispatches
+ * to the right SDK internally. Pass `provider` so the confirmation
+ * copy reads correctly for both Plaid and SnapTrade.
  *
  * Gates the action behind an AlertDialog (matches the /goals + /simulator
  * delete pattern). Toast on success/failure; router.refresh() so the
@@ -31,9 +36,11 @@ import { cn } from '@/lib/utils';
 export function DisconnectItemButton({
   itemId,
   institutionName,
+  provider = 'plaid',
 }: {
   itemId: string;
   institutionName: string;
+  provider?: 'plaid' | 'snaptrade';
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -76,9 +83,19 @@ export function DisconnectItemButton({
             <AlertDialogDescription>
               This permanently removes the institution and every account,
               transaction, holding, and recurring stream it provided.
-              Plaid&apos;s connection will be revoked. To get this data
-              back later you&apos;ll need to reconnect via Plaid Link
-              and resync from scratch.
+              {provider === 'snaptrade' ? (
+                <>
+                  {' '}The SnapTrade connection will be revoked. To get
+                  this data back later you&apos;ll need to reconnect via
+                  the SnapTrade Connection Portal and resync from scratch.
+                </>
+              ) : (
+                <>
+                  {' '}Plaid&apos;s connection will be revoked. To get
+                  this data back later you&apos;ll need to reconnect via
+                  Plaid Link and resync from scratch.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

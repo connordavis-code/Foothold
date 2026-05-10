@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { externalItems } from '@/lib/db/schema';
+import { logError } from '@/lib/logger';
 import { syncItem as syncPlaidItem } from '@/lib/plaid/sync';
 import { syncSnaptradeItem } from '@/lib/snaptrade/sync';
 
@@ -32,19 +33,32 @@ export async function syncExternalItem(
     throw new Error(`external_item ${externalItemId} not found`);
   }
 
-  switch (row.provider) {
-    case 'plaid': {
-      const summary = await syncPlaidItem(externalItemId);
-      return { provider: 'plaid', summary };
+  // Wrap the per-provider sync in a try/log/rethrow so SyncButton-
+  // triggered failures land in error_log alongside cron failures.
+  // Server actions in production wrap thrown errors in a generic
+  // "An error occurred in the Server Components render" message that
+  // strips the actual cause — without this we'd be flying blind.
+  try {
+    switch (row.provider) {
+      case 'plaid': {
+        const summary = await syncPlaidItem(externalItemId);
+        return { provider: 'plaid', summary };
+      }
+      case 'snaptrade': {
+        const summary = await syncSnaptradeItem(externalItemId);
+        return { provider: 'snaptrade', summary };
+      }
+      default:
+        throw new Error(
+          `external_item ${externalItemId} has unknown provider=${row.provider}`,
+        );
     }
-    case 'snaptrade': {
-      const summary = await syncSnaptradeItem(externalItemId);
-      return { provider: 'snaptrade', summary };
-    }
-    default:
-      throw new Error(
-        `external_item ${externalItemId} has unknown provider=${row.provider}`,
-      );
+  } catch (err) {
+    await logError('sync.dispatcher', err, {
+      externalItemId,
+      provider: row.provider,
+    });
+    throw err;
   }
 }
 

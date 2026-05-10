@@ -9,7 +9,11 @@ export default async function GoalsPage() {
   const session = await auth();
   if (!session?.user) return null;
 
-  const goals = await getGoalsWithProgress(session.user.id);
+  // includeInactive so the leaderboard's Archived section can render. The
+  // partition step inside <PaceLeaderboard> bucketizes by isActive first.
+  const goals = await getGoalsWithProgress(session.user.id, {
+    includeInactive: true,
+  });
 
   if (goals.length === 0) {
     return <EmptyState />;

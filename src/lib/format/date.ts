@@ -40,3 +40,25 @@ export function humanizeDate(
       : { month: 'short', day: 'numeric', year: 'numeric' },
   );
 }
+
+/**
+ * "5m ago" / "2h ago" / "yesterday" / locale date for older.
+ *
+ * Promoted from `src/app/(app)/settings/page.tsx` so settings, sync-pill,
+ * source health rows, and the dashboard "as of" annotations all read
+ * from one source of truth. `now` is injectable for deterministic tests.
+ */
+export function formatRelative(d: Date, now: Date = new Date()): string {
+  const diffMs = now.getTime() - d.getTime();
+  // Future dates (clock skew) read as "just now" rather than negative.
+  if (diffMs < 0) return 'just now';
+  const min = Math.floor(diffMs / 60_000);
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  if (day === 1) return 'yesterday';
+  if (day < 7) return `${day}d ago`;
+  return d.toLocaleDateString();
+}

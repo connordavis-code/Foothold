@@ -13,7 +13,7 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import type { AdapterAccount } from 'next-auth/adapters';
-import type { ScenarioOverrides } from '@/lib/forecast/types';
+import type { MonthlyProjection, ScenarioOverrides } from '@/lib/forecast/types';
 
 /**
  * Convention for this file:
@@ -150,7 +150,7 @@ export const financialAccounts = pgTable('financial_account', {
   itemId: text('item_id')
     .notNull()
     .references(() => externalItems.id, { onDelete: 'cascade' }),
-  plaidAccountId: text('plaid_account_id').unique().notNull(),
+  providerAccountId: text('provider_account_id').unique().notNull(),
   name: text('name').notNull(),
   officialName: text('official_name'),
   mask: text('mask'),
@@ -238,7 +238,7 @@ export const securities = pgTable('security', {
   id: text('id')
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  plaidSecurityId: text('plaid_security_id').unique().notNull(),
+  providerSecurityId: text('provider_security_id').unique().notNull(),
   ticker: text('ticker'),
   name: text('name'),
   // equity | etf | mutual_fund | fixed_income | cash | crypto | derivative | other
@@ -268,6 +268,12 @@ export const holdings = pgTable(
       .notNull()
       .references(() => securities.id, { onDelete: 'cascade' }),
     quantity: numeric('quantity', { precision: 18, scale: 6 }).notNull(),
+    // INVARIANT: total cost basis for the position (price-paid * units),
+    // NOT the per-share average. Plaid reports it as a total directly;
+    // SnapTrade reports `average_purchase_price` per-share, so the
+    // SnapTrade sync multiplies by units before writing here.
+    // /investments computes (institutionValue − costBasis) / costBasis
+    // for the % return; mismatched units produce 1000%+ nonsense.
     costBasis: numeric('cost_basis', { precision: 14, scale: 2 }),
     institutionValue: numeric('institution_value', {
       precision: 14,
@@ -395,7 +401,7 @@ export const investmentTransactions = pgTable(
     securityId: text('security_id').references(() => securities.id, {
       onDelete: 'set null',
     }),
-    plaidInvestmentTransactionId: text('plaid_investment_transaction_id')
+    providerInvestmentTransactionId: text('provider_investment_transaction_id')
       .unique()
       .notNull(),
     // Plaid: positive = cash OUT of account, negative = cash IN.
@@ -489,6 +495,17 @@ export const errorLog = pgTable(
   },
   (e) => ({
     occurredAtIdx: index('error_log_occurred_at_idx').on(e.occurredAt),
+    // Phase 3 sync-health query reads "last success/failure per item per
+    // op" via predicates of the shape `WHERE external_item_id = ? AND
+    // op = ? AND level = ? ORDER BY occurred_at DESC LIMIT 1`. The
+    // composite leading on (external_item_id, op) gives an index seek
+    // straight to the relevant rows; trailing occurred_at supports the
+    // DESC LIMIT 1 without a separate sort.
+    itemOpOccurredIdx: index('error_log_item_op_occurred_idx').on(
+      e.externalItemId,
+      e.op,
+      e.occurredAt,
+    ),
   }),
 );
 
@@ -556,6 +573,58 @@ export const forecastNarratives = pgTable(
 
 export type ForecastNarrative = typeof forecastNarratives.$inferSelect;
 export type ForecastNarrativeInsert = typeof forecastNarratives.$inferInsert;
+
+/**
+ * Daily snapshot of each user's BASELINE forecast projection (no overrides).
+ * Phase 1 simulator reorientation, PR 2 of 5.
+ *
+ * Two consumers planned:
+ *   - **Backtest accuracy** — "30 days ago we predicted $X for today;
+ *     actual is $Y; variance Z%." Compares row[idx_for_today].endCash from
+ *     a 30-day-old snapshot against today's net worth. Calendar-gated:
+ *     UI ships ~30 days after this table starts accumulating rows.
+ *   - **Dashboard trajectory line** — 90 days back from `forecastSnapshots`
+ *     (each row's `baselineProjection[0].endCash` is that day's start cash)
+ *     plus 90 days forward from a fresh `projectCash()` call.
+ *
+ * Storage shape: full `MonthlyProjection[]` rather than just
+ * `{month, endCash}[]`. JSONB cost is trivial (24 rows × ~5 fields per row),
+ * and storing the full projection means future analyses (per-category
+ * spend trajectory, inflow/outflow shape) don't require a schema migration.
+ * `goalImpacts` is excluded because it cross-references `goal.id` which
+ * may not exist at backtest time.
+ *
+ * Unique on (userId, snapshotDate) — at most one row per user per day.
+ * The cron upserts so re-runs within the same day overwrite (idempotent).
+ *
+ * `snapshotDate` is a calendar `date` derived in UTC at cron-run time.
+ * Vercel crons run in UTC, so this is the natural anchor.
+ */
+export const forecastSnapshots = pgTable(
+  'forecast_snapshot',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    snapshotDate: date('snapshot_date').notNull(),
+    baselineProjection: jsonb('baseline_projection')
+      .$type<MonthlyProjection[]>()
+      .notNull(),
+    generatedAt: ts('generated_at').notNull().defaultNow(),
+  },
+  (t) => ({
+    userDateUnique: uniqueIndex('forecast_snapshot_user_date_idx').on(
+      t.userId,
+      t.snapshotDate,
+    ),
+  }),
+);
+
+export type ForecastSnapshot = typeof forecastSnapshots.$inferSelect;
+export type ForecastSnapshotInsert = typeof forecastSnapshots.$inferInsert;
 
 /**
  * SnapTrade per-user credential. SnapTrade's auth model is per-USER

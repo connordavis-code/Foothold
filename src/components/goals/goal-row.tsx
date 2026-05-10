@@ -29,7 +29,7 @@ export function GoalRow({ goal }: Props) {
         <Link
           href={drilldown}
           className="absolute inset-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label={`See transactions for ${goal.name}`}
+          aria-label={`Open ${goal.name} detail`}
         />
       )}
 
@@ -113,19 +113,12 @@ function drilldownHref(
   goal: GoalWithProgress,
   v: ReturnType<typeof paceVerdict>,
 ): string | null {
-  if (goal.type !== 'spend_cap') return null;
-  const params = new URLSearchParams();
-  const monthStart = currentMonthStartIso();
-  params.set('from', monthStart);
-  if (goal.categoryFilter && goal.categoryFilter.length > 0) {
-    params.set('category', goal.categoryFilter[0]);
-  } else if (goal.accountIds && goal.accountIds.length > 0) {
-    params.set('account', goal.accountIds[0]);
-  } else {
-    return null;
-  }
+  // Both goal types now drill into the rich detail page (Phase 3-pt3).
+  // Spend-cap rows previously linked to /transactions filtered by category;
+  // that link now lives on the detail page's "View all" CTA in the
+  // contributing feed. Savings rows had no drill before — they get one now.
   void v;
-  return `/transactions?${params.toString()}`;
+  return `/goals/${goal.id}`;
 }
 
 function numbersLine(goal: GoalWithProgress): string {
@@ -222,13 +215,6 @@ function scopeLine(goal: GoalWithProgress): string | null {
     parts.push(goal.categoryFilter.map(humanizeCategory).join(' · '));
   }
   return parts.length > 0 ? parts.join(' — ') : null;
-}
-
-function currentMonthStartIso(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  return `${y}-${m}-01`;
 }
 
 function formatMonth(d: string): string {

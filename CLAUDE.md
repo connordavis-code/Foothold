@@ -7,9 +7,11 @@
 
 ## Project
 
-Single-user personal finance tool. Plaid syncs transactions, investments,
-and recurring streams into Supabase Postgres. Dashboard surfaces balances,
-recurring outflows, and goal progress with EOM projections.
+Personal finance tool being prepared for **multi-user public release**
+(2026-05-09 directional shift; currently single-user but treat all new work
+as production-grade for a multi-tenant product). Plaid syncs transactions,
+investments, and recurring streams into Supabase Postgres. Dashboard surfaces
+balances, recurring outflows, and goal progress with EOM projections.
 
 **Stack:** Next.js 14 (App Router) · TypeScript · Drizzle ORM · Supabase
 Postgres · Auth.js v5 (magic-link via Resend) · Plaid · Tailwind +
@@ -112,6 +114,73 @@ Mutations live in `src/lib/<domain>/actions.ts`, called from
   `--gradient-hero`, `radius-card` / `radius-pill`, motion + easing.
   See [globals.css](src/app/globals.css). `font-serif` reserved for
   /insights narrative only.
+
+### Multi-aggregator: external_item + dispatcher
+Plaid is no longer the only aggregator. `external_item` (was
+`plaid_item`) carries a `provider` discriminator — currently
+`'plaid' | 'snaptrade'`. Per-provider mutable state lives in
+`provider_state` JSONB so adding new providers doesn't churn the
+column set (Plaid stores its `transactionsCursor` here).
+
+`secret` on `external_item` is **nullable**. Plaid rows always set it
+(per-item access_token); SnapTrade rows leave it NULL because their
+`userSecret` is per-USER, not per-connection — that lives on
+[snaptrade_user](src/lib/db/schema.ts) (1:1 with users.id). When
+working in Plaid code paths, narrow with the `PlaidExternalItem`
+type from [plaid/sync.ts](src/lib/plaid/sync.ts) which asserts
+`secret: string`. Plaid-specific selects in
+[plaid/actions.ts](src/lib/plaid/actions.ts) defensively filter
+`provider='plaid'`.
+
+Sync entry point: [`syncExternalItem(id)`](src/lib/sync/dispatcher.ts)
+reads `provider` and routes to `syncPlaidItem` or `syncSnaptradeItem`,
+returning a discriminated-union summary. Cron + /settings sync button
+use it. The Plaid update-mode reconnect flow stays Plaid-specific
+(`markItemReconnected` calls `syncPlaidItem` directly).
+
+Disconnect: [`disconnectExternalItemAction`](src/lib/sync/actions.ts) —
+'use server' module dispatching by provider. Lives separate from
+`dispatcher.ts` because that file exports non-action plain functions,
+which Next 14 RSC rejects in `'use server'` modules.
+
+SnapTrade reuses `plaid_account_id` / `plaid_security_id` /
+`plaid_investment_transaction_id` as provider-stable IDs (UUIDs vs
+Plaid namespace IDs don't collide). Future cleanup may rename to
+provider-neutral; not load-bearing.
+
+SnapTrade activity amounts are **flipped** at the sync boundary
+([snaptrade/sync.ts](src/lib/snaptrade/sync.ts)) so the codebase's
+"positive = cash OUT" invariant holds across providers.
+
+**SnapTrade activities HTTP 410 is a permanent N/A signal, not a
+failure.** Some SnapTrade brokerages (Fidelity IRA/Roth/401k subtypes
+canonically) don't expose transaction history through the data
+partnership — `getActivities` returns 410 Gone, forever. Treating
+that as a failure floods error_log + the digest + the trust strip
+with un-actionable noise. Pattern:
+
+  - sync layer ([snaptrade/sync.ts]) catches 410 specifically, skips
+    `logError`, sets `result.activitiesUnsupported`. When EVERY account
+    in the item is 410-marked, writes one item-level info row
+    `snaptrade.sync.activities.unsupported`.
+  - health-query layer ([db/queries/health.ts]) fetches that op as the
+    9th parallel lookup (now 1 + 9N queries). Pure helper
+    `isSnaptradeTransactionsUnsupported(ops)` returns true iff the
+    marker is newer than the latest success or failure for that
+    capability — self-healing via timestamp precedence.
+  - `inferCapabilities('snaptrade', _, { transactionsUnsupported })`
+    drops `transactions` from the tracked set when the flag is true.
+    Item resolves to investments-only health tracking.
+
+Reusable pattern for any upstream limitation that's account-subtype-
+specific and permanent. Don't blanket-disable a capability at the
+provider level — let the data signal drive the classifier.
+
+UI gating: `snaptradeConfigured()` from
+[snaptrade/client.ts](src/lib/snaptrade/client.ts) is server-evaluated
+and passed as `snaptradeEnabled` into
+[ConnectAccountButton](src/components/connect/connect-account-button.tsx).
+Keys unset → SnapTrade card hidden; Plaid path unchanged.
 
 ### Transaction category override is display-only
 `transactions.categoryOverrideId` overrides the row's displayed
@@ -219,6 +288,79 @@ component renders `<Icon />`, the resulting element crosses cleanly),
 or (b) store a string identifier and resolve to the component
 inside the client component. Fixed in `d955dd4` for `<NavLink>`.
 
+### Don't pass functions across the server→client boundary in config props (2026-05-07)
+Same general failure mode as the forwardRef lesson — functions in any
+shape (component, callback, getter) can't cross RSC. /drift's mobile
+flag-history list passed a `<MobileList>` config object full of
+functions (`rowKey`, `topLine`, `rightCell`, `rowHref`) directly from
+the server page. Latent for weeks because the render path was gated on
+`flagHistory.length > 0`; AmEx's production backfill flipped a category
+into elevated state for the first time and the bug fired.
+
+Symptom: `Application error: a server-side exception has occurred (see
+the server logs for more information). Digest: <number>`. Next 14
+renders the error.tsx fallback for any uncaught page-render exception;
+the actual "Functions cannot be passed directly to Client Components"
+message only surfaces in Vercel logs.
+
+Fix: tiny client-component wrapper that holds the config in client-side
+scope. /transactions does this via `<MobileTransactionsShell>` — same
+pattern. Fixed in `deb1d43` via `<FlagHistoryList>`.
+
+This is **strike two for non-serializable values across RSC** (count
+the forwardRef lesson). One more and it gets promoted from Lesson to
+Architecture note (or a code-level guard, e.g., a lint rule).
+
+### Don't use SnapTrade `transactionsAndReporting.getActivities` — it 410s for new users (2026-05-09)
+Endpoint deprecated 2026-04-25; returns HTTP 410 Gone for any
+SnapTrade user registered after that date. We registered during
+Phase B (2026-05-07), so every call from
+[snaptrade/sync.ts](src/lib/snaptrade/sync.ts) hit 410 — silently
+killed activities for all 3 Fidelity accounts on every nightly +
+manual sync. Existed in production for ~2 days before the daily
+digest email surfaced it. Detected only because the structured-
+axios logger from `05c12de` was already in place to capture the
+status code.
+
+Replacement: `accountInformation.getAccountActivities` (account-
+scoped, not user-scoped). Differences from the deprecated call:
+- param `accounts: <id>` → `accountId: <id>` (singular)
+- response wraps `{ data: UniversalActivity[], pagination }` instead
+  of returning the array directly — unwrap as `actRes.data?.data`
+- paginated, default + max `limit: 1000`; one page covers any
+  realistic personal account window. If a heavy trader joins,
+  add offset-loop pagination
+- "Data is cached and refreshed once a day" per docs — fine for
+  our nightly cron freshness model.
+
+**Whenever a SnapTrade endpoint emits 410, suspect deprecation
+first** — SnapTrade's pattern is to gate deprecated endpoints on
+user-registration-date rather than blanket-removing them, so the
+old code paths keep working in dev/older users while silently
+breaking for new ones.
+
+### Don't ship a Plaid endpoint without verifying its product authorization (2026-05-07)
+`accounts/balance/get` requires the `balance` product authorized at
+the Plaid APP level — Dashboard + `PLAID_PRODUCTS` env — separate
+from per-item Link consent. Cron at
+[src/app/api/cron/balances/route.ts] called `accountsBalanceGet` while
+`PLAID_PRODUCTS=transactions,investments`; Plaid 400'd every 6h with
+`INVALID_PRODUCT: client is not authorized to access ["balance"]`,
+hidden until the structured-axios logger from `05c12de` surfaced the
+response body via `error_log.context.responseBody`. **Fix is at the
+Plaid app level, not per-item** — same error_code as institution-
+capability mismatches (`PRODUCTS_NOT_SUPPORTED` on AmEx-style credit-
+only items pre-`fb0e421`), but the per-item capability filter from
+`c4293e4` couldn't help because the gate is upstream. Two fix paths:
+(A) enable `balance` in Plaid Dashboard → API Products, add to
+`PLAID_PRODUCTS`, reconnect existing items via Link update mode;
+(B) swap to `accountsGet` (cached, no `balance` product gate, accepts
+staler balances — Plaid refreshes the cache opportunistically). Shipped
+B for MVP since Phase 2/3 reliability UI labels "as of X hours ago"
+honestly. **Whenever adding a new Plaid endpoint, check Plaid docs for
+the required product, then verify it's in `PLAID_PRODUCTS` AND
+authorized in Plaid Dashboard before deploying.**
+
 ---
 
 ## Coding conventions
@@ -227,8 +369,10 @@ inside the client component. Fixed in `d955dd4` for `<NavLink>`.
 - Server components by default; `"use client"` only when interaction
   requires it.
 - Imports: `@/...` always — no relative imports across `src/`.
-- Currency: `formatCurrency()` in [utils.ts](src/lib/utils.ts), never
-  `toFixed` by hand.
+- Currency: `formatCurrency()` in [utils.ts](src/lib/utils.ts) for tables /
+  column-aligned numbers ($50.00 — preserves cent column);
+  `formatCurrencyCompact()` for narrative prose ($50 — drops trailing zeros
+  on whole-dollar amounts). Never `toFixed` by hand.
 
 ---
 
@@ -423,21 +567,340 @@ Test count: 280 vitest (266 → +14 from `humanizeDate`,
 `groupByDate`, `activeTransactionFilterCount`; Phase 3 is UI
 plumbing with no testable predicates).
 
+**Plaid Production cutover** (2026-05-06–07)
+- `PLAID_ENV=production` flipped; Wells Fargo connected via real OAuth
+  end-to-end. Two banks initially failed at Link with different
+  wordings — diagnostic split:
+  - **AmEx** ("Plaid doesn't support connections between AmEx and
+    Foothold"): per-app-product-config mismatch. Default `PLAID_PRODUCTS`
+    requested `transactions+investments`; AmEx is credit-card-only with
+    no investments product, so the AND-filter on `linkTokenCreate`
+    excluded it. Fix in `fb0e421`: split to `products: ['transactions']`
+    + `additional_consented_products: ['investments']` so investments is
+    initialized per-institution where supported, silently skipped
+    elsewhere. AmEx connects cleanly post-fix.
+  - **Fidelity** ("Fidelity accounts are not able to be connected
+    through Plaid at this time"): Plaid platform-side block, not in
+    Plaid Dashboard's OAuth-institutions list at all. Public industry
+    context: Plaid–Fidelity dispute over data-access fees, with Fidelity
+    routing partners through their own Akoya/Fidelity-Access channel.
+    No code-level fix; tracked under SnapTrade integration as the
+    realistic path.
+
+**Multi-aggregator scaffolding** (2026-05-07)
+- **Phase A** (`cebde2d`): generalize `plaid_item` → `external_item`
+  with `provider` discriminator + `provider_state` JSONB. Plaid
+  cursor migrated into providerState. Migration SQL in
+  `docs/migrations/2026-05-06-external-item.sql`, applied in-place to
+  the live Wells Fargo row. 27 files mechanically renamed; logger
+  context key `plaidItemId` → `externalItemId`.
+- **Phase B** (`7bb611b`): SnapTrade integration data layer. New
+  `snaptrade_user` table (1:1 with users.id) holds per-user encrypted
+  `userSecret`; `external_item.secret` relaxed to NULLABLE so SnapTrade
+  rows can leave it NULL. `snaptrade-typescript-sdk` installed; client
+  wrapper + server actions (register / portal-URL / reconcile /
+  disconnect); sync orchestrator mapping accounts → positions →
+  activities onto the existing `holding` + `investment_transaction`
+  tables. New dispatcher `syncExternalItem` in `src/lib/sync/`
+  routes by provider. Cron + sync-button updated to use it. Sign
+  convention flipped on SnapTrade activities to match Plaid's
+  positive=cash-OUT invariant.
+- **Phase C** (`d96d6e9`): UI surface. `<ConnectAccountButton>` provider
+  picker on /settings (Bank/credit via Plaid, Brokerage via SnapTrade);
+  /snaptrade-redirect parent/child page mirroring /oauth-redirect's
+  pattern; unified `disconnectExternalItemAction` dispatching by
+  provider. SnapTrade option gated server-side via `snaptradeConfigured()`
+  — keys unset hides the brokerage card.
+
+**Drift RSC boundary fix** (2026-05-07; `deb1d43`)
+- Latent server→client boundary bug in /drift exposed when AmEx's
+  backfill flipped a category into elevated state for the first time
+  (flagHistory.length > 0 → MobileList rendered with config-of-functions).
+  Fixed via `<FlagHistoryList>` client wrapper. See Lessons learned >
+  "Don't pass functions across the server→client boundary in config props."
+
+**Phase 3-pt3 — Per-goal coaching detail page** (2026-05-07 evening; spec
+at `docs/superpowers/specs/2026-05-07-phase-3-pt3-goal-detail-design.md`,
+plan at `docs/superpowers/plans/2026-05-07-phase-3-pt3-goal-detail.md`)
+- New route `/goals/[id]` with 5 sections: header (name, status pill,
+  edit/delete), projection card (type+verdict-branched headline copy),
+  trajectory chart (Recharts: cumulative actual + ideal pace + reference
+  at target/cap), contributing-data feed (spend-cap top-20 sorted by
+  amount OR savings weekly net deltas), coaching card (italic status +
+  optional muted action sentence). Server-rendered except for the chart
+  client island.
+- **Pure predicates extracted for testability** (matches Phase 5 pattern):
+  `walkBackTrajectory` in `src/lib/goals/trajectory.ts` (mirrors W-06
+  dashboard sparkline post-fix; UTC date math, today's delta is folded
+  into anchor); `composeCoaching` in `src/lib/goals/coaching.ts`
+  (deterministic two-sentence producer, six-arm discriminated union by
+  `kind × verdict`, no LLM in MVP); `pickTopDiscretionaryCategory` in
+  `src/lib/goals/discretionary.ts` (zero-filled trailing-3-complete-month
+  median, drops zero-median picks so a one-off purchase can't become a
+  steady-discretionary recommendation).
+- **Coaching action source for behind-savings**:
+  `getTopDiscretionaryCategory(userId)` in `src/lib/db/queries/goal-detail.ts`
+  — largest non-recurring outflow category by trailing-3-complete-month
+  median (excludes `TRANSFER_IN`/`TRANSFER_OUT`/`LOAN_PAYMENTS`,
+  EXCLUDES partial current month). Drift query as primary source is
+  deferred to 3-pt3.b.
+- **Drilldown rewire**: both savings AND spend-cap rows on `/goals` now
+  drill to `/goals/${id}` (was: spend-cap-only drill to filtered
+  `/transactions`). Symmetric.
+- Test count delta: +20 (10 from `walkBackTrajectory` + `composeCoaching`,
+  3 from `formatCurrencyCompact`, 7 from `pickTopDiscretionaryCategory`;
+  query layer integration-tested via UAT). Two-stage in-loop review +
+  external review caught 1 bug-class issue (`pickTopDiscretionaryCategory`
+  median-of-present-buckets) and 4 spec-vs-plan-drift items now deferred
+  to 3-pt3.b.
+
+**Phase 3-pt3.b — close the four 3-pt3 deferrals** (2026-05-08)
+- **Drift query as primary coaching source**:
+  `getBehindSavingsCoachingCategory` in
+  [goal-detail.ts](src/lib/db/queries/goal-detail.ts) calls
+  `getDriftAnalysis` first, picks `currentlyElevated[0]`, converts
+  `currentTotal × 52/12 → monthlyAmount` (spike rate, not baseline —
+  the action sentence reads "trim X at $Y/mo" so Y should reflect the
+  user's CURRENT behavior). Falls back to `getTopDiscretionaryCategory`
+  when drift has nothing flagged.
+- **Projected continuation line** on
+  [trajectory-chart.tsx](src/components/goals/trajectory-chart.tsx):
+  third `<Line>` from today→windowEnd, dashed, hue follows `isBehind`.
+  `computeProjection` in [page.tsx](src/app/(app)/goals/[id]/page.tsx)
+  derives endValue from `monthlyVelocity / 30.5` (savings, floored at
+  0) or `projectedMonthly` (spend-cap). Returns null when daysRemaining
+  ≤ 0 (post-target savings, end-of-month caps).
+- **Archived goals reachable**: `getGoalsWithProgress(userId, opts?:
+  { includeInactive?: boolean })` defaults false; `/goals/[id]` passes
+  true so archived URLs stop 404-ing. The "· Archived" eyebrow on
+  `<GoalDetailHeader>` is now live (was dead branch). `/goals` page
+  also passes true; `<PaceLeaderboard>` partitions on `isActive`
+  first, then verdict — adds a third "Archived" section beneath
+  Behind/On pace, sorted by `createdAt` desc, with `opacity-70`
+  wrapper. Drizzle typing detail: conditional where-shapes need
+  explicit `: SQL` annotation + `and(...)!` non-null assertion to
+  preserve row-type inference (cf. `buildWhere(...)` pattern in
+  [transactions.ts](src/lib/db/queries/transactions.ts)).
+- **Mobile tap-to-edit on spend-cap feed**: `<SpendCapFeed>` is now
+  a client component holding active-row state; mounts
+  `<TransactionDetailSheet>` (same picker /transactions and
+  `<RecentActivityCard>` use). Query extended to select `pending`,
+  `accountMask`, and `overrideCategoryName` (left join to
+  `categories` on `categoryOverrideId`, mirroring `getTransactions`).
+  `categoryOptions` plumbed through from the page's `Promise.all`.
+  Desktop stays presentational via `md:pointer-events-none`.
+
+**Observability + W-06 sparkline + SnapTrade inline sync** (2026-05-07 evening)
+- **Logger axios capture** (`05c12de`) — `logError` duck-types
+  axios-shaped errors and persists `httpStatus` + `responseBody` to
+  the context column. Plaid + SnapTrade SDK 4xx rows in `error_log`
+  now carry their structured upstream payload (Plaid:
+  `error_code`/`error_type`/`request_id`; SnapTrade: similar) instead
+  of the opaque "Request failed with status code 400" that used to
+  be all that survived. Forced by the `cron.balance_refresh` 400s
+  being un-debuggable from logs alone.
+- **W-06 sparkline scope + empty state** (`2e86e8d` + `1af7b07`,
+  finding W-06 in `docs/reviews/2026-05-05-REVIEW.md`) —
+  `getNetWorthSparkline` previously anchored on `summary.netWorth`
+  (which already includes accounts opened mid-window) and walked
+  back through transactions. New accounts have no compensating
+  opening-balance txn, so their `currentBalance` carried into "30
+  days ago" with nothing to subtract — visible as a fake $50k jump
+  on first-render after any new account connect within the window.
+  Fix: anchor on signed sum of stable, non-investment accounts
+  (`createdAt <= startStr`) and apply the same `lte(createdAt,
+  startDate)` filter to the transaction JOIN. When zero stable
+  accounts exist (brand-new install), the query returns `[]` and
+  `<HeroCard>` swaps the sparkline for "Trend appears once your
+  accounts have 30 days of history". Today's sparkline value can
+  diverge from `getDashboardSummary().netWorth` when accounts are
+  <window-old; sparkline is rendered shape-only so the divergence
+  isn't user-visible.
+- **SnapTrade inline sync** (`d0b7de4`) —
+  `syncSnaptradeBrokeragesAction` returns the inserted
+  `external_item.id`s; `<SnaptradeRedirectClient>` runs
+  `syncItemAction(id)` per new item via `Promise.allSettled`. Brand-
+  new brokerage connections render holdings on `/investments`
+  immediately instead of waiting up to 24h for the nightly cron.
+  `allSettled` preserves partial success when one of multiple new
+  brokerages fails its initial sync — toast surfaces the failure
+  count, success state otherwise renders a primary "View
+  investments" CTA.
+
 ### In progress
-- **Plaid Production access review** — submitted 2026-05-01 + Q9
-  amendment. Approval odds ~25-35% first-pass, ~60-70% with follow-up.
-  May 6 triage agent scheduled. One sandbox Wells Fargo item kept for
-  webhook E2E — wipe before flipping `PLAID_ENV=production`.
+- **Reliability initiative** — make Foothold trustworthy enough to
+  replace checking multiple finance apps. Six-phase plan + canonical
+  handoff in `docs/reliability/implementation-plan.md` and
+  `docs/reliability/README.md`. Principle: important financial
+  numbers should carry freshness/health context (fresh, stale,
+  partial, failed, unverifiable).
+- **Phase 1 (balance refresh + W-05) — shipped + verified + Path B
+  applied (`c8f49a1`).** Three structural changes in
+  `src/app/api/cron/balances/route.ts` (`c4293e4`) + new pure helpers
+  in `src/lib/plaid/balance-refresh.{ts,test.ts}` (13 tests):
+  (a) capability filter — pre-fetch per-item `financial_account` rows,
+  retain only `depository`+`credit`, pass explicit `account_ids`.
+  Items with zero capable accounts → `continue` + info log
+  `cron.balance_refresh.skipped`.
+  (b) W-05 — UPDATE WHERE now scoped on `(itemId, providerAccountId)`
+  to survive disconnect+reconnect re-use scenarios.
+  (c) null-clobber guard — `buildBalanceUpdate` only includes a balance
+  field when Plaid returned a non-null value, preserving prior
+  `currentBalance`/`availableBalance` rather than writing null over
+  real data (read surfaces in `dashboard.ts`, `forecast.ts`,
+  `goals.ts` treat null as zero, so silent null-writes were worse
+  than a 4xx).
+  Per-item success writes `cron.balance_refresh.item` info row carrying
+  `accountCount` + `updatedCount` — Phase 3's health query reads this
+  `op` to derive last-successful-balance-refresh per item.
+  **Verification outcome** (00:00 UTC 2026-05-08 cron): both items
+  still 400'd. New `error_log.context.responseBody` from logger
+  `05c12de` revealed `INVALID_PRODUCT: client is not authorized to
+  access ["balance"]` — Plaid app-level auth issue, not per-item or
+  per-account. Capability filter cannot fix it (gate is upstream).
+  See Lessons learned > "Don't ship a Plaid endpoint without verifying
+  its product authorization" for the full diagnosis.
+  **Path B shipped** (`c8f49a1`): swapped `accountsBalanceGet` →
+  `accountsGet` in `src/app/api/cron/balances/route.ts`. Cached
+  balances (no `balance` product gate); Plaid refreshes the cache
+  opportunistically so the 6h cron still gives hours-fresh values for
+  active institutions. Phase 2/3 reliability UI labels "as of X hours
+  ago" honestly. **Path A (real intraday freshness)** remains
+  available: enable `balance` in Plaid Dashboard, add to
+  `PLAID_PRODUCTS` env, reconnect existing items via Link update mode,
+  swap the endpoint back.
+- **Phase 2 (sync health classification, pure) — shipped.**
+  `src/lib/sync/health.{ts,test.ts}` (39 tests). Discriminated-union
+  `CapabilityState` (`not_applicable` vs `tracked` with success/failure
+  timestamps + optional summary); 4 capabilities (`balances`,
+  `transactions`, `investments`, `recurring`); per-provider
+  `FRESHNESS_POLICY` (Plaid balances 12h, nightly windows 36h;
+  SnapTrade omits balances + recurring). `classifyItemHealth` returns
+  `state` + `requiresUserAction` + `reason` + `byCapability`
+  breakdown. Priority: `needs_reconnect` (any non-active itemStatus)
+  → `unknown` (no applicable caps OR all never_synced) → `degraded`
+  (some failed + some success-backed `fresh`/`stale`) → `failed`
+  (some failed + no success-backed; never_synced doesn't count as
+  working) → `healthy` (all fresh) → `stale`. `syncing` is set by callers
+  (in-flight sync UI), never derived. Design deltas vs the original
+  spec block documented in `docs/reliability/implementation-plan.md`
+  § Phase 2 Status (notably: dropped `accounts` capability; defensive
+  tracked-but-no-policy → N/A; required-Record input forces explicit
+  N/A handling).
+- **Phase 3 (sync health DB query) — shipped.**
+  `src/lib/db/queries/health.{ts,test.ts}` (23 pure tests on three
+  mapping helpers). `getSourceHealth(userId)` returns one
+  `SourceHealth` row per `external_item` carrying the Phase 2 verdict
+  (state/reason/requiresUserAction/byCapability) plus raw timestamps
+  for "as of when" UI copy. Capability inference is provider-aware
+  and account-types-driven for Plaid (`balances`/`transactions`/`recurring`
+  gate on depository+credit; `investments` gates on investment),
+  fixed-shape for SnapTrade (`transactions + investments` always).
+  Log → CapabilityState mapping handled by pure helper
+  `resolveCapabilityTimestamps(provider, lastSyncedAt, ops)` which owns
+  the op-class → capability translation rules. Four load-bearing
+  resolutions: (1) `external_item.lastSyncedAt` fallback for nightly-
+  backed capabilities (manual / initial sync writes lastSyncedAt but
+  no info row, so freshly connected sources count as fresh);
+  (2) SnapTrade per-capability error ops merge into the relevant
+  capability's failure timestamp — `snaptrade.sync.activities` →
+  transactions, `snaptrade.sync.positions` → investments;
+  (3) **SnapTrade per-capability resolution is three-branch**:
+  if a per-capability info row exists, use it as authoritative
+  success; else if a per-capability error row exists, success is
+  null (do NOT fall back to lastSyncedAt — the orchestrator updates
+  lastSyncedAt at the end of every sync regardless of partial
+  failures, so falling back would mask them as `fresh`); else
+  fall back to nightly + lastSyncedAt (backward-compat for items
+  pre-deploy); (4) `sync.dispatcher` errors apply to all
+  nightly-backed capabilities for both providers (manual sync
+  failures previously vanished from health). Composite index added
+  to schema — **`npm run db:push` required** to apply
+  `error_log_item_op_occurred_idx (external_item_id, op, occurred_at)`.
+  Query shape is 1 + 9N (1 typed Drizzle for items+account-types
+  array_agg, 9 parallel error_log lookups per item: balance
+  success/failure, nightly success/failure, snaptrade activities
+  success/failure, snaptrade positions success/failure, dispatcher
+  failure). No `external_item.secret` selected; `WHERE
+  external_item.user_id = $1` scopes per-user.
+- **Phase 4 (Settings health panel) — shipped; browser UAT pending.**
+  `/settings` is the first UI consumer of `getSourceHealth()`. New
+  `<SourceHealthRow>` server component at `src/components/sync/`
+  renders institution + state pill + secondary line + action
+  buttons; per-account sub-list preserved as-is. State pill follows
+  DESIGN.md restraint: amber for `degraded` (Partial) /
+  `needs_reconnect` (Reconnect), destructive for `failed`,
+  silent for `healthy` / `stale` / `unknown`. Pure helpers:
+  `summarizeSourceHealth(source, now)` for the secondary line
+  (healthy → "Synced 5m ago"; elevated → classifier reason
+  verbatim); `formatRelative(d, now)` promoted from
+  `settings/page.tsx` to `src/lib/format/date.ts` for cross-page
+  reuse. **Provider-aware reconnect** — Plaid uses update-mode (per-
+  item link token via `<ReconnectButton>`); SnapTrade routes through
+  the user-scoped Connection Portal via new
+  `<SnaptradeReconnectButton>`. `<DisconnectItemButton>` takes a
+  `provider` prop so the confirmation copy reads correctly for both.
+  Provider name renders as a prefix on the secondary line ("Plaid ·
+  Synced 5m ago"). **SnapTrade reconcile now repairs broken rows**:
+  `syncSnaptradeBrokeragesAction` was insert-only — a user reconnecting
+  a `login_required` SnapTrade row would route through the portal
+  successfully but the row would stay broken (the auth's
+  providerItemId was treated as "known" and skipped). Now uses pure
+  helper `partitionSnaptradeAuthsForReconcile` to partition incoming
+  auths into insert/repair/no-op; repairs flip status to active +
+  refresh metadata, with a `statusChanged` flag so metadata-only
+  refreshes don't inflate the "reconnected" tally.
+  /snaptrade-redirect syncs both new + repaired item IDs and renders
+  distinct copy. 35 new pure tests across Phase 4; full vitest
+  437/437. Mobile uses single responsive component rather than
+  literal
+  `<MobileList>` — rationale in
+  `docs/reliability/implementation-plan.md` § Phase 4 Status
+  (MobileList is for dense scrolling lists with single tap targets;
+  settings has multi-button rows).
+- **Phase 5 (Dashboard trust strip) — shipped; browser UAT pending.**
+  `/dashboard` is the second UI consumer of `getSourceHealth()`. New
+  `<TrustStrip>` server component at `src/components/sync/` renders
+  above `<HeroCard>`. Three branches via pure helper
+  `summarizeTrustStrip`: `healthy` → muted single line ("Fresh 5m
+  ago · 5 sources"); `no_signal` (every source pre-first-sync) →
+  muted "Sync pending"; `elevated` (any source `degraded` / `failed`
+  / `needs_reconnect`) → amber-bordered block with sentence-at-N=1 /
+  mini-list-at-N≥2 + "Open settings" CTA. Stale + unknown per-source
+  states are intentionally silent — same restraint rule as the
+  `<StatePill>` in `<SourceHealthRow>`. **Conservative-anchor decision**:
+  `freshAt` in healthy is the OLDEST among per-source
+  `lastSuccessfulSyncAt`, not the newest — flattering the freshest
+  source while others are 12h old would undercut the initiative's
+  honest-freshness North Star. Reuses classifier `reason` strings
+  verbatim (same pattern as Phase 4's `summarizeSourceHealth`) so
+  /settings and /dashboard speak the same language; tighten copy in
+  one place if either reads weirdly. 10 new pure tests
+  (`trust-strip.test.ts`); full vitest 447/447. Locked design via
+  `AskUserQuestion` before implementation: always-visible-muted
+  (rejected silent-unless-elevated), placement above hero (rejected
+  inside-hero contamination + top-bar chip), sentence-at-N=1/list-at-
+  N≥2 (rejected always-rollup + count-only chevron). Browser UAT
+  pending — same constraint as Phase 4 (auth-gated dev server).
 
 ### Next up
-- **Reconnect once Plaid approved** — flip `PLAID_ENV=production`,
-  paste fresh secret, update Vercel env, reconnect via `/settings`.
-  `linkTokenCreate` doesn't pass `redirect_uri` — fine for non-OAuth
-  banks, breaks Chase / Cap One until configured.
-- **Phase 3-pt3** — per-goal coaching detail page (defer until real
-  data flows)
+- **Plaid Production access review** for Fidelity (deprioritized) —
+  Plaid has no OAuth integration with Fidelity in production; filing
+  doesn't help. Re-check Plaid Dashboard > OAuth institutions every
+  few months in case the situation changes.
+- **Reliability Phases 5 + 6** — Phase 5 dashboard trust strip
+  (aggregated source-health sentence above the headline summary) and
+  Phase 6 freshness context on key numbers (net worth / investments /
+  forecast baseline). `getSourceHealth()` from Phase 3 is the data
+  source; design in `docs/reliability/implementation-plan.md` § 5–6.
 - **Phase 4-pt2** — investment what-if simulator (deferred from Phase
   4 by design; needs its own brainstorm focused on modeling depth).
+- **Reliability Phase 6** — freshness annotations on headline numbers
+  (dashboard hero, investments summary, forecast baseline, goals pace,
+  recurring monthly total). Pulls per-number "as of when / from which
+  sources / cached or live" context from the same `getSourceHealth()`
+  query the trust strip uses. Spec at
+  `docs/reliability/implementation-plan.md` § Phase 6.
 
 ---
 

@@ -4,9 +4,6 @@
  * Validated at server-action boundaries via zod (see scenario-zod.ts).
  */
 export type ScenarioOverrides = {
-  /** Default 12. Saved scenarios may carry their own preference. */
-  horizonMonths?: number;
-
   /** Per-category monthly $ change. Negative = cut, positive = increase. */
   categoryDeltas?: Array<{
     categoryId: string;

@@ -27,6 +27,23 @@ export function formatCurrency(
 }
 
 /**
+ * Currency formatter for narrative prose. Drops trailing zero cents on
+ * whole-dollar amounts ($50, not $50.00) but preserves cents otherwise
+ * ($50.32). Use ONLY in inline prose where reading flow matters more than
+ * column alignment. For tables / cards / numeric grids use formatCurrency
+ * so values right-align at the cent column.
+ */
+export function formatCurrencyCompact(amount: number): string {
+  const isWhole = Number.isInteger(amount);
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: isWhole ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+/**
  * Format a percentage with 1 decimal.
  * 0.0734 → "7.3%"
  */

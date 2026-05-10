@@ -32,15 +32,15 @@ export async function syncRecurringForItem(
   );
   if (eligible.length === 0) return { inflows: 0, outflows: 0 };
 
-  const acctIdByPlaidId = new Map(
-    eligible.map((a) => [a.plaidAccountId, a.id]),
+  const acctIdByProviderId = new Map(
+    eligible.map((a) => [a.providerAccountId, a.id]),
   );
 
   let res;
   try {
     res = await plaid.transactionsRecurringGet({
       access_token: item.secret,
-      account_ids: eligible.map((a) => a.plaidAccountId),
+      account_ids: eligible.map((a) => a.providerAccountId),
     });
   } catch (e) {
     // PRODUCT_NOT_READY can fire on a freshly-connected item — Plaid
@@ -56,7 +56,7 @@ export async function syncRecurringForItem(
   }
 
   const buildRow = (s: PlaidStream, direction: 'inflow' | 'outflow') => {
-    const accountId = acctIdByPlaidId.get(s.account_id);
+    const accountId = acctIdByProviderId.get(s.account_id);
     if (!accountId) return null;
     return {
       itemId: item.id,

@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, lt, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, lt, sql, type SQL } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   financialAccounts,
@@ -111,16 +111,23 @@ async function getMonthlyVelocity(
 
 /**
  * Load all of the user's goals with progress + projections computed.
+ *
+ * `includeInactive` defaults false so the active leaderboard stays clean;
+ * /goals/[id] passes true so archived goals render via direct URL, and
+ * the leaderboard renders an explicit "Archived" section.
  */
 export async function getGoalsWithProgress(
   userId: string,
+  opts: { includeInactive?: boolean } = {},
 ): Promise<GoalWithProgress[]> {
+  // SQL-typed local matches the buildWhere(...): SQL pattern used in
+  // transactions.ts — drizzle's `.where()` row-type inference collapses to
+  // `any` if the arg is left as `SQL | undefined` (which `and()` returns).
+  const goalsWhere: SQL = opts.includeInactive
+    ? eq(goals.userId, userId)
+    : and(eq(goals.userId, userId), eq(goals.isActive, true))!;
   const [rawGoals, accs] = await Promise.all([
-    db
-      .select()
-      .from(goals)
-      .where(and(eq(goals.userId, userId), eq(goals.isActive, true)))
-      .orderBy(goals.createdAt),
+    db.select().from(goals).where(goalsWhere).orderBy(goals.createdAt),
     db
       .select({
         id: financialAccounts.id,

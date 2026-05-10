@@ -267,7 +267,14 @@ export function SimulatorClient({
           <div className="space-y-8">
             <ForecastChart
               baseline={baselineResult.projection}
-              scenario={engineResult.projection}
+              scenarios={[
+                {
+                  id: selectedScenarioId ?? 'current',
+                  name: selectedScenario?.name ?? 'Current scenario',
+                  projection: engineResult.projection,
+                  colorVar: '--chart-1',
+                },
+              ]}
             />
             <GoalDiffCards
               goalImpacts={engineResult.goalImpacts}

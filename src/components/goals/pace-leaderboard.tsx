@@ -7,7 +7,7 @@ type Props = {
 };
 
 export function PaceLeaderboard({ goals }: Props) {
-  const { behind, onPace } = partition(goals);
+  const { behind, onPace, archived } = partition(goals);
 
   return (
     <div className="space-y-6">
@@ -23,6 +23,13 @@ export function PaceLeaderboard({ goals }: Props) {
           goals={onPace}
         />
       )}
+      {archived.length > 0 && (
+        <Section
+          eyebrow={`Archived · ${archived.length} ${plural(archived.length, 'goal')}`}
+          goals={archived}
+          muted
+        />
+      )}
     </div>
   );
 }
@@ -30,14 +37,22 @@ export function PaceLeaderboard({ goals }: Props) {
 function Section({
   eyebrow,
   goals,
+  muted = false,
 }: {
   eyebrow: string;
   goals: GoalWithProgress[];
+  muted?: boolean;
 }) {
   return (
     <section className="space-y-3">
       <p className="text-eyebrow">{eyebrow}</p>
-      <ul className="overflow-hidden rounded-card border border-border bg-surface-elevated divide-y divide-border/60">
+      <ul
+        className={
+          muted
+            ? 'overflow-hidden rounded-card border border-border bg-surface-elevated divide-y divide-border/60 opacity-70'
+            : 'overflow-hidden rounded-card border border-border bg-surface-elevated divide-y divide-border/60'
+        }
+      >
         {goals.map((g) => (
           <GoalRow key={g.id} goal={g} />
         ))}
@@ -49,14 +64,20 @@ function Section({
 function partition(goals: GoalWithProgress[]) {
   const behind: GoalWithProgress[] = [];
   const onPace: GoalWithProgress[] = [];
+  const archived: GoalWithProgress[] = [];
   for (const g of goals) {
+    if (!g.isActive) {
+      archived.push(g);
+      continue;
+    }
     const v = paceVerdict(g);
     if (v === 'over' || v === 'behind') behind.push(g);
     else onPace.push(g);
   }
   behind.sort((a, b) => severityKey(b) - severityKey(a));
   onPace.sort((a, b) => b.progress.fraction - a.progress.fraction);
-  return { behind, onPace };
+  archived.sort((a, b) => +b.createdAt - +a.createdAt);
+  return { behind, onPace, archived };
 }
 
 function plural(n: number, word: string): string {

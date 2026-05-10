@@ -1,10 +1,7 @@
-import { eq, inArray } from 'drizzle-orm';
+import { inArray } from 'drizzle-orm';
 import { auth } from '@/auth';
 import { ConnectAccountButton } from '@/components/connect/connect-account-button';
-import { DisconnectItemButton } from '@/components/plaid/disconnect-item-button';
-import { ReconnectButton } from '@/components/plaid/reconnect-button';
-import { statusLabel } from '@/components/plaid/status';
-import { SyncButton } from '@/components/plaid/sync-button';
+import { SourceHealthRow } from '@/components/sync/source-health-row';
 import {
   Card,
   CardContent,
@@ -13,7 +10,8 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { db } from '@/lib/db';
-import { financialAccounts, externalItems } from '@/lib/db/schema';
+import { getSourceHealth } from '@/lib/db/queries/health';
+import { financialAccounts } from '@/lib/db/schema';
 import { snaptradeConfigured } from '@/lib/snaptrade/client';
 import { formatCurrency } from '@/lib/utils';
 
@@ -21,20 +19,16 @@ export default async function SettingsPage() {
   const session = await auth();
   if (!session?.user) return null;
 
-  const items = await db
-    .select()
-    .from(externalItems)
-    .where(eq(externalItems.userId, session.user.id))
-    .orderBy(externalItems.createdAt);
+  const sources = await getSourceHealth(session.user.id);
 
-  const accounts = items.length
+  const accounts = sources.length
     ? await db
         .select()
         .from(financialAccounts)
         .where(
           inArray(
             financialAccounts.itemId,
-            items.map((i) => i.id),
+            sources.map((s) => s.itemId),
           ),
         )
     : [];
@@ -81,47 +75,17 @@ export default async function SettingsPage() {
           <ConnectAccountButton snaptradeEnabled={snaptradeConfigured()} />
         </CardHeader>
         <CardContent>
-          {items.length === 0 ? (
+          {sources.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No institutions connected yet.
             </p>
           ) : (
             <ul className="space-y-6">
-              {items.map((item) => {
-                const itemAccounts = accountsByItem.get(item.id) ?? [];
+              {sources.map((source) => {
+                const itemAccounts = accountsByItem.get(source.itemId) ?? [];
                 return (
-                  <li key={item.id} className="space-y-3">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="font-medium flex items-center gap-2">
-                          {item.institutionName ?? 'Unknown institution'}
-                          {item.status !== 'active' && (
-                            <span className="inline-flex items-center rounded-full border border-amber-500/50 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
-                              {statusLabel(item.status)}
-                            </span>
-                          )}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Connected {item.createdAt.toLocaleDateString()} ·{' '}
-                          {item.lastSyncedAt
-                            ? `synced ${formatRelative(item.lastSyncedAt)}`
-                            : 'never synced'}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {item.status === 'active' ? (
-                          <SyncButton itemId={item.id} />
-                        ) : (
-                          <ReconnectButton itemId={item.id} />
-                        )}
-                        <DisconnectItemButton
-                          itemId={item.id}
-                          institutionName={
-                            item.institutionName ?? 'this institution'
-                          }
-                        />
-                      </div>
-                    </div>
+                  <li key={source.itemId} className="space-y-3">
+                    <SourceHealthRow source={source} />
                     {itemAccounts.length > 0 && (
                       <ul className="rounded-md border border-border divide-y divide-border text-sm">
                         {itemAccounts.map((a) => (
@@ -161,18 +125,4 @@ export default async function SettingsPage() {
       </Card>
     </div>
   );
-}
-
-/** "5 minutes ago" / "2 hours ago" / "yesterday" / locale date for older. */
-function formatRelative(d: Date): string {
-  const diffMs = Date.now() - d.getTime();
-  const min = Math.floor(diffMs / 60_000);
-  if (min < 1) return 'just now';
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  const day = Math.floor(hr / 24);
-  if (day === 1) return 'yesterday';
-  if (day < 7) return `${day}d ago`;
-  return d.toLocaleDateString();
 }

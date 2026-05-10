@@ -3,13 +3,25 @@
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+// syncItemAction lives in plaid/actions.ts but its body is provider-
+// neutral (auth + ownership check + dispatcher). Importing here avoids
+// adding a redundant wrapper. Will move to src/lib/sync/actions.ts when
+// the planned provider-neutral file rename happens.
+import { syncItemAction } from '@/lib/plaid/actions';
 import { syncSnaptradeBrokeragesAction } from '@/lib/snaptrade/actions';
 
 type Status =
   | { kind: 'reconciling' }
-  | { kind: 'syncing'; addedCount: number }
-  | { kind: 'done'; added: number; total: number }
+  | { kind: 'syncing'; syncingCount: number }
+  | {
+      kind: 'done';
+      added: number;
+      repaired: number;
+      total: number;
+      syncFailed: number;
+    }
   | { kind: 'error'; message: string };
 
 /**
@@ -36,7 +48,13 @@ export function SnaptradeRedirectClient() {
     ranRef.current = true;
 
     (async () => {
-      let reconcileResult: { added: number; total: number };
+      let reconcileResult: {
+        added: number;
+        repaired: number;
+        total: number;
+        newItemIds: string[];
+        repairedItemIds: string[];
+      };
       try {
         reconcileResult = await syncSnaptradeBrokeragesAction();
       } catch (e) {
@@ -50,20 +68,57 @@ export function SnaptradeRedirectClient() {
         return;
       }
 
-      // Initial sync isn't strictly needed — nightly cron will pick up
-      // new items — but the user expects to see their data after
-      // connecting. Best-effort; failures don't block the success state
-      // because the items are already recorded and reachable.
-      setStatus({ kind: 'syncing', addedCount: reconcileResult.added });
-      // We need item ids to call syncItemAction. The reconcile action
-      // doesn't return them — fetch them client-side via a follow-up
-      // server action would be cleanest, but for the MVP we just rely
-      // on the cron. Skipping initial sync here keeps the page lean.
+      // Both newly-added and repaired items need an immediate sync.
+      // Repaired items were previously stuck (login_required / error)
+      // and the user just re-authorized — their holdings on file may
+      // be stale. Eagerly syncing here means the user sees up-to-date
+      // positions on /investments without waiting for the nightly cron.
+      const syncableItemIds = [
+        ...reconcileResult.newItemIds,
+        ...reconcileResult.repairedItemIds,
+      ];
+
+      if (syncableItemIds.length === 0) {
+        setStatus({
+          kind: 'done',
+          added: reconcileResult.added,
+          repaired: reconcileResult.repaired,
+          total: reconcileResult.total,
+          syncFailed: 0,
+        });
+        return;
+      }
+
+      // Best-effort sync: items are already recorded / repaired and
+      // the nightly cron will pick up anything that fails here, so a
+      // sync failure doesn't promote to error UI. Toast surfaces the
+      // count so the user can retry from Settings if they care.
+      setStatus({
+        kind: 'syncing',
+        syncingCount: syncableItemIds.length,
+      });
+
+      const results = await Promise.allSettled(
+        syncableItemIds.map((id) => syncItemAction(id)),
+      );
+      const syncFailed = results.filter(
+        (r) => r.status === 'rejected',
+      ).length;
+
+      if (syncFailed > 0) {
+        toast.error(
+          syncFailed === 1
+            ? 'One initial sync failed. Use Sync now on Settings to retry.'
+            : `${syncFailed} initial syncs failed. Use Sync now on Settings to retry.`,
+        );
+      }
 
       setStatus({
         kind: 'done',
         added: reconcileResult.added,
+        repaired: reconcileResult.repaired,
         total: reconcileResult.total,
+        syncFailed,
       });
     })();
   }, []);
@@ -83,26 +138,30 @@ export function SnaptradeRedirectClient() {
           <Block
             icon={<Loader2 className="h-5 w-5 animate-spin" />}
             title="Almost there…"
-            caption={`Loading positions for ${status.addedCount} new ${status.addedCount === 1 ? 'connection' : 'connections'}.`}
+            caption={`Loading positions for ${status.syncingCount} ${status.syncingCount === 1 ? 'connection' : 'connections'}.`}
           />
         )}
         {status.kind === 'done' && (
           <Block
             icon={<CheckCircle2 className="h-5 w-5 text-positive" />}
-            title={
-              status.added > 0
-                ? `Connected ${status.added} ${status.added === 1 ? 'brokerage' : 'brokerages'}`
-                : 'No new brokerages added'
-            }
-            caption={
-              status.added > 0
-                ? 'Initial sync runs at the next scheduled refresh — or click Sync now on Settings.'
-                : `${status.total} authorizations on file. Nothing changed.`
-            }
+            title={doneTitle(status)}
+            caption={doneCaption(status)}
             cta={
-              <Button asChild>
-                <Link href="/settings">Back to settings</Link>
-              </Button>
+              status.added + status.repaired > 0 &&
+              status.syncFailed < status.added + status.repaired ? (
+                <div className="flex flex-col items-center gap-2">
+                  <Button asChild>
+                    <Link href="/investments">View investments</Link>
+                  </Button>
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link href="/settings">Back to settings</Link>
+                  </Button>
+                </div>
+              ) : (
+                <Button asChild>
+                  <Link href="/settings">Back to settings</Link>
+                </Button>
+              )
             }
           />
         )}
@@ -121,6 +180,42 @@ export function SnaptradeRedirectClient() {
       </div>
     </div>
   );
+}
+
+function doneTitle(status: {
+  added: number;
+  repaired: number;
+}): string {
+  const { added, repaired } = status;
+  if (added > 0 && repaired > 0) {
+    return `Connected ${added} · Reconnected ${repaired}`;
+  }
+  if (added > 0) {
+    return `Connected ${added} ${added === 1 ? 'brokerage' : 'brokerages'}`;
+  }
+  if (repaired > 0) {
+    return `Reconnected ${repaired} ${repaired === 1 ? 'brokerage' : 'brokerages'}`;
+  }
+  return 'No changes';
+}
+
+function doneCaption(status: {
+  added: number;
+  repaired: number;
+  total: number;
+  syncFailed: number;
+}): string {
+  const changes = status.added + status.repaired;
+  if (changes === 0) {
+    return `${status.total} authorizations on file. Nothing changed.`;
+  }
+  if (status.syncFailed === changes) {
+    return 'Initial sync failed — your data will load at the next scheduled refresh.';
+  }
+  if (status.syncFailed > 0) {
+    return 'Holdings partially loaded. Retry from Settings to top up the rest.';
+  }
+  return 'Holdings are loaded — open Investments to see them.';
 }
 
 function Block({

@@ -10,6 +10,7 @@ import { RecentActivityCard } from '@/components/dashboard/recent-activity-card'
 import { SplitCard } from '@/components/dashboard/split-card';
 import { UpcomingRecurringCard } from '@/components/dashboard/upcoming-recurring-card';
 import { MotionStack } from '@/components/motion/motion-stack';
+import { TrustStrip } from '@/components/sync/trust-strip';
 import { getCategoryOptions } from '@/lib/db/queries/categories';
 import {
   getDashboardSummary,
@@ -20,6 +21,7 @@ import {
 import { getDriftAnalysis } from '@/lib/db/queries/drift';
 import { getForecastHistory } from '@/lib/db/queries/forecast';
 import { getGoalsWithProgress } from '@/lib/db/queries/goals';
+import { getSourceHealth } from '@/lib/db/queries/health';
 import { getLatestInsight } from '@/lib/db/queries/insights';
 import { getUpcomingRecurringOutflows } from '@/lib/db/queries/recurring';
 import { db } from '@/lib/db';
@@ -44,6 +46,7 @@ export default async function DashboardPage() {
     liquidAccounts,
     forecastHistory,
     categoryOptions,
+    sourceHealth,
   ] = await Promise.all([
     getDashboardSummary(userId),
     getNetWorthMonthlyDelta(userId),
@@ -56,6 +59,7 @@ export default async function DashboardPage() {
     countLiquidAccounts(userId),
     getForecastHistory(userId),
     getCategoryOptions(userId),
+    getSourceHealth(userId),
   ]);
 
   if (!summary.hasAnyItem) {
@@ -76,6 +80,8 @@ export default async function DashboardPage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:px-8 sm:py-10">
       <MotionStack className="space-y-5">
+        <TrustStrip sources={sourceHealth} />
+
         <HeroCard
           netWorth={summary.netWorth}
           monthlyDelta={monthlyDelta}

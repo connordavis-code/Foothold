@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatCurrency, formatPercent } from './utils';
+import { formatCurrency, formatCurrencyCompact, formatPercent } from './utils';
 
 describe('formatCurrency', () => {
   it('formats positive amounts with thousands separators', () => {
@@ -16,6 +16,22 @@ describe('formatCurrency', () => {
 
   it('renders compact notation for large amounts', () => {
     expect(formatCurrency(1_234_567, { compact: true })).toBe('$1.2M');
+  });
+});
+
+describe('formatCurrencyCompact', () => {
+  it('drops cents for whole-dollar amounts', () => {
+    expect(formatCurrencyCompact(50)).toBe('$50');
+    expect(formatCurrencyCompact(1234)).toBe('$1,234');
+  });
+
+  it('keeps cents for fractional amounts', () => {
+    expect(formatCurrencyCompact(50.32)).toBe('$50.32');
+  });
+
+  it('handles negatives the same way', () => {
+    expect(formatCurrencyCompact(-50)).toBe('-$50');
+    expect(formatCurrencyCompact(-50.32)).toBe('-$50.32');
   });
 });
 
