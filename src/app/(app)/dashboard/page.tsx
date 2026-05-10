@@ -6,11 +6,14 @@ import { DriftFlagsCard } from '@/components/dashboard/drift-flags-card';
 import { GoalsRow } from '@/components/dashboard/goals-row';
 import { HeroCard } from '@/components/dashboard/hero-card';
 import { InsightTeaserCard } from '@/components/dashboard/insight-teaser-card';
+import { PageHeader } from '@/components/dashboard/page-header';
 import { RecentActivityCard } from '@/components/dashboard/recent-activity-card';
 import { SplitCard } from '@/components/dashboard/split-card';
 import { UpcomingRecurringCard } from '@/components/dashboard/upcoming-recurring-card';
 import { MotionStack } from '@/components/motion/motion-stack';
 import { TrustStrip } from '@/components/sync/trust-strip';
+import { summarizeTrustStrip } from '@/lib/sync/trust-strip';
+import { formatRelative } from '@/lib/format/date';
 import { getCategoryOptions } from '@/lib/db/queries/categories';
 import {
   getDashboardSummary,
@@ -77,9 +80,32 @@ export default async function DashboardPage() {
   });
   const eomProjected = projection.projection[0]?.endCash ?? liquidBalance;
 
+  // T1 inline freshness approximation — T7 swaps this for formatFreshness().
+  const todayLabel = `Today · ${new Date().toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  })}`;
+  const trustSummary = summarizeTrustStrip(sourceHealth);
+  const freshnessHeadline =
+    trustSummary.kind === 'healthy'
+      ? `Fresh ${formatRelative(trustSummary.freshAt)} · ${trustSummary.sourceCount} ${
+          trustSummary.sourceCount === 1 ? 'source' : 'sources'
+        }`
+      : trustSummary.kind === 'no_signal'
+        ? `Sync pending · ${trustSummary.sourceCount} sources`
+        : trustSummary.kind === 'quiet'
+          ? `Synced ${formatRelative(trustSummary.syncedAt)} · ${trustSummary.sourceCount} sources`
+          : `${trustSummary.elevated.length} source${trustSummary.elevated.length === 1 ? '' : 's'} need attention`;
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:px-8 sm:py-10">
-      <MotionStack className="space-y-5">
+      <PageHeader
+        todayLabel={todayLabel}
+        freshnessHeadline={freshnessHeadline}
+        freshnessCaveat={null}
+      />
+      <MotionStack className="mt-6 space-y-5">
         <TrustStrip sources={sourceHealth} />
 
         <HeroCard
