@@ -36,9 +36,9 @@ export function NavLink({ href, label, children }: Props) {
       href={href}
       aria-current={isActive ? 'page' : undefined}
       className={cn(
-        'sb-item relative flex items-center gap-3 rounded-[var(--r-btn)] px-3 py-2 text-[13px] transition-[transform,color] duration-fast ease-out-quart',
+        'sb-item relative flex items-center gap-3 rounded-[var(--r-btn)] px-3 py-2 text-[13px] transition-[transform,color,background-color] duration-fast ease-out-quart',
         isActive
-          ? 'sb-item-active pl-[18px] font-medium text-[color:var(--text)]'
+          ? 'sb-item-active bg-[color:var(--surface)] pl-[22px] font-medium text-[color:var(--text)]'
           : 'text-[color:var(--text-2)] hover:translate-x-[2px] hover:text-[color:var(--text)]',
       )}
     >

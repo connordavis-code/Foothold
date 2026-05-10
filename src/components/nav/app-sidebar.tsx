@@ -22,7 +22,7 @@ import { SidebarBrand } from './sidebar-brand';
  */
 export function AppSidebar() {
   return (
-    <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-[var(--hairline)] bg-[color:var(--surface)]">
+    <aside className="hidden md:flex sticky top-0 h-screen w-60 shrink-0 flex-col border-r border-[var(--hairline)] bg-[color:var(--bg-2)]">
       <SidebarBrand />
 
       <nav
