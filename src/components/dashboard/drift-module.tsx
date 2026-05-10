@@ -42,9 +42,13 @@ export function DriftModule({ elevated }: Props) {
       </header>
       <ul className="mt-4 space-y-2">
         {sorted.map((row) => {
-          const isHot = row.ratio > 1;
-          // Bar fill clamped to prevent 10×+ ratios blowing the bar width.
-          const widthPct = Math.min(row.ratio * 10, 100);
+          // Bar scale: 0% = no spend, 10% = baseline (1× ratio), 100% = 10× ratio cap.
+          // Two-segment fill semantically splits "typical spend" from "drift above typical":
+          //   - baseline segment: 0% → 10% (or 0% → current, whichever is smaller)
+          //   - drift segment: 10% → current (only when current > baseline)
+          const currentPct = Math.min(row.ratio * 10, 100);
+          const baselinePct = Math.min(10, currentPct);
+          const driftPct = Math.max(0, currentPct - 10);
           return (
             <li
               key={row.category}
@@ -55,14 +59,24 @@ export function DriftModule({ elevated }: Props) {
               </div>
               <div className="relative h-2 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
                 <div
-                  className="h-full rounded-full"
+                  className="absolute left-0 top-0 h-full"
                   style={{
-                    width: `${widthPct}%`,
-                    background: isHot
-                      ? 'var(--semantic-success)'
-                      : 'var(--text-3)',
+                    width: `${baselinePct}%`,
+                    background: 'var(--text-3)',
                   }}
+                  aria-hidden
                 />
+                {driftPct > 0 && (
+                  <div
+                    className="absolute top-0 h-full"
+                    style={{
+                      left: '10%',
+                      width: `${driftPct}%`,
+                      background: 'var(--semantic-success)',
+                    }}
+                    aria-hidden
+                  />
+                )}
               </div>
               <div className="text-right font-mono tabular-nums text-[--text-2]">
                 {fmtMoney(row.currentTotal)}{' '}
