@@ -44,6 +44,12 @@
     --text-3: rgba(26, 32, 28, 0.45);
     --accent-soft: rgba(107, 138, 90, 0.16);
     --accent-strong: #557244;
+    /* Dot halo — used by .sig-dot + .sb-item-active::before. Higher
+     * alpha than --accent-soft because it surrounds a small focal point
+     * that needs visible weight, not a wash. Theme-aware: BRG-deep on
+     * bone canvas reads as a green tint; lifted cream-green on deep-
+     * forest reads as a glow. Bundle ref: rgba in keyframe definitions. */
+    --dot-halo: rgba(0, 66, 37, 0.35);
 
     /* shadcn semantic tokens (HSL tuples for hsl(var(--x) / N) alpha
      * composition). Values rebound to Foothold palette so existing
@@ -144,6 +150,7 @@
     --text-3: rgba(236, 242, 230, 0.58);
     --accent-soft: rgba(107, 138, 90, 0.18);
     --accent-strong: #8aa979;
+    --dot-halo: rgba(168, 194, 152, 0.50);
 
     --background: 154 50% 5%;        /* deep-forest */
     --foreground: 90 32% 93%;        /* bone-ink */
@@ -268,12 +275,12 @@
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: var(--accent);
+    background: var(--foothold-green);
     /* Static + animated halo — same dual-shadow pattern as
      * .sb-item-active::before (single keyframe drives both surfaces). */
     box-shadow:
-      0 0 0 3px var(--accent-soft),
-      0 0 0 0 var(--accent-soft);
+      0 0 0 3px var(--dot-halo),
+      0 0 0 0 var(--dot-halo);
     animation: sb-here-pulse 2.6s ease-out infinite;
   }
   @media (max-width: 720px) {
@@ -317,14 +324,14 @@
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: var(--accent);
+    background: var(--foothold-green);
     /* Dual-shadow: a constant 3px halo ring around the dot + a
      * pulsing outward ring (animated via keyframe). The constant halo
      * gives the active state visible weight at all times; the pulse
      * adds rhythm without being the only signal. */
     box-shadow:
-      0 0 0 3px var(--accent-soft),
-      0 0 0 0 var(--accent-soft);
+      0 0 0 3px var(--dot-halo),
+      0 0 0 0 var(--dot-halo);
     animation: sb-here-pulse 2.6s ease-out infinite;
   }
   .sb-brand-pulse svg {
@@ -338,17 +345,17 @@
 @keyframes sb-here-pulse {
   0% {
     box-shadow:
-      0 0 0 3px var(--accent-soft),
-      0 0 0 0 var(--accent-soft);
+      0 0 0 3px var(--dot-halo),
+      0 0 0 0 var(--dot-halo);
   }
   70% {
     box-shadow:
-      0 0 0 3px var(--accent-soft),
+      0 0 0 3px var(--dot-halo),
       0 0 0 8px transparent;
   }
   100% {
     box-shadow:
-      0 0 0 3px var(--accent-soft),
+      0 0 0 3px var(--dot-halo),
       0 0 0 0 transparent;
   }
 }
