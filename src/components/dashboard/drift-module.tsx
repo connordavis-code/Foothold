@@ -53,13 +53,7 @@ export function DriftModule({ elevated }: Props) {
               <div className="truncate font-medium text-[--text]">
                 {humanizeCategory(row.category)}
               </div>
-              <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
-                {/* Baseline tick at fixed left offset per prototype */}
-                <div
-                  className="absolute top-0 h-full w-px bg-[--text-3]"
-                  style={{ left: '14%' }}
-                  aria-hidden
-                />
+              <div className="relative h-2 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
                 <div
                   className="h-full rounded-full"
                   style={{
