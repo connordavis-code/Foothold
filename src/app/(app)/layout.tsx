@@ -27,7 +27,7 @@ export default async function AppLayout({
 
   return (
     <CommandPaletteProvider>
-      <div className="flex min-h-screen bg-surface-paper">
+      <div className="relative flex min-h-screen">
         <AppSidebar />
         <div className="flex flex-1 flex-col min-w-0">
           <TopBar userId={session.user.id} email={session.user.email} />

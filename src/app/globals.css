@@ -356,6 +356,54 @@
   }
 }
 
+/* R.1 T7 page-bg textures. Topographic contour map (840×840 primary)
+ * + a wider-spaced elevation rings overlay (1080×1080 secondary). The
+ * second layer is offset so the pattern doesn't repeat as a single
+ * stamp — gives the canvas depth without becoming busy.
+ *
+ * Bundle ref: claude-design-context/styles.css body::before/after.
+ * Theme convention is inverted from the bundle (our :root = light,
+ * bundle's :root = dark), so the default rules use dark-graphite
+ * strokes for the light canvas, and .dark overrides to cream strokes
+ * for the deep-forest canvas. Mix-blend-mode keeps the strokes from
+ * reading as a pasted-on overlay. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='840' height='840' viewBox='0 0 840 840'><g fill='none' stroke='%231a201c' stroke-width='1' stroke-linecap='round' stroke-linejoin='round'><path d='M 220 200 C 260 170, 320 175, 350 200 C 380 225, 380 270, 340 290 C 300 310, 245 305, 215 280 C 185 255, 185 225, 220 200 Z'/><path d='M 195 175 C 250 135, 350 140, 390 180 C 425 220, 420 290, 365 320 C 310 350, 230 345, 190 305 C 155 270, 150 215, 195 175 Z'/><path d='M 165 145 C 235 95, 380 100, 430 155 C 475 210, 470 305, 395 350 C 320 390, 215 385, 165 335 C 120 290, 110 195, 165 145 Z'/><path d='M 130 110 C 220 50, 410 55, 475 130 C 535 205, 525 325, 425 380 C 325 430, 195 425, 130 360 C 75 305, 60 175, 130 110 Z'/><path d='M 600 480 C 640 460, 700 470, 720 510 C 740 550, 720 590, 670 600 C 620 610, 575 595, 565 555 C 555 515, 570 495, 600 480 Z'/><path d='M 575 455 C 635 425, 730 435, 760 490 C 790 545, 760 605, 690 625 C 620 645, 555 625, 530 575 C 510 530, 525 485, 575 455 Z'/><path d='M 545 425 C 625 385, 760 395, 800 470 C 840 545, 800 625, 705 655 C 615 685, 525 660, 495 600 C 470 545, 485 465, 545 425 Z'/><path d='M 510 390 C 615 340, 815 345, 855 445 C 890 545, 845 660, 720 690 C 595 720, 485 695, 455 615 C 430 545, 440 440, 510 390 Z'/><path d='M 80 620 C 130 600, 200 615, 215 660 C 230 705, 195 745, 145 745 C 95 745, 50 720, 45 680 C 40 645, 50 632, 80 620 Z'/><path d='M 55 595 C 125 565, 235 580, 255 645 C 275 710, 220 770, 140 775 C 70 780, 15 745, 10 690 C 5 645, 15 615, 55 595 Z'/><path d='M 30 565 C 115 525, 270 535, 295 625 C 320 715, 240 800, 135 805 C 40 810, -25 760, -25 695 C -25 640, -10 590, 30 565 Z'/></g></svg>");
+  background-size: 840px 840px;
+  opacity: 0.05;
+  mix-blend-mode: multiply;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1080' height='1080' viewBox='0 0 1080 1080'><g fill='none' stroke='%231a201c' stroke-width='1' stroke-linecap='round' stroke-linejoin='round' opacity='0.7'><path d='M 380 380 C 470 340, 620 345, 690 410 C 760 475, 745 595, 645 635 C 545 675, 410 660, 360 580 C 315 510, 320 415, 380 380 Z'/><path d='M 330 340 C 450 280, 685 285, 770 380 C 855 475, 825 635, 690 690 C 555 745, 380 720, 320 615 C 265 520, 270 390, 330 340 Z'/><path d='M 850 850 C 920 825, 1010 845, 1025 905 C 1040 965, 985 1005, 905 1000 C 830 995, 795 945, 815 895 C 825 870, 835 858, 850 850 Z'/></g></svg>");
+  background-size: 1080px 1080px;
+  background-position: -180px -120px;
+  opacity: 0.04;
+  mix-blend-mode: multiply;
+}
+
+.dark body::before {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='840' height='840' viewBox='0 0 840 840'><g fill='none' stroke='%23d4dccf' stroke-width='1' stroke-linecap='round' stroke-linejoin='round'><path d='M 220 200 C 260 170, 320 175, 350 200 C 380 225, 380 270, 340 290 C 300 310, 245 305, 215 280 C 185 255, 185 225, 220 200 Z'/><path d='M 195 175 C 250 135, 350 140, 390 180 C 425 220, 420 290, 365 320 C 310 350, 230 345, 190 305 C 155 270, 150 215, 195 175 Z'/><path d='M 165 145 C 235 95, 380 100, 430 155 C 475 210, 470 305, 395 350 C 320 390, 215 385, 165 335 C 120 290, 110 195, 165 145 Z'/><path d='M 130 110 C 220 50, 410 55, 475 130 C 535 205, 525 325, 425 380 C 325 430, 195 425, 130 360 C 75 305, 60 175, 130 110 Z'/><path d='M 600 480 C 640 460, 700 470, 720 510 C 740 550, 720 590, 670 600 C 620 610, 575 595, 565 555 C 555 515, 570 495, 600 480 Z'/><path d='M 575 455 C 635 425, 730 435, 760 490 C 790 545, 760 605, 690 625 C 620 645, 555 625, 530 575 C 510 530, 525 485, 575 455 Z'/><path d='M 545 425 C 625 385, 760 395, 800 470 C 840 545, 800 625, 705 655 C 615 685, 525 660, 495 600 C 470 545, 485 465, 545 425 Z'/><path d='M 510 390 C 615 340, 815 345, 855 445 C 890 545, 845 660, 720 690 C 595 720, 485 695, 455 615 C 430 545, 440 440, 510 390 Z'/><path d='M 80 620 C 130 600, 200 615, 215 660 C 230 705, 195 745, 145 745 C 95 745, 50 720, 45 680 C 40 645, 50 632, 80 620 Z'/><path d='M 55 595 C 125 565, 235 580, 255 645 C 275 710, 220 770, 140 775 C 70 780, 15 745, 10 690 C 5 645, 15 615, 55 595 Z'/><path d='M 30 565 C 115 525, 270 535, 295 625 C 320 715, 240 800, 135 805 C 40 810, -25 760, -25 695 C -25 640, -10 590, 30 565 Z'/></g></svg>");
+  opacity: 0.04;
+  mix-blend-mode: overlay;
+}
+
+.dark body::after {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1080' height='1080' viewBox='0 0 1080 1080'><g fill='none' stroke='%23d4dccf' stroke-width='1' stroke-linecap='round' stroke-linejoin='round' opacity='0.7'><path d='M 380 380 C 470 340, 620 345, 690 410 C 760 475, 745 595, 645 635 C 545 675, 410 660, 360 580 C 315 510, 320 415, 380 380 Z'/><path d='M 330 340 C 450 280, 685 285, 770 380 C 855 475, 825 635, 690 690 C 555 745, 380 720, 320 615 C 265 520, 270 390, 330 340 Z'/><path d='M 850 850 C 920 825, 1010 845, 1025 905 C 1040 965, 985 1005, 905 1000 C 830 995, 795 945, 815 895 C 825 870, 835 858, 850 850 Z'/></g></svg>");
+  opacity: 0.03;
+  mix-blend-mode: overlay;
+}
+
 /* Hero-card loading shimmer. Plain animate-pulse looks anemic on the
  * deep-green gradient canvas; this swept highlight reads as "loading
  * something rich". Respects prefers-reduced-motion via the global
