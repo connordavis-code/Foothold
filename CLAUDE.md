@@ -214,6 +214,30 @@ no longer matters mathematically — see
 `apply-overrides-commutativity.test.ts`. Closes review W-09. Spec at
 `docs/superpowers/specs/2026-05-05-w09-override-applier-clipping-design.md`.
 
+### R.1+ redesign uses two-layer tokens — HSL tuples need `hsl()` wrap
+[globals.css] has two parallel token systems:
+
+- **shadcn semantic tokens** (`--background`, `--primary`, `--accent`,
+  etc.) — bare HSL tuples like `99 21% 45%` for Tailwind alpha
+  composition via `hsl(var(--x) / N)`. Consume via `hsl(var(--token))`
+  in custom CSS or via the Tailwind utility (`bg-primary`).
+- **Bundle brand tokens** (`--foothold-green`, `--brg`, `--bone`,
+  `--paper`, `--slate`, `--accent-soft`, `--dot-halo`) — raw hex /
+  rgba for direct color use.
+
+**Pitfall:** writing `background: var(--accent)` in custom CSS silently
+fails — the bare HSL tuple isn't a valid color value, browsers fall
+back to transparent. Typecheck / Tailwind / build can't catch it; only
+visual UAT does. Caught in R.1 commit `1ae898c` after the active-route
+sidebar dot rendered invisible.
+
+**Rule:** when consuming a shadcn token as a direct color in custom
+CSS, wrap with `hsl(...)`. For brand colors prefer the bundle hex
+token (`var(--foothold-green)`) — it works as a direct color and
+conveys intent ("this IS the brand color"). For Tailwind utility
+consumption, use the utility class form (`bg-accent`) — Tailwind
+applies the `hsl()` wrap for you.
+
 ---
 
 ## Lessons learned
@@ -231,6 +255,11 @@ Build overwrites `.next/BUILD_ID` and chunk manifests; live dev's
 module map points at chunks no longer on disk → pages render unstyled
 until Ctrl+C, `rm -rf .next`, restart dev. Use `typecheck` for
 verification while dev runs; reserve `build` for pre-deploy.
+
+**Strikes:** 2 of 3. Most recent: R.1 redesign session 2026-05-09 —
+ran build 3× to verify next/font fetches; user's dev server cache
+invalidated; required `rm -rf .next` + restart. 3rd strike promotes
+to Architecture note or a `predev` guard hook.
 
 ### Don't trust Ctrl+C to fully kill `next dev` on :3000
 After editing middleware, edge module map can hold a stale ref
@@ -1029,6 +1058,23 @@ plan at `docs/superpowers/plans/2026-05-07-phase-3-pt3-goal-detail.md`)
   inside-hero contamination + top-bar chip), sentence-at-N=1/list-at-
   N≥2 (rejected always-rollup + count-only chevron). Browser UAT
   pending — same constraint as Phase 4 (auth-gated dev server).
+- **Foothold Redesign milestone** — multi-phase visual + IA redesign
+  shipping R.1–R.6 to a long-lived `feat/redesign` branch (never merge
+  to main until R.6 polish closes). Spec at
+  [docs/redesign/SPEC.md](docs/redesign/SPEC.md); R.0–R.6 sequencing
+  locked 2026-05-09. **R.1 Foundation shipped 2026-05-09** — fonts
+  (Inter Tight + IBM Plex Mono + Fraunces; latin+latin-ext for EU
+  multi-tenant readiness), two-layer token swap (shadcn HSL tuples +
+  bundle brand hex; see Architecture > "two-layer tokens"),
+  `<FootholdMark>` brand component (pure-data testable),
+  `<SignatureFooter>` cartographic line below page content (live time
+  + IANA-tz-derived coords + 44-city lookup table, Boston fallback),
+  top-bar wrapper restyle (translucent hairline border), sidebar
+  restyle (sticky 100vh + `<SidebarBrand>` mount with click-pulse +
+  active-row pill background + pulse-only halo dot),
+  `body::before/::after` topographic page-bg textures. 10 commits on
+  `feat/redesign`, user-verified through visual UAT. **R.2 (Dashboard
+  restyle) is next** — PLAN.md not yet written.
 
 ### Next up
 - **Plaid Production access review** for Fidelity (deprioritized) —
