@@ -53,6 +53,36 @@ function withMonoNumerals(text: string): React.ReactNode {
   );
 }
 
+/**
+ * Pulls the first sentence off the front of the narrative for the
+ * Fraunces editorial lead. Returns null when the first sentence is too
+ * long (>180c) or too short (<20c) — in those cases the card falls back
+ * to rendering all paragraphs as body, preserving honesty when the AI
+ * prompt happens to produce a run-on opener.
+ *
+ * Sentence boundary = punctuation + whitespace. Decimals like $338.69
+ * don't match because they have no trailing space.
+ *
+ * When the AI prompt is later tuned to emit editorial leads natively
+ * (R.3 concern), this extractor becomes the no-op fallback.
+ */
+function extractLead(firstParagraph: string): {
+  lead: string | null;
+  remainder: string;
+} {
+  const match = firstParagraph.match(/[.!?]\s+/);
+  if (!match) return { lead: null, remainder: firstParagraph };
+  const idx = match.index! + match[0].length;
+  const candidate = firstParagraph.slice(0, idx).trim();
+  if (candidate.length > 180 || candidate.length < 20) {
+    return { lead: null, remainder: firstParagraph };
+  }
+  return {
+    lead: candidate,
+    remainder: firstParagraph.slice(idx).trim(),
+  };
+}
+
 export function WeekInsightCard({ insight, sequenceNumber, stats }: Props) {
   if (!insight) {
     return (
@@ -69,8 +99,10 @@ export function WeekInsightCard({ insight, sequenceNumber, stats }: Props) {
   }
 
   const paragraphs = insight.narrative.split(/\n\n+/).filter(Boolean);
-  const lead = paragraphs[0] ?? '';
-  const body = paragraphs.slice(1);
+  const firstPara = paragraphs[0] ?? '';
+  const { lead, remainder } = extractLead(firstPara);
+  // Body = (remainder of first paragraph, if any) + subsequent paragraphs.
+  const body = [remainder, ...paragraphs.slice(1)].filter(Boolean);
 
   return (
     <article id="brief" className="rounded-card bg-[--surface] p-6">
