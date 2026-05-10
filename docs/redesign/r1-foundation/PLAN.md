@@ -33,7 +33,7 @@ R.1 lands on a **long-lived feature branch** `feat/redesign` — not main. Reaso
 - [tailwind.config.ts](../../../tailwind.config.ts) — `theme.extend.fontFamily` updates
 
 **Subtasks**:
-1. Add `IBM_Plex_Mono` and `Inter_Tight` from `next/font/google` with weights 400/500/600/700 (sans), 400/500 (mono), and italic for both (Inter Tight italic exists; Plex italic for completeness)
+1. Add `IBM_Plex_Mono` and `Inter_Tight` from `next/font/google` with weights 400/500/600/700 (sans), 400/500 (mono), italic variants for both, and `subsets: ['latin', 'latin-ext']` on each (EU-inclusive multi-tenant readiness — locked 2026-05-09)
 2. Wire CSS variables: `--font-ui` → Inter Tight, `--font-mono` → IBM Plex Mono, `--font-display` → Fraunces (preserved — already in repo)
 3. Remove unused JetBrains Mono import + any `geist` references
 4. Set `font-feature-settings: "tnum", "zero", "ss01"` on `.num` / `.mono` utility class for tabular numerals
@@ -125,7 +125,7 @@ R.1 lands on a **long-lived feature branch** `feat/redesign` — not main. Reaso
 1. Client component (`"use client"`) — uses `useState` + `setInterval` for live time updates every 30s
 2. Two clusters: left (status indicator + source count) + right (coordinates + sync timestamp + version)
 3. **Source count** — pulls from `getSourceHealth()` (already exists from Reliability Phase 3) for the count of active sources. **DEFER** the data wiring to R.2 — for R.1, hardcode "3 sources" and treat the data integration as an R.2 task. Reason: keeps R.1 scope tight; the trust strip in R.2 needs the same data hookup and can land both together.
-4. **Coordinates** — placeholder `42.3601° N · 71.0589° W` (Boston) for R.1. Real source: user's timezone-derived coordinates is non-trivial and not load-bearing. **DEFER** to R.6 polish.
+4. **Coordinates** — derive client-side from `Intl.DateTimeFormat().resolvedOptions().timeZone` mapped via a static IANA-zone → city-coords lookup table (city-center approximation). No network, no server geo, no PII upstream. Lookup falls back to Boston `42.3601° N · 71.0589° W` if zone is unrecognized. (Locked 2026-05-09 — upgraded from R.6 deferral.)
 5. **Sync timestamp** — derive from current time, format `HH:MM` in user's local TZ. Real source for "last sync time" lands in R.2 alongside trust strip.
 6. **Version** — read from `package.json` at build time via env var `NEXT_PUBLIC_APP_VERSION` or hardcode for R.1
 7. Pulsing green dot indicator (`.sig-dot` per styles.css) — animation honors `prefers-reduced-motion`
@@ -281,12 +281,12 @@ R.1 ships when:
 
 ---
 
-## Open questions to lock at R.1 kickoff
+## Locked decisions (2026-05-09 kickoff)
 
-1. **`feat/redesign` branch vs `data-theme="redesign"` toggle gating?** Recommendation: feature branch (cleaner). Toggle adds runtime branching for marginal preview benefit.
-2. **Font subset strategy** — Inter Tight has many weights; loading 4 + italic = ~6 font files. Subset to latin-only? Recommendation: yes, latin-only for now; revisit if i18n becomes a multi-user requirement.
-3. **`<SignatureFooter>` mount point** — directly in `(app)/layout.tsx` (current proposal) or separate `<AppShell>` wrapper component? Recommendation: directly in layout for R.1; refactor to wrapper if R.2 reveals shared shell logic.
-4. **Coordinate placeholder** — Boston coords (42.3601° N · 71.0589° W) per prototype, or user's timezone-derived approximation? Recommendation: hardcode placeholder for R.1; defer dynamic source to R.6.
+1. **Branch strategy**: `feat/redesign` long-lived branch off `main`. Each subsequent R.x phase merges into it; full milestone single-PRs to `main` after R.6 polish. Rejected the `data-theme="redesign"` runtime toggle — runtime branching for marginal preview benefit, dual-token CSS bloat.
+2. **Font subset**: `['latin', 'latin-ext']` on both `IBM_Plex_Mono` and `Inter_Tight`. Adds accented EU character coverage (`ą`, `ł`, `č`) for multi-tenant rollout; payload cost ~10-15% over latin-only, acceptable under HTTP/2 multiplexing.
+3. **`<SignatureFooter>` mount**: directly in `(app)/layout.tsx`. Rejected pre-emptive `<AppShell>` wrapper as YAGNI — refactor to wrapper if R.2 reveals shared shell logic worth extracting.
+4. **Coordinates**: browser-tz-derived via static IANA-zone → city-coords lookup. Upgraded from R.6 deferral to R.1 inclusion — moves the footer from decorative placeholder to real-feeling signal day-one without server geo or PII concerns.
 
 ---
 
