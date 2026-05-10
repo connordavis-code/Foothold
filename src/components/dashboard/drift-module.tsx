@@ -33,7 +33,7 @@ export function DriftModule({ elevated }: Props) {
             width: 8,
             height: 8,
             borderRadius: 9999,
-            background: 'var(--accent)',
+            background: 'var(--semantic-success)',
           }}
         />
         <span>
@@ -64,7 +64,9 @@ export function DriftModule({ elevated }: Props) {
                   className="h-full rounded-full"
                   style={{
                     width: `${widthPct}%`,
-                    background: isHot ? 'var(--accent)' : 'var(--text-3)',
+                    background: isHot
+                      ? 'var(--semantic-success)'
+                      : 'var(--text-3)',
                   }}
                 />
               </div>

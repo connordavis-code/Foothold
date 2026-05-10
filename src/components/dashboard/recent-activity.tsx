@@ -7,7 +7,7 @@ import { TransactionDetailSheet } from '@/components/transactions/transaction-de
 import type { CategoryOption } from '@/lib/db/queries/categories';
 import type { RecentTransaction } from '@/lib/db/queries/dashboard';
 import { humanizeCategory } from '@/lib/format/category';
-import { cn, formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 
 type Props = {
   transactions: RecentTransaction[];
@@ -101,10 +101,10 @@ function Row({ t, onTap }: { t: RecentTransaction; onTap: () => void }) {
         </p>
       </div>
       <p
-        className={cn(
-          'shrink-0 font-mono text-sm tabular-nums',
-          isIncome ? 'text-[--success]' : 'text-[--text]',
-        )}
+        className="shrink-0 font-mono text-sm tabular-nums"
+        style={{
+          color: isIncome ? 'var(--semantic-success)' : 'var(--text)',
+        }}
       >
         {formatCurrency(display, { signed: true })}
       </p>

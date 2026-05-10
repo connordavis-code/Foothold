@@ -145,11 +145,13 @@ export function WeekInsightCard({ insight, sequenceNumber, stats }: Props) {
           <div>
             <dt className="text-[--text-3]">Net</dt>
             <dd
-              className={
-                stats.netCents >= 0
-                  ? 'mt-0.5 font-mono tabular-nums text-[--success]'
-                  : 'mt-0.5 font-mono tabular-nums text-[--caution]'
-              }
+              className="mt-0.5 font-mono tabular-nums"
+              style={{
+                color:
+                  stats.netCents >= 0
+                    ? 'var(--semantic-success)'
+                    : 'var(--semantic-caution)',
+              }}
             >
               {stats.netCents >= 0 ? '+' : '−'}
               {fmtMoney(stats.netCents)}

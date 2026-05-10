@@ -75,7 +75,7 @@ export function HeroTrajectory({ historicalSeries, forecastSeries, band }: Props
   return (
     <div className="relative" aria-hidden="true">
       <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-24 w-full">
-        {bandPath && <path d={bandPath} fill="var(--accent)" opacity="0.08" />}
+        {bandPath && <path d={bandPath} fill="var(--semantic-success)" opacity="0.08" />}
         <path
           d={historicalPath}
           fill="none"
@@ -87,7 +87,7 @@ export function HeroTrajectory({ historicalSeries, forecastSeries, band }: Props
         <path
           d={forecastPath}
           fill="none"
-          stroke="var(--accent)"
+          stroke="var(--semantic-success)"
           strokeWidth="0.9"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -103,8 +103,8 @@ export function HeroTrajectory({ historicalSeries, forecastSeries, band }: Props
           strokeDasharray="0.6 1.2"
           opacity="0.35"
         />
-        <circle cx={todayX} cy={todayY} r="1.6" fill="var(--accent)" />
-        <circle cx={todayX} cy={todayY} r="3" fill="var(--accent)" opacity="0.18" />
+        <circle cx={todayX} cy={todayY} r="1.6" fill="var(--semantic-success)" />
+        <circle cx={todayX} cy={todayY} r="3" fill="var(--semantic-success)" opacity="0.18" />
       </svg>
       <div className="mt-1 flex justify-between text-[10px] uppercase tracking-wider text-[--text-3]">
         <span>90 days back</span>

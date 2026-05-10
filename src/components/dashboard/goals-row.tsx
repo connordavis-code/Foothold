@@ -50,9 +50,13 @@ function GoalTile({ goal }: { goal: GoalWithProgress }) {
   const overCap = p.type === 'spend_cap' && p.fraction > 1;
   const onPaceOverCap = p.type === 'spend_cap' && !overCap && p.projectedMonthly > p.cap;
 
-  // Spend-cap bar tone: positive/normal accent until pace warning kicks in
+  // Spend-cap bar tone: positive/normal accent until pace warning kicks in.
+  // Use Foothold complete-color semantic tokens (NOT --accent, which is an
+  // HSL fragment that needs hsl() wrapping and silently fails as raw var()).
   const barColor =
-    overCap || onPaceOverCap ? 'var(--caution)' : 'var(--accent)';
+    overCap || onPaceOverCap
+      ? 'var(--semantic-caution)'
+      : 'var(--semantic-success)';
 
   const headValue =
     p.type === 'savings' ? formatCurrency(p.current) : formatCurrency(p.spent);
@@ -81,7 +85,11 @@ function GoalTile({ goal }: { goal: GoalWithProgress }) {
           <span className="text-[--text]">
             {headValue} <span className="text-[--text-3]">of {headTotal}</span>
           </span>
-          <span className={overCap ? 'text-[--caution]' : 'text-[--text-3]'}>
+          <span
+            style={{
+              color: overCap ? 'var(--semantic-caution)' : 'var(--text-3)',
+            }}
+          >
             {formatPercent(p.fraction)}
           </span>
         </div>

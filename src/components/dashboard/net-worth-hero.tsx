@@ -55,8 +55,8 @@ export function NetWorthHero({
               width: 8,
               height: 8,
               borderRadius: 9999,
-              background: 'var(--accent)',
-              boxShadow: '0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)',
+              background: 'var(--semantic-success)',
+              boxShadow: '0 0 0 3px var(--dot-halo)',
             }}
           />
           You are here ·{' '}
@@ -87,13 +87,14 @@ export function NetWorthHero({
 
       <footer className="relative mt-4 flex items-baseline justify-between gap-3 text-xs">
         <div
-          className={
-            monthlyDelta < 0
-              ? 'text-[--caution]'
-              : monthlyDelta > 0
-                ? 'text-[--success]'
-                : 'text-[--text-3]'
-          }
+          style={{
+            color:
+              monthlyDelta < 0
+                ? 'var(--semantic-caution)'
+                : monthlyDelta > 0
+                  ? 'var(--semantic-success)'
+                  : 'var(--text-3)',
+          }}
         >
           <span className="font-mono tabular-nums">
             {deltaSign}
