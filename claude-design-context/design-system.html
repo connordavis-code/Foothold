@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Foothold · Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="styles.css"/>
+<style>
+  /* ---- Design system page chrome ---- */
+  body { padding: 0; }
+  .ds-shell {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 64px clamp(20px, 4vw, 56px) 96px;
+  }
+  .ds-hero { padding: 24px 0 56px; border-bottom: 1px solid var(--hairline); margin-bottom: 56px; }
+  .ds-hero-eyebrow {
+    font-family: var(--font-ui); font-size: 11px;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--text-3); font-weight: 500;
+    margin-bottom: 14px;
+  }
+  .ds-hero-title {
+    font-family: var(--font-display); font-style: italic;
+    font-size: clamp(48px, 7vw, 84px); font-weight: 400;
+    letter-spacing: -0.025em; color: var(--text);
+    line-height: 1.02; margin: 0 0 18px;
+  }
+  .ds-hero-sub {
+    font-size: 15px; color: var(--text-2); max-width: 560px;
+    line-height: 1.6;
+  }
+  .ds-hero-mark { display: inline-flex; margin-bottom: 18px; }
+
+  .ds-section { margin: 0 0 80px; }
+  .ds-section-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 16px; margin-bottom: 32px;
+    border-top: 1px solid var(--hairline);
+    padding-top: 24px;
+  }
+  .ds-section-num {
+    font-family: var(--font-mono); font-size: 11px;
+    letter-spacing: 0.1em; color: var(--text-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .ds-section-title {
+    font-family: var(--font-display); font-style: italic;
+    font-size: 32px; font-weight: 400;
+    letter-spacing: -0.015em; color: var(--text);
+    margin: 0;
+  }
+  .ds-section-sub {
+    font-size: 14px; color: var(--text-2);
+    max-width: 480px; line-height: 1.55;
+  }
+
+  .ds-h3 {
+    font-family: var(--font-ui); font-size: 11px;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--text-3); font-weight: 500;
+    margin: 32px 0 14px; padding-bottom: 10px;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  /* Color swatches */
+  .ds-swatch-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+  }
+  .ds-swatch {
+    border: 1px solid var(--hairline);
+    border-radius: 8px; overflow: hidden;
+    background: var(--surface);
+  }
+  .ds-swatch-block { height: 80px; }
+  .ds-swatch-meta { padding: 10px 12px; }
+  .ds-swatch-name { font-size: 12px; color: var(--text); font-weight: 500; }
+  .ds-swatch-token {
+    font-family: var(--font-mono); font-size: 10.5px;
+    color: var(--text-3); margin-top: 2px;
+    letter-spacing: 0.02em;
+  }
+  .ds-swatch-value {
+    font-family: var(--font-mono); font-size: 10.5px;
+    color: var(--text-3); margin-top: 2px;
+    letter-spacing: 0.02em;
+  }
+
+  /* Type specimens */
+  .ds-type-row {
+    display: grid; grid-template-columns: 200px 1fr;
+    gap: 32px;
+    padding: 22px 0;
+    border-bottom: 1px solid var(--hairline);
+    align-items: baseline;
+  }
+  .ds-type-meta {
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .ds-type-label {
+    font-size: 12px; color: var(--text); font-weight: 500;
+  }
+  .ds-type-spec {
+    font-family: var(--font-mono); font-size: 10.5px;
+    color: var(--text-3); letter-spacing: 0.02em;
+    line-height: 1.5;
+  }
+  .ds-type-sample { color: var(--text); }
+
+  .ds-spec-display { font-family: var(--font-display); font-style: italic; font-size: 56px; font-weight: 400; letter-spacing: -0.025em; }
+  .ds-spec-page-title { font-family: var(--font-display); font-style: italic; font-size: 42px; font-weight: 400; letter-spacing: -0.02em; }
+  .ds-spec-section-title { font-family: var(--font-display); font-style: italic; font-size: 22px; font-weight: 400; letter-spacing: -0.01em; }
+  .ds-spec-h2 { font-size: 18px; font-weight: 500; }
+  .ds-spec-body { font-size: 14px; line-height: 1.6; }
+  .ds-spec-small { font-size: 12.5px; color: var(--text-2); }
+  .ds-spec-eyebrow { font-family: var(--font-ui); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-3); font-weight: 500; }
+  .ds-spec-smallcaps { font-family: var(--font-ui); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3); font-weight: 500; }
+  .ds-spec-mono-hero { font-family: var(--font-mono); font-size: 56px; letter-spacing: -0.035em; font-variant-numeric: tabular-nums; }
+  .ds-spec-mono-body { font-family: var(--font-mono); font-size: 14px; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+  .ds-spec-mono-mini { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; color: var(--text-3); text-transform: uppercase; }
+
+  /* Spacing */
+  .ds-spacing-row {
+    display: flex; align-items: center; gap: 18px;
+    padding: 8px 0;
+    font-family: var(--font-mono); font-size: 12px;
+  }
+  .ds-spacing-token { width: 60px; color: var(--text-3); }
+  .ds-spacing-bar {
+    height: 12px;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+  .ds-spacing-px { color: var(--text-2); margin-left: auto; }
+
+  /* Component panels */
+  .ds-panel {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-card);
+    padding: 28px;
+    margin-bottom: 16px;
+  }
+  .ds-panel-meta {
+    font-family: var(--font-mono); font-size: 10.5px;
+    color: var(--text-3); letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .ds-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .ds-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .ds-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+
+  /* Button samples */
+  .ds-btn-row { display: flex; gap: 12px; flex-wrap: wrap; }
+
+  /* Mark variants */
+  .ds-mark-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+  }
+  .ds-mark-cell {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 12px; padding: 28px 20px;
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
+    background: var(--surface);
+  }
+  .ds-mark-name { font-size: 11px; color: var(--text-3); font-family: var(--font-mono); letter-spacing: 0.04em; }
+
+  /* Status dots */
+  .ds-status-row { display: flex; gap: 32px; align-items: center; flex-wrap: wrap; }
+  .ds-status-cell { display: flex; align-items: center; gap: 10px; }
+  .ds-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .ds-dot.connected { background: var(--accent-strong); box-shadow: 0 0 0 4px rgba(168, 194, 152, 0.20); }
+  .ds-dot.warn      { background: #c08a4f; box-shadow: 0 0 0 4px rgba(192, 138, 79, 0.18); }
+  .ds-dot.muted     { background: var(--text-3); opacity: 0.5; }
+
+  /* Chip examples */
+  .ds-chip { display: inline-flex; font-family: var(--font-ui); font-size: 11px; letter-spacing: 0.04em; font-weight: 500; padding: 3px 8px; border-radius: 4px; }
+  .ds-chip.green { background: rgba(168, 194, 152, 0.14); color: var(--accent-strong); }
+  .ds-chip.amber { background: rgba(192, 138, 79, 0.12); color: #c08a4f; }
+  .ds-chip.gray  { background: var(--hairline); color: var(--text-2); }
+  .ds-chip.blue  { background: rgba(125, 144, 173, 0.14); color: #9aacc4; }
+
+  /* Toggle (recreated locally for demo) */
+  .ds-toggle {
+    width: 38px; height: 22px; border-radius: 11px;
+    background: var(--hairline);
+    border: 1px solid var(--hairline-strong);
+    position: relative;
+    display: inline-block;
+  }
+  .ds-toggle.on { background: var(--accent-strong); border-color: var(--accent-strong); }
+  .ds-toggle-knob {
+    position: absolute; top: 1px; left: 1px;
+    width: 18px; height: 18px;
+    background: var(--surface);
+    border-radius: 50%;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.18);
+    transition: transform 180ms ease;
+  }
+  .ds-toggle.on .ds-toggle-knob { transform: translateX(16px); background: #fff; }
+
+  /* Theme switcher (page-local) */
+  .ds-theme-switch {
+    position: fixed; top: 24px; right: 24px;
+    background: var(--surface); border: 1px solid var(--hairline);
+    border-radius: 6px; padding: 6px;
+    display: inline-flex; gap: 4px;
+    z-index: 100;
+  }
+  .ds-theme-btn {
+    font: inherit; font-size: 12px; padding: 6px 12px;
+    border-radius: 4px; border: 0; background: transparent;
+    color: var(--text-3); cursor: pointer;
+  }
+  .ds-theme-btn.active { background: var(--bg-2); color: var(--text); }
+
+  /* Misc */
+  .ds-token { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-3); letter-spacing: 0.02em; }
+  .ds-pos   { color: var(--accent-strong); }
+  .ds-warn  { color: #c08a4f; }
+
+  /* Pages overview */
+  .ds-pages-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+  .ds-page-card {
+    border: 1px solid var(--hairline); border-radius: 8px;
+    background: var(--surface); overflow: hidden;
+  }
+  .ds-page-thumb {
+    background: var(--bg-2); border-bottom: 1px solid var(--hairline);
+    height: 180px; display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  .ds-page-thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+  .ds-page-info { padding: 12px 16px; }
+  .ds-page-name { font-size: 13px; color: var(--text); font-weight: 500; }
+  .ds-page-purpose { font-size: 12px; color: var(--text-3); margin-top: 2px; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+  <div class="ds-theme-switch">
+    <button class="ds-theme-btn active" data-theme="dark">Dark</button>
+    <button class="ds-theme-btn" data-theme="light">Light</button>
+  </div>
+
+  <main class="ds-shell">
+
+    <!-- Hero -->
+    <header class="ds-hero">
+      <div class="ds-hero-mark">
+        <svg width="80" height="64" viewBox="-64 -52 128 104" shape-rendering="geometricPrecision" style="display:block">
+          <g stroke-linecap="round" fill="none">
+            <path d="M -54 -40 Q -28 -52, -2 -44 Q 22 -38, 54 -42" stroke="currentColor" stroke-width="1.6" opacity="0.4"/>
+            <path d="M -56 -22 Q -28 -34, 0 -26 Q 26 -20, 56 -24" stroke="currentColor" stroke-width="1.6" opacity="0.7"/>
+            <path d="M -58 -2 Q -28 -16, 2 -6 Q 28 0, 58 -4" stroke="currentColor" stroke-width="1.9" opacity="0.95"/>
+            <path d="M -56 18 Q -28 6, 0 14 Q 26 20, 56 16" stroke="currentColor" stroke-width="1.6" opacity="0.7"/>
+            <path d="M -52 36 Q -26 26, 2 32 Q 24 38, 52 34" stroke="currentColor" stroke-width="1.6" opacity="0.4"/>
+          </g>
+          <circle cx="2" cy="-6" r="4.5" fill="var(--accent)"/>
+        </svg>
+      </div>
+      <div class="ds-hero-eyebrow">Foothold · v0.4 · May 2026</div>
+      <h1 class="ds-hero-title">Where you stand,<br/>mapped honestly.</h1>
+      <p class="ds-hero-sub">A design system for a quiet personal finance product. Numbers as protagonist. Hairlines instead of shadows. Italic Fraunces for editorial moments. A single green dot means "you are here" — and that meaning carries everywhere.</p>
+    </header>
+
+    <!-- Brand -->
+    <section class="ds-section">
+      <header class="ds-section-head">
+        <div>
+          <div class="ds-section-num">01 — Brand</div>
+          <h2 class="ds-section-title">The mark</h2>
+        </div>
+        <p class="ds-section-sub">A terrain contour with one position dot. Three lines in compact contexts; five lines at hero scale. The dot — always the brand green — is load-bearing.</p>
+      </header>
+
+      <div class="ds-mark-grid">
+        <div class="ds-mark-cell">
+          <svg width="80" height="64" viewBox="-64 -52 128 104" style="display:block"><g stroke-linecap="round" fill="none"><path d="M -54 -40 Q -28 -52, -2 -44 Q 22 -38, 54 -42" stroke="currentColor" stroke-width="1.6" opacity="0.4"/><path d="M -56 -22 Q -28 -34, 0 -26 Q 26 -20, 56 -24" stroke="currentColor" stroke-width="1.6" opacity="0.7"/><path d="M -58 -2 Q -28 -16, 2 -6 Q 28 0, 58 -4" stroke="currentColor" stroke-width="1.9" opacity="0.95"/><path d="M -56 18 Q -28 6, 0 14 Q 26 20, 56 16" stroke="currentColor" stroke-width="1.6" opacity="0.7"/><path d="M -52 36 Q -26 26, 2 32 Q 24 38, 52 34" stroke="currentColor" stroke-width="1.6" opacity="0.4"/></g><circle cx="2" cy="-6" r="4.5" fill="var(--accent)"/></svg>
+          <div class="ds-mark-name">Hero · 5 lines</div>
+        </div>
+        <div class="ds-mark-cell">
+          <svg width="50" height="40" viewBox="-64 -32 128 64" shape-rendering="geometricPrecision"><g stroke-linecap="round" fill="none" stroke="currentColor"><path d="M -54 -22 Q -28 -32, 0 -26 Q 26 -20, 54 -24" stroke-width="3" opacity="0.55"/><path d="M -56 0 Q -28 -12, 2 -4 Q 28 4, 56 0" stroke-width="3.4"/><path d="M -54 22 Q -28 12, 2 18 Q 26 24, 54 20" stroke-width="3" opacity="0.55"/></g><circle cx="2" cy="-4" r="5" fill="var(--accent)"/></svg>
+          <div class="ds-mark-name">Sidebar · 3 lines</div>
+        </div>
+        <div class="ds-mark-cell">
+          <div style="display:flex;align-items:center;gap:10px"><svg width="50" height="40" viewBox="-64 -32 128 64" shape-rendering="geometricPrecision"><g stroke-linecap="round" fill="none" stroke="currentColor"><path d="M -54 -22 Q -28 -32, 0 -26 Q 26 -20, 54 -24" stroke-width="3" opacity="0.55"/><path d="M -56 0 Q -28 -12, 2 -4 Q 28 4, 56 0" stroke-width="3.4"/><path d="M -54 22 Q -28 12, 2 18 Q 26 24, 54 20" stroke-width="3" opacity="0.55"/></g><circle cx="2" cy="-4" r="5" fill="var(--accent)"/></svg><span style="font-family:var(--font-display);font-style:italic;font-size:22px;letter-spacing:-0.01em">Foothold</span></div>
+          <div class="ds-mark-name">Lockup · serif</div>
+        </div>
+        <div class="ds-mark-cell">
+          <div style="display:flex;align-items:center;gap:10px"><svg width="50" height="40" viewBox="-64 -32 128 64" shape-rendering="geometricPrecision"><g stroke-linecap="round" fill="none" stroke="currentColor"><path d="M -54 -22 Q -28 -32, 0 -26 Q 26 -20, 54 -24" stroke-width="3" opacity="0.55"/><path d="M -56 0 Q -28 -12, 2 -4 Q 28 4, 56 0" stroke-width="3.4"/><path d="M -54 22 Q -28 12, 2 18 Q 26 24, 54 20" stroke-width="3" opacity="0.55"/></g><circle cx="2" cy="-4" r="5" fill="var(--accent)"/></svg><span style="font-family:var(--font-ui);font-size:18px;letter-spacing:0.02em">foothold</span></div>
+          <div class="ds-mark-name">Lockup · sans</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Color -->
+    <section class="ds-section">
+      <header class="ds-section-head">
+        <div>
+          <div class="ds-section-num">02 — Color</div>
+          <h2 class="ds-section-title">A terrain palette</h2>
+        </div>
+        <p class="ds-section-sub">Warm neutrals (paper-like in light, weathered in dark), one brand green, one signal amber. Both themes share semantic role names.</p>
+      </header>
+
+      <h3 class="ds-h3">Surfaces · neutrals</h3>
+      <div class="ds-swatch-grid">
+        <div class="ds-swatch"><div class="ds-swatch-block" style="background:var(--bg)"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Background</div><div class="ds-swatch-token">--bg</div><div class="ds-swatch-value" data-token-value="--bg"></div></div></div>
+        <div class="ds-swatch"><div class="ds-swatch-block" style="background:var(--bg-2)"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Background sub</div><div class="ds-swatch-token">--bg-2</div><div class="ds-swatch-value" data-token-value="--bg-2"></div></div></div>
+        <div class="ds-swatch"><div class="ds-swatch-block" style="background:var(--surface)"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Surface</div><div class="ds-swatch-token">--surface</div><div class="ds-swatch-value" data-token-value="--surface"></div></div></div>
+        <div class="ds-swatch"><div class="ds-swatch-block" style="background:var(--surface-2)"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Surface elevated</div><div class="ds-swatch-token">--surface-2</div><div class="ds-swatch-value" data-token-value="--surface-2"></div></div></div>
+      </div>
+
+      <h3 class="ds-h3">Text</h3>
+      <div class="ds-swatch-grid">
+        <div class="ds-swatch"><div class="ds-swatch-block" style="background:var(--text)"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Text · primary</div><div class="ds-swatch-token">--text</div><div class="ds-swatch-value" data-token-value="--text"></div></div></div>
+        <div class="ds-swatch"><div class="ds-swatch-block" style="background:var(--text-2)"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Text · secondary</div><div class="ds-swatch-token">--text-2</div><div class="ds-swatch-value" data-token-value="--text-2"></div></div></div>
+        <div class="ds-swatch"><div class="ds-swatch-block" style="background:var(--text-3)"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Text · tertiary</div><div class="ds-swatch-token">--text-3</div><div class="ds-swatch-value" data-token-value="--text-3"></div></div></div>
+        <div class="ds-swatch"><div class="ds-swatch-block" style="background:var(--hairline-strong)"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Hairline · strong</div><div class="ds-swatch-token">--hairline-strong</div><div class="ds-swatch-value" data-token-value="--hairline-strong"></div></div></div>
+      </div>
+
+      <h3 class="ds-h3">Brand &amp; signals</h3>
+      <div class="ds-swatch-grid">
+        <div class="ds-swatch"><div class="ds-swatch-block" style="background:var(--accent)"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Brand · the dot</div><div class="ds-swatch-token">--accent</div><div class="ds-swatch-value" data-token-value="--accent"></div></div></div>
+        <div class="ds-swatch"><div class="ds-swatch-block" style="background:var(--accent-strong)"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Brand · emphasis</div><div class="ds-swatch-token">--accent-strong</div><div class="ds-swatch-value" data-token-value="--accent-strong"></div></div></div>
+        <div class="ds-swatch"><div class="ds-swatch-block" style="background:#c08a4f"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Signal · amber</div><div class="ds-swatch-token">drift / warning</div><div class="ds-swatch-value">#c08a4f</div></div></div>
+        <div class="ds-swatch"><div class="ds-swatch-block" style="background:#9aacc4"></div><div class="ds-swatch-meta"><div class="ds-swatch-name">Signal · blue-gray</div><div class="ds-swatch-token">utilities / international</div><div class="ds-swatch-value">#9aacc4</div></div></div>
+      </div>
+    </section>
+
+    <!-- Typography -->
+    <section class="ds-section">
+      <header class="ds-section-head">
+        <div>
+          <div class="ds-section-num">03 — Type</div>
+          <h2 class="ds-section-title">Three families, strict purpose</h2>
+        </div>
+        <p class="ds-section-sub">Söhne / Inter for chrome. Fraunces italic for editorial moments only — page titles, weekly briefs, empty states. JetBrains Mono for every numeral.</p>
+      </header>
+
+      <div class="ds-type-row">
+        <div class="ds-type-meta">
+          <div class="ds-type-label">Display · hero</div>
+          <div class="ds-type-spec">Fraunces italic<br/>56–84px / -0.025em<br/>weight 400</div>
+        </div>
+        <div class="ds-type-sample ds-spec-display">Where you stand</div>
+      </div>
+      <div class="ds-type-row">
+        <div class="ds-type-meta">
+          <div class="ds-type-label">Page title</div>
+          <div class="ds-type-spec">Fraunces italic<br/>38–48px / -0.02em</div>
+        </div>
+        <div class="ds-type-sample ds-spec-page-title">Investments</div>
+      </div>
+      <div class="ds-type-row">
+        <div class="ds-type-meta">
+          <div class="ds-type-label">Section title</div>
+          <div class="ds-type-spec">Fraunces italic<br/>22px / -0.01em</div>
+        </div>
+        <div class="ds-type-sample ds-spec-section-title">How it's distributed</div>
+      </div>
+      <div class="ds-type-row">
+        <div class="ds-type-meta">
+          <div class="ds-type-label">Heading</div>
+          <div class="ds-type-spec">Söhne / Inter<br/>18px / weight 500</div>
+        </div>
+        <div class="ds-type-sample ds-spec-h2">Recent activity</div>
+      </div>
+      <div class="ds-type-row">
+        <div class="ds-type-meta">
+          <div class="ds-type-label">Eyebrow</div>
+          <div class="ds-type-spec">Söhne uppercase<br/>11px / 0.18em</div>
+        </div>
+        <div class="ds-type-sample ds-spec-eyebrow">Forward look</div>
+      </div>
+      <div class="ds-type-row">
+        <div class="ds-type-meta">
+          <div class="ds-type-label">Smallcaps · label</div>
+          <div class="ds-type-spec">Söhne uppercase<br/>11px / 0.14em</div>
+        </div>
+        <div class="ds-type-sample ds-spec-smallcaps">Spend · May</div>
+      </div>
+      <div class="ds-type-row">
+        <div class="ds-type-meta">
+          <div class="ds-type-label">Body</div>
+          <div class="ds-type-spec">Söhne / Inter<br/>14px / 1.6 line</div>
+        </div>
+        <div class="ds-type-sample ds-spec-body">A quiet, calm-by-design view of where your money is and where it's going.</div>
+      </div>
+      <div class="ds-type-row">
+        <div class="ds-type-meta">
+          <div class="ds-type-label">Body · small</div>
+          <div class="ds-type-spec">Söhne / Inter<br/>12.5px</div>
+        </div>
+        <div class="ds-type-sample ds-spec-small">Three devices · last activity 2 minutes ago</div>
+      </div>
+      <div class="ds-type-row">
+        <div class="ds-type-meta">
+          <div class="ds-type-label">Mono · hero</div>
+          <div class="ds-type-spec">JetBrains Mono<br/>56px / -0.035em<br/>tabular-nums</div>
+        </div>
+        <div class="ds-type-sample ds-spec-mono-hero">$95,955.42</div>
+      </div>
+      <div class="ds-type-row">
+        <div class="ds-type-meta">
+          <div class="ds-type-label">Mono · body</div>
+          <div class="ds-type-spec">JetBrains Mono<br/>14px / -0.01em<br/>tabular-nums</div>
+        </div>
+        <div class="ds-type-sample ds-spec-mono-body">−$2,118.84 · +12.4%</div>
+      </div>
+      <div class="ds-type-row">
+        <div class="ds-type-meta">
+          <div class="ds-type-label">Mono · uppercase</div>
+          <div class="ds-type-spec">JetBrains Mono<br/>11px / 0.04em</div>
+        </div>
+        <div class="ds-type-sample ds-spec-mono-mini">Trader Joes #532 · Chase ··4221</div>
+      </div>
+    </section>
+
+    <!-- Spacing -->
+    <section class="ds-section">
+      <header class="ds-section-head">
+        <div>
+          <div class="ds-section-num">04 — Spacing</div>
+          <h2 class="ds-section-title">Even rhythm</h2>
+        </div>
+        <p class="ds-section-sub">Multiples of 2 and 4. Page padding scales with viewport.</p>
+      </header>
+
+      <div id="ds-spacing"></div>
+
+      <h3 class="ds-h3">Radii</h3>
+      <div class="ds-row">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px"><div style="width:64px;height:64px;background:var(--surface);border:1px solid var(--hairline);border-radius:4px"></div><div class="ds-token">--r-chip · 4px</div></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px"><div style="width:64px;height:64px;background:var(--surface);border:1px solid var(--hairline);border-radius:6px"></div><div class="ds-token">--r-btn · 6px</div></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px"><div style="width:64px;height:64px;background:var(--surface);border:1px solid var(--hairline);border-radius:10px"></div><div class="ds-token">--r-card · 10px</div></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px"><div style="width:64px;height:32px;background:var(--surface);border:1px solid var(--hairline);border-radius:11px"></div><div class="ds-token">--r-pill · 11px</div></div>
+      </div>
+    </section>
+
+    <!-- Components -->
+    <section class="ds-section">
+      <header class="ds-section-head">
+        <div>
+          <div class="ds-section-num">05 — Components</div>
+          <h2 class="ds-section-title">Building blocks</h2>
+        </div>
+        <p class="ds-section-sub">The small set the product reuses. Each one earns its place.</p>
+      </header>
+
+      <h3 class="ds-h3">Buttons</h3>
+      <div class="ds-panel">
+        <div class="ds-panel-meta">.btn .btn-primary .btn-ghost · 6px radius · 140ms ease</div>
+        <div class="ds-btn-row">
+          <button class="btn primary">Save changes</button>
+          <button class="btn ghost">Cancel</button>
+          <button class="btn ghost btn-sm">Manage</button>
+          <button class="btn ghost btn-sm danger-btn">Disconnect</button>
+        </div>
+      </div>
+
+      <h3 class="ds-h3">Toggles</h3>
+      <div class="ds-panel">
+        <div class="ds-panel-meta">38×22px · 11px radius · 180ms cubic-bezier(0.32, 0.72, 0.18, 1)</div>
+        <div class="ds-row">
+          <div style="display:flex;align-items:center;gap:12px"><span class="ds-toggle"><span class="ds-toggle-knob"></span></span><span class="ds-token">off</span></div>
+          <div style="display:flex;align-items:center;gap:12px;margin-left:32px"><span class="ds-toggle on"><span class="ds-toggle-knob"></span></span><span class="ds-token">on</span></div>
+        </div>
+      </div>
+
+      <h3 class="ds-h3">Status dots</h3>
+      <div class="ds-panel">
+        <div class="ds-panel-meta">8px circle + 4px halo · pulses optionally · the brand vocabulary</div>
+        <div class="ds-status-row">
+          <div class="ds-status-cell"><span class="ds-dot connected"></span><span class="ds-token" style="color:var(--text)">connected</span></div>
+          <div class="ds-status-cell"><span class="ds-dot warn"></span><span class="ds-token" style="color:var(--text)">needs reauth</span></div>
+          <div class="ds-status-cell"><span class="ds-dot muted"></span><span class="ds-token" style="color:var(--text)">disconnected</span></div>
+        </div>
+      </div>
+
+      <h3 class="ds-h3">Chips</h3>
+      <div class="ds-panel">
+        <div class="ds-panel-meta">11px / 0.04em · 4px radius · color-coded by category</div>
+        <div class="ds-row">
+          <span class="ds-chip green">Groceries</span>
+          <span class="ds-chip amber">Food and Drink</span>
+          <span class="ds-chip blue">Utilities</span>
+          <span class="ds-chip gray">Transfer</span>
+          <span class="ds-chip green">Income</span>
+        </div>
+      </div>
+
+      <h3 class="ds-h3">Segmented control</h3>
+      <div class="ds-panel">
+        <div class="ds-panel-meta">Inset wrap · active pill with 1px shadow · 140ms transition</div>
+        <div class="ds-row">
+          <div class="settings-segment">
+            <button class="settings-seg-btn">Compact</button>
+            <button class="settings-seg-btn active">Comfortable</button>
+            <button class="settings-seg-btn">Roomy</button>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="ds-h3">KPI block</h3>
+      <div class="ds-panel">
+        <div class="ds-panel-meta">smallcaps label + mono number · the everywhere unit</div>
+        <div class="ds-grid-3" style="gap:0;padding:8px 0;border-top:1px solid var(--hairline);border-bottom:1px solid var(--hairline)">
+          <div style="padding:0 24px;border-right:1px solid var(--hairline)"><div class="ds-spec-smallcaps">Spend · May</div><div class="ds-spec-mono-hero" style="font-size:24px;letter-spacing:-0.02em;margin-top:4px;color:var(--text)">$3,547.82</div><div style="font-family:var(--font-mono);font-size:11px;color:var(--text-3);margin-top:4px;letter-spacing:0.03em">across 19 charges</div></div>
+          <div style="padding:0 24px;border-right:1px solid var(--hairline)"><div class="ds-spec-smallcaps">Income · May</div><div class="ds-spec-mono-hero ds-pos" style="font-size:24px;letter-spacing:-0.02em;margin-top:4px">$2,075.99</div><div style="font-family:var(--font-mono);font-size:11px;color:var(--text-3);margin-top:4px;letter-spacing:0.03em">1 deposit</div></div>
+          <div style="padding:0 24px"><div class="ds-spec-smallcaps">Net · May</div><div class="ds-spec-mono-hero ds-warn" style="font-size:24px;letter-spacing:-0.02em;margin-top:4px;white-space:nowrap">−$1,471.83</div><div style="font-family:var(--font-mono);font-size:11px;color:var(--text-3);margin-top:4px;letter-spacing:0.03em">spending more than earned</div></div>
+        </div>
+      </div>
+
+      <h3 class="ds-h3">Editorial card</h3>
+      <div class="ds-panel" style="padding:36px 40px">
+        <div class="ds-panel-meta">Fraunces italic body · max-width 560px · used 1× per page max</div>
+        <div style="font-family:var(--font-ui);font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-3);margin-bottom:14px">This week</div>
+        <div style="font-family:var(--font-display);font-style:italic;font-size:24px;line-height:1.4;letter-spacing:-0.005em;color:var(--text);max-width:560px">You held your line. Spending was within drift, three of four goals are tracking, and the recurring charges held steady at <span style="color:var(--accent-strong);font-style:normal;font-family:var(--font-mono);font-size:0.78em;letter-spacing:-0.01em">$3,883.39</span> for May.</div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-3);margin-top:24px;letter-spacing:0.04em">— Sunday brief · 19:42 EDT</div>
+      </div>
+    </section>
+
+    <!-- Pages -->
+    <section class="ds-section">
+      <header class="ds-section-head">
+        <div>
+          <div class="ds-section-num">06 — Pages</div>
+          <h2 class="ds-section-title">The product surface</h2>
+        </div>
+        <p class="ds-section-sub">Seven pages, one shell. Each one applies the system above.</p>
+      </header>
+
+      <div class="ds-pages-grid">
+        <div class="ds-page-card"><div class="ds-page-thumb"><img src="screens/01-dashboard.png" alt="Dashboard"/></div><div class="ds-page-info"><div class="ds-page-name">Dashboard</div><div class="ds-page-purpose">At-a-glance state · hero net worth · drift · weekly brief</div></div></div>
+        <div class="ds-page-card"><div class="ds-page-thumb"><img src="screens/02-simulator.png" alt="Simulator"/></div><div class="ds-page-info"><div class="ds-page-name">Simulator</div><div class="ds-page-purpose">Project net worth forward · scenario layering · goal markers</div></div></div>
+        <div class="ds-page-card"><div class="ds-page-thumb"><img src="screens/03-goals.png" alt="Goals"/></div><div class="ds-page-info"><div class="ds-page-name">Goals</div><div class="ds-page-purpose">Long-term targets · ETA · progress bars</div></div></div>
+        <div class="ds-page-card"><div class="ds-page-thumb"><img src="screens/04-recurring.png" alt="Recurring"/></div><div class="ds-page-info"><div class="ds-page-name">Recurring</div><div class="ds-page-purpose">Detected subscriptions · upcoming charges · drift flagging</div></div></div>
+        <div class="ds-page-card"><div class="ds-page-thumb"><img src="screens/05-transactions.png" alt="Transactions"/></div><div class="ds-page-info"><div class="ds-page-name">Transactions</div><div class="ds-page-purpose">Searchable ledger · grouped by date · category chips</div></div></div>
+        <div class="ds-page-card"><div class="ds-page-thumb"><img src="screens/06-investments.png" alt="Investments"/></div><div class="ds-page-info"><div class="ds-page-name">Investments</div><div class="ds-page-purpose">Portfolio overview · allocation · holdings</div></div></div>
+        <div class="ds-page-card"><div class="ds-page-thumb"><img src="screens/07-settings.png" alt="Settings"/></div><div class="ds-page-info"><div class="ds-page-name">Settings</div><div class="ds-page-purpose">Profile · connections · preferences · privacy · danger zone</div></div></div>
+      </div>
+    </section>
+
+    <!-- Motion -->
+    <section class="ds-section">
+      <header class="ds-section-head">
+        <div>
+          <div class="ds-section-num">07 — Motion</div>
+          <h2 class="ds-section-title">Quiet by design</h2>
+        </div>
+        <p class="ds-section-sub">Short, purposeful, never bouncy. The product feels alive but never fidgety.</p>
+      </header>
+
+      <div class="ds-panel">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead style="text-align:left">
+            <tr style="border-bottom:1px solid var(--hairline)">
+              <th style="padding:10px 12px 14px;font-family:var(--font-ui);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-3);font-weight:500">Pattern</th>
+              <th style="padding:10px 12px 14px;font-family:var(--font-ui);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-3);font-weight:500">Duration</th>
+              <th style="padding:10px 12px 14px;font-family:var(--font-ui);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-3);font-weight:500">Easing</th>
+              <th style="padding:10px 12px 14px;font-family:var(--font-ui);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-3);font-weight:500">Where</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid var(--hairline)"><td style="padding:14px 12px">Standard hover</td><td class="ds-token" style="padding:14px 12px">140ms</td><td class="ds-token" style="padding:14px 12px">ease</td><td style="padding:14px 12px;color:var(--text-2)">Buttons, cards, rows</td></tr>
+            <tr style="border-bottom:1px solid var(--hairline)"><td style="padding:14px 12px">Toggle slide</td><td class="ds-token" style="padding:14px 12px">180ms</td><td class="ds-token" style="padding:14px 12px">cubic-bezier(0.32, 0.72, 0.18, 1)</td><td style="padding:14px 12px;color:var(--text-2)">Switch knob</td></tr>
+            <tr style="border-bottom:1px solid var(--hairline)"><td style="padding:14px 12px">Card stagger</td><td class="ds-token" style="padding:14px 12px">200ms · 60ms interval</td><td class="ds-token" style="padding:14px 12px">ease-out</td><td style="padding:14px 12px;color:var(--text-2)">First-paint reveals</td></tr>
+            <tr style="border-bottom:1px solid var(--hairline)"><td style="padding:14px 12px">Hero count-up</td><td class="ds-token" style="padding:14px 12px">1200ms</td><td class="ds-token" style="padding:14px 12px">ease-out</td><td style="padding:14px 12px;color:var(--text-2)">Net worth on first paint</td></tr>
+            <tr style="border-bottom:1px solid var(--hairline)"><td style="padding:14px 12px">Position dot pulse</td><td class="ds-token" style="padding:14px 12px">2000ms loop</td><td class="ds-token" style="padding:14px 12px">ease-in-out</td><td style="padding:14px 12px;color:var(--text-2)">Brand mark, sync pill</td></tr>
+            <tr><td style="padding:14px 12px">Logo click</td><td class="ds-token" style="padding:14px 12px">600ms</td><td class="ds-token" style="padding:14px 12px">ease</td><td style="padding:14px 12px;color:var(--text-2)">Sidebar brand pulse-and-lift</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Voice -->
+    <section class="ds-section">
+      <header class="ds-section-head">
+        <div>
+          <div class="ds-section-num">08 — Voice</div>
+          <h2 class="ds-section-title">How Foothold sounds</h2>
+        </div>
+        <p class="ds-section-sub">Direct, calm, observational. Never hype-y. The footer signature is technical-cartographic; the editorial moments are reflective.</p>
+      </header>
+
+      <div class="ds-grid-2">
+        <div class="ds-panel">
+          <div class="ds-panel-meta">Page subtitles</div>
+          <p style="font-style:italic;font-family:var(--font-display);font-size:16px;line-height:1.5;color:var(--text)">Where your money is working. Quiet by design — markets move, but the plan doesn't.</p>
+        </div>
+        <div class="ds-panel">
+          <div class="ds-panel-meta">Empty states</div>
+          <p style="font-style:italic;font-family:var(--font-display);font-size:16px;line-height:1.5;color:var(--text)">Your terrain hasn't been mapped yet. Connect an account to see where you stand.</p>
+        </div>
+        <div class="ds-panel">
+          <div class="ds-panel-meta">Footer signature</div>
+          <p style="font-family:var(--font-mono);font-size:12px;color:var(--text-2);letter-spacing:0.03em">42.3601° N · 71.0589° W · synced 19:42 EDT · v0.4</p>
+        </div>
+        <div class="ds-panel">
+          <div class="ds-panel-meta">Drift alert</div>
+          <p style="font-family:var(--font-ui);font-size:14px;color:var(--text);line-height:1.5">Three things broke pattern this week. The Paddle.com charge is unfamiliar — flagged for review.</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // Theme toggle
+    document.querySelectorAll('.ds-theme-btn').forEach((b) => {
+      b.addEventListener('click', () => {
+        const t = b.dataset.theme;
+        document.documentElement.setAttribute('data-theme', t);
+        document.querySelectorAll('.ds-theme-btn').forEach((bb) => bb.classList.toggle('active', bb === b));
+        // Re-render swatch values
+        renderSwatchValues();
+      });
+    });
+
+    // Render computed swatch values
+    function renderSwatchValues() {
+      const cs = getComputedStyle(document.documentElement);
+      document.querySelectorAll('[data-token-value]').forEach((el) => {
+        const v = cs.getPropertyValue(el.dataset.tokenValue).trim();
+        el.textContent = v;
+      });
+    }
+    renderSwatchValues();
+
+    // Spacing scale
+    const scale = [4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 28, 32, 40, 48, 56];
+    const wrap = document.getElementById('ds-spacing');
+    scale.forEach((px) => {
+      const row = document.createElement('div');
+      row.className = 'ds-spacing-row';
+      row.innerHTML = `<span class="ds-spacing-token">s-${px}</span><span class="ds-spacing-bar" style="width:${px}px"></span><span class="ds-spacing-px">${px}px</span>`;
+      wrap.appendChild(row);
+    });
+  </script>
+</body>
+</html>
