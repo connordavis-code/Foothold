@@ -7,9 +7,11 @@
 
 ## Project
 
-Single-user personal finance tool. Plaid syncs transactions, investments,
-and recurring streams into Supabase Postgres. Dashboard surfaces balances,
-recurring outflows, and goal progress with EOM projections.
+Personal finance tool being prepared for **multi-user public release**
+(2026-05-09 directional shift; currently single-user but treat all new work
+as production-grade for a multi-tenant product). Plaid syncs transactions,
+investments, and recurring streams into Supabase Postgres. Dashboard surfaces
+balances, recurring outflows, and goal progress with EOM projections.
 
 **Stack:** Next.js 14 (App Router) · TypeScript · Drizzle ORM · Supabase
 Postgres · Auth.js v5 (magic-link via Resend) · Plaid · Tailwind +
