@@ -48,12 +48,12 @@ export function DriftModule({ elevated }: Props) {
           return (
             <li
               key={row.category}
-              className="grid grid-cols-[1fr_auto_auto] items-center gap-3 text-xs"
+              className="grid grid-cols-[180px_minmax(160px,1fr)_auto] items-center gap-3 text-xs"
             >
-              <div className="font-medium text-[--text]">
+              <div className="truncate font-medium text-[--text]">
                 {humanizeCategory(row.category)}
               </div>
-              <div className="relative h-1.5 w-32 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+              <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
                 {/* Baseline tick at fixed left offset per prototype */}
                 <div
                   className="absolute top-0 h-full w-px bg-[--text-3]"
@@ -70,7 +70,7 @@ export function DriftModule({ elevated }: Props) {
                   }}
                 />
               </div>
-              <div className="font-mono tabular-nums text-[--text-2]">
+              <div className="text-right font-mono tabular-nums text-[--text-2]">
                 {fmtMoney(row.currentTotal)}{' '}
                 <span className="text-[--text-3]">
                   · {fmtMoney(row.baselineWeekly)} ({row.ratio.toFixed(1)}×)
