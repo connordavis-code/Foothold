@@ -2,15 +2,22 @@ import Link from 'next/link';
 import { ArrowRight, Mountain } from 'lucide-react';
 import { auth } from '@/auth';
 import { Button } from '@/components/ui/button';
-import { DriftFlagsCard } from '@/components/dashboard/drift-flags-card';
+import { DriftModule } from '@/components/dashboard/drift-module';
 import { GoalsRow } from '@/components/dashboard/goals-row';
-import { HeroCard } from '@/components/dashboard/hero-card';
-import { InsightTeaserCard } from '@/components/dashboard/insight-teaser-card';
-import { RecentActivityCard } from '@/components/dashboard/recent-activity-card';
-import { SplitCard } from '@/components/dashboard/split-card';
-import { UpcomingRecurringCard } from '@/components/dashboard/upcoming-recurring-card';
+import { Kpis } from '@/components/dashboard/kpis';
+import { NetWorthHero } from '@/components/dashboard/net-worth-hero';
+import { PageHeader } from '@/components/dashboard/page-header';
+import { RecentActivity } from '@/components/dashboard/recent-activity';
+import { RecurringList } from '@/components/dashboard/recurring-list';
+import { WeekInsightCard } from '@/components/dashboard/week-insight-card';
 import { MotionStack } from '@/components/motion/motion-stack';
 import { TrustStrip } from '@/components/sync/trust-strip';
+import { formatFreshness } from '@/lib/format/freshness';
+import {
+  forecastDailySeries,
+  uncertaintyBand,
+} from '@/lib/forecast/trajectory';
+import { computeRunway, type MonthlyTotals } from '@/lib/forecast/runway';
 import { getCategoryOptions } from '@/lib/db/queries/categories';
 import {
   getDashboardSummary,
@@ -22,17 +29,34 @@ import { getDriftAnalysis } from '@/lib/db/queries/drift';
 import { getForecastHistory } from '@/lib/db/queries/forecast';
 import { getGoalsWithProgress } from '@/lib/db/queries/goals';
 import { getSourceHealth } from '@/lib/db/queries/health';
-import { getLatestInsight } from '@/lib/db/queries/insights';
+import {
+  getInsightForWeek,
+  getInsightSequenceNumber,
+  getLatestInsight,
+  getWeeklyBriefStats,
+} from '@/lib/db/queries/insights';
 import { getUpcomingRecurringOutflows } from '@/lib/db/queries/recurring';
 import { db } from '@/lib/db';
 import { financialAccounts, externalItems } from '@/lib/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { projectCash } from '@/lib/forecast/engine';
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: { week?: string };
+}) {
   const session = await auth();
   if (!session?.user) return null;
   const userId = session.user.id;
+
+  // Brief data source: when ?week=YYYY-MM-DD honored, show that specific
+  // week; otherwise default to latest. The /insights/[week] deep-link
+  // (deleted in R.2) redirects here with the param preserved.
+  const requestedWeek = searchParams?.week;
+  const insightPromise = requestedWeek
+    ? getInsightForWeek(userId, requestedWeek)
+    : getLatestInsight(userId);
 
   const [
     summary,
@@ -41,7 +65,7 @@ export default async function DashboardPage() {
     upcomingRecurring,
     goals,
     drift,
-    latestInsight,
+    insight,
     recent,
     liquidAccounts,
     forecastHistory,
@@ -50,17 +74,25 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     getDashboardSummary(userId),
     getNetWorthMonthlyDelta(userId),
-    getNetWorthSparkline(userId, 30),
+    getNetWorthSparkline(userId, 90),
     getUpcomingRecurringOutflows(userId, 7),
     getGoalsWithProgress(userId),
     getDriftAnalysis(userId),
-    getLatestInsight(userId),
+    insightPromise,
     getRecentTransactions(userId, 5),
     countLiquidAccounts(userId),
     getForecastHistory(userId),
     getCategoryOptions(userId),
     getSourceHealth(userId),
   ]);
+
+  // Brief stats + sequence number depend on the resolved insight's week range.
+  const [briefStats, briefSeqNum] = insight
+    ? await Promise.all([
+        getWeeklyBriefStats(userId, insight.weekStart, insight.weekEnd),
+        getInsightSequenceNumber(userId, insight.weekStart),
+      ])
+    : [null, 0];
 
   if (!summary.hasAnyItem) {
     return <EmptyState />;
@@ -77,32 +109,82 @@ export default async function DashboardPage() {
   });
   const eomProjected = projection.projection[0]?.endCash ?? liquidBalance;
 
+  // Trajectory inputs: historical sparkline (90 points) + interpolated forecast
+  // from projectCash monthly anchors. Band returns null when historical <60 points.
+  const historicalSeries = sparkline.map((p) => p.netWorth);
+  const forecastSeries = forecastDailySeries(
+    liquidBalance,
+    projection.projection,
+    90,
+  );
+  const band = uncertaintyBand(historicalSeries, forecastSeries);
+
+  // Runway input: aggregate per-month outflow across all PFC categories;
+  // pair with same-index incomeHistory entry. ForecastHistory trims to
+  // TRAILING_MONTHS=3 already.
+  const incomeHistory = forecastHistory.incomeHistory ?? [];
+  const categoryHistory = forecastHistory.categoryHistory ?? {};
+  const trailingMonths: MonthlyTotals[] = incomeHistory.map((inflow, i) => {
+    const outflow = Object.values(categoryHistory).reduce(
+      (sum, arr) => sum + (arr[i] ?? 0),
+      0,
+    );
+    return { inflow, outflow };
+  });
+  const runwayWeeks = computeRunway(liquidBalance, trailingMonths);
+
+  const todayLabel = `Today · ${new Date().toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  })}`;
+  const freshness = formatFreshness({
+    sources: sourceHealth.map((s) => ({
+      name: s.institutionName ?? 'Source',
+      lastSyncAt: s.lastSuccessfulSyncAt,
+    })),
+  });
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:px-8 sm:py-10">
-      <MotionStack className="space-y-5">
+      <PageHeader
+        todayLabel={todayLabel}
+        freshnessHeadline={freshness.headline}
+        freshnessCaveat={freshness.caveat}
+      />
+      <MotionStack className="mt-6 space-y-5">
         <TrustStrip sources={sourceHealth} />
 
-        <HeroCard
+        <NetWorthHero
           netWorth={summary.netWorth}
           monthlyDelta={monthlyDelta}
-          sparkline={sparkline}
+          historicalSeries={historicalSeries}
+          forecastSeries={forecastSeries}
+          band={band}
+          freshnessHeadline={freshness.headline}
+          freshnessCaveat={freshness.caveat}
         />
 
-        <SplitCard
+        <Kpis
           liquidBalance={liquidBalance}
           liquidAccountCount={liquidAccounts}
           eomProjected={eomProjected}
+          runwayWeeks={runwayWeeks}
         />
 
-        <DriftFlagsCard flags={drift.currentlyElevated} />
+        <DriftModule elevated={drift.currentlyElevated} />
 
         <GoalsRow goals={goals} />
 
-        <UpcomingRecurringCard upcoming={upcomingRecurring} />
+        <RecurringList upcoming={upcomingRecurring} />
 
-        <InsightTeaserCard insight={latestInsight} />
+        <WeekInsightCard
+          insight={insight}
+          sequenceNumber={briefSeqNum}
+          stats={briefStats}
+        />
 
-        <RecentActivityCard
+        <RecentActivity
           transactions={recent}
           categoryOptions={categoryOptions}
         />

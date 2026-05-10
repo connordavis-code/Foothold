@@ -431,8 +431,9 @@ authorized in Plaid Dashboard before deploying.**
   pure predicates extracted from route handlers so tests don't need
   DB or Next runtime.
 
-**Phase 6 — UI redesign** (2026-05-05; spec at
-`docs/superpowers/specs/2026-05-05-foothold-redesign-design.md`)
+**Phase 6 — UI redesign** (2026-05-05; spec deleted 2026-05-10 — superseded
+by [docs/redesign/SPEC.md](docs/redesign/SPEC.md). See git history for the
+original Phase 6 spec)
 - Sub-phases: 6.1 foundation (editorial tokens, sonner+cmdk+framer-
   motion, top-bar shell with sync pill + ⌘K, sidebar restyle); 6.2
   dashboard card-newsfeed; 6.3 /transactions operator-tier (mono

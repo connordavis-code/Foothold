@@ -45,13 +45,9 @@ export function TrustStrip({
   const summary = summarizeTrustStrip(sources);
 
   if (summary.kind === 'healthy') {
-    const sourceLabel = summary.sourceCount === 1 ? 'source' : 'sources';
-    return (
-      <p className="px-1 text-xs text-muted-foreground">
-        Fresh {formatRelative(summary.freshAt, now)} · {summary.sourceCount}{' '}
-        {sourceLabel}
-      </p>
-    );
+    // R.2 absorbs the healthy-state line into <PageHeader>'s right-meta strip.
+    // Returning null avoids a duplicate "Fresh Nh ago · N sources" above the hero.
+    return null;
   }
 
   if (summary.kind === 'quiet') {

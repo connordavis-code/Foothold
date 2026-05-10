@@ -7,7 +7,7 @@ import { TransactionDetailSheet } from '@/components/transactions/transaction-de
 import type { CategoryOption } from '@/lib/db/queries/categories';
 import type { RecentTransaction } from '@/lib/db/queries/dashboard';
 import { humanizeCategory } from '@/lib/format/category';
-import { cn, formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 
 type Props = {
   transactions: RecentTransaction[];
@@ -15,49 +15,40 @@ type Props = {
 };
 
 /**
- * Five most recent transactions as compact card-rows (NOT a table — the
- * full table lives at /transactions). The "View all" link is the right
- * affordance for "I want to scan a hundred rows"; this surface is for
- * "what did I just spend on?".
+ * Five most recent transactions as a flat row list (per R.2 prototype).
+ * Renamed from <RecentActivityCard> + restyled to drop the section card
+ * shell — the rows breathe with the page rhythm now.
  *
- * Tap-to-edit on mobile: row tap at <md opens the same half-sheet
- * /transactions uses. At md+, the row is presentational — desktop's
- * canonical edit flow lives in the operator table (j/k nav, multi-
- * select, bulk-action bar), and adding a tap-sheet would conflict with
- * those gestures.
+ * Tap-to-edit on mobile preserved: row tap at <md opens the same half-
+ * sheet /transactions uses. At md+, the row is presentational — desktop's
+ * canonical edit flow lives in the operator table.
  */
-export function RecentActivityCard({ transactions, categoryOptions }: Props) {
+export function RecentActivity({ transactions, categoryOptions }: Props) {
   const [active, setActive] = useState<RecentTransaction | null>(null);
   if (transactions.length === 0) return null;
   const visible = transactions.slice(0, 5);
 
   return (
-    <section className="rounded-card border border-border bg-surface-elevated p-5 sm:p-6">
-      <header className="mb-4 flex items-baseline justify-between gap-3">
+    <section>
+      <header className="flex items-baseline justify-between gap-3">
         <div>
-          <p className="text-eyebrow">
-            Recent activity
-          </p>
-          <h2 className="mt-1 text-sm font-medium">
+          <h3 className="text-sm font-semibold text-[--text]">Recent activity</h3>
+          <p className="text-xs text-[--text-3]">
             Last {visible.length} transactions
-          </h2>
+          </p>
         </div>
         <Link
           href="/transactions"
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors duration-fast ease-out-quart hover:text-foreground"
+          className="inline-flex items-center gap-1 text-xs text-[--text-2] hover:text-[--text]"
         >
           View all
           <ArrowRight className="h-3 w-3" />
         </Link>
       </header>
 
-      <ul className="divide-y divide-border/70">
+      <ul className="mt-3 divide-y divide-[--hairline]">
         {visible.map((t) => (
-          <Row
-            key={t.id}
-            t={t}
-            onTap={() => setActive(t)}
-          />
+          <Row key={t.id} t={t} onTap={() => setActive(t)} />
         ))}
       </ul>
 
@@ -70,13 +61,7 @@ export function RecentActivityCard({ transactions, categoryOptions }: Props) {
   );
 }
 
-function Row({
-  t,
-  onTap,
-}: {
-  t: RecentTransaction;
-  onTap: () => void;
-}) {
+function Row({ t, onTap }: { t: RecentTransaction; onTap: () => void }) {
   // Plaid sign convention: positive = money OUT. Flip for display.
   const display = -t.amount;
   const isIncome = display > 0;
@@ -87,18 +72,21 @@ function Row({
       : null;
 
   const inner = (
-    <div className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">
+    <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 py-2.5">
+      <div className="font-mono text-xs tabular-nums text-[--text-3]">
+        {formatTxDate(t.date)}
+      </div>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium text-[--text]">
           {t.merchantName ?? t.name}
           {t.pending && (
-            <span className="ml-2 text-[10px] font-normal uppercase tracking-wider text-muted-foreground">
+            <span className="ml-2 text-[10px] font-normal uppercase tracking-wider text-[--text-3]">
               pending
             </span>
           )}
         </p>
-        <p className="truncate text-xs text-muted-foreground">
-          {formatTxDate(t.date)}
+        <p className="truncate text-xs text-[--text-3]">
+          {t.name}
           {categoryLabel && (
             <>
               <span> · </span>
@@ -113,24 +101,22 @@ function Row({
         </p>
       </div>
       <p
-        className={cn(
-          'shrink-0 font-mono text-sm tabular-nums',
-          isIncome ? 'text-positive' : 'text-foreground',
-        )}
+        className="shrink-0 font-mono text-sm tabular-nums"
+        style={{
+          color: isIncome ? 'var(--semantic-success)' : 'var(--text)',
+        }}
       >
         {formatCurrency(display, { signed: true })}
       </p>
     </div>
   );
 
-  // Mobile: tap-to-edit. Desktop: presentational (operator table at
-  // /transactions is the canonical edit surface).
   return (
     <li>
       <button
         type="button"
         onClick={onTap}
-        className="block w-full text-left transition-colors duration-fast ease-out-quart md:pointer-events-none md:cursor-default md:hover:bg-transparent"
+        className="block w-full text-left transition-colors hover:bg-[--surface-2] md:pointer-events-none md:cursor-default md:hover:bg-transparent"
       >
         {inner}
       </button>
