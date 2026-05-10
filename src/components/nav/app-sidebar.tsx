@@ -1,11 +1,13 @@
-import Link from 'next/link';
 import { NavLink } from './nav-link';
 import { navGroups, settingsItem } from './nav-routes';
+import { SidebarBrand } from './sidebar-brand';
 
 /**
  * Vertical sidebar — server component, renders the static link tree.
- * Active-state highlighting is handled per-link by <NavLink> (client) so
- * we don't ship the whole sidebar to the bundle.
+ * Active-state highlighting is handled per-link by <NavLink> (client).
+ * Brand cluster is <SidebarBrand> (client) — needed for the click-pulse
+ * animation on the mark. Both client islands keep the rest of the
+ * sidebar tree out of the JS bundle.
  *
  * Icons are rendered here (server) and passed to NavLink as children;
  * passing the Lucide icon function as a prop trips Next 14's
@@ -13,28 +15,23 @@ import { navGroups, settingsItem } from './nav-routes';
  *
  * Sign-out + email used to live here. Both lifted to the top-bar user
  * menu in Phase 6.1, freeing the bottom of the sidebar.
+ *
+ * R.1 T6 restyle: brand mount, group labels with hairlines above
+ * (.sb-group + .sb-group selector), active-state pulsing green dot via
+ * .sb-item-active::before. CSS lives in globals.css @layer components.
  */
 export function AppSidebar() {
   return (
-    <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-border bg-card">
-      <div className="px-6 py-4 border-b border-border">
-        <Link
-          href="/dashboard"
-          className="block text-base font-semibold tracking-tight"
-        >
-          Foothold
-        </Link>
-      </div>
+    <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-[var(--hairline)] bg-[color:var(--surface)]">
+      <SidebarBrand />
 
       <nav
-        className="flex-1 px-3 py-4 space-y-5 overflow-y-auto"
+        className="flex-1 px-3 py-4 overflow-y-auto"
         aria-label="Primary"
       >
         {navGroups.map((group) => (
-          <div key={group.label}>
-            <div className="px-3 pb-1.5 text-[10px] uppercase tracking-[0.08em] text-muted-foreground/70">
-              {group.label}
-            </div>
+          <div key={group.label} className="sb-group">
+            <div className="sb-group-label">{group.label}</div>
             <div className="space-y-0.5">
               {group.items.map((item) => (
                 <NavLink key={item.href} href={item.href} label={item.label}>
@@ -46,7 +43,7 @@ export function AppSidebar() {
         ))}
       </nav>
 
-      <div className="border-t border-border px-3 py-3">
+      <div className="border-t border-[var(--hairline)] px-3 py-3">
         <NavLink href={settingsItem.href} label={settingsItem.label}>
           <settingsItem.icon className="h-4 w-4" />
         </NavLink>

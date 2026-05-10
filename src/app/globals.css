@@ -279,11 +279,52 @@
       gap: 6px;
     }
   }
+
+  /* R.1 T6 sidebar restyle. Quiet items, pulsing green dot for the
+   * active route (single accent floor), gentle hover indent + icon
+   * scale as honest affordance. Brand cluster gets a one-shot pulse
+   * on click via the .sb-brand-pulse class toggled by SidebarBrand.
+   * Bundle ref: claude-design-context/styles.css .sb-* block. */
+  .sb-group + .sb-group {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--hairline);
+  }
+  .sb-group-label {
+    padding: 0 12px 6px;
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--text-3);
+  }
+  .sb-item svg {
+    transition: transform var(--motion-fast) var(--ease-out-quart);
+  }
+  .sb-item:hover svg {
+    transform: scale(1.05);
+  }
+  .sb-item-active::before {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 0 var(--accent-soft);
+    animation: sb-here-pulse 2.6s ease-out infinite;
+  }
+  .sb-brand-pulse svg {
+    animation: sb-brand-pulse 600ms ease-out;
+  }
 }
 
 /* Pulsing-ring keyframe shared between <SignatureFooter>'s `.sig-dot`
- * and (T6) the sidebar's active-route indicator. Single definition so
- * the rhythm stays consistent across both surfaces. */
+ * and the sidebar's active-route indicator (.sb-item-active::before).
+ * Single definition so the rhythm stays consistent across both. */
 @keyframes sb-here-pulse {
   0% {
     box-shadow: 0 0 0 0 var(--accent-soft);
@@ -296,9 +337,22 @@
   }
 }
 
+/* One-shot brand pulse triggered by clicking <SidebarBrand>. Class is
+ * toggled by the client component for 600ms; this animates the inner
+ * SVG (FootholdMark) for that window only. */
+@keyframes sb-brand-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .sig-dot {
+  .sig-dot,
+  .sb-item-active::before,
+  .sb-brand-pulse svg {
     animation: none;
+  }
+  .sb-item:hover svg {
+    transform: none;
   }
 }
 

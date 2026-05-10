@@ -13,8 +13,14 @@ type Props = {
 /**
  * Sidebar link with active-state styling. Active = pathname is the link
  * itself OR a sub-route under it (so /transactions/abc still highlights
- * Transactions). Active state uses --accent for a deliberate, persistent
- * tint vs. a transient hover wash.
+ * Transactions).
+ *
+ * R.1 T6 restyle: active state replaced an accent-tint background with a
+ * pulsing green dot at the left edge (single-hue restraint per DESIGN.md
+ * "Mono-numeral, restrained accent floor"). Hover state indents 2px and
+ * scales the icon 1.05× as a quiet honest-affordance signal. Both the
+ * dot pulse keyframe and the hover transitions live in globals.css under
+ * .sb-item / .sb-item-active.
  *
  * Icons are passed as children — Lucide icons are forwardRef components
  * (functions) and Next 14 refuses to serialize them across the
@@ -30,10 +36,10 @@ export function NavLink({ href, label, children }: Props) {
       href={href}
       aria-current={isActive ? 'page' : undefined}
       className={cn(
-        'flex items-center gap-3 px-3 py-2 rounded-card text-sm transition-colors duration-fast ease-out-quart',
+        'sb-item relative flex items-center gap-3 rounded-[var(--r-btn)] px-3 py-2 text-[13px] transition-[transform,color] duration-fast ease-out-quart',
         isActive
-          ? 'bg-accent text-foreground font-medium'
-          : 'text-muted-foreground hover:bg-accent/40 hover:text-foreground',
+          ? 'sb-item-active pl-[18px] font-medium text-[color:var(--text)]'
+          : 'text-[color:var(--text-2)] hover:translate-x-[2px] hover:text-[color:var(--text)]',
       )}
     >
       {children}
