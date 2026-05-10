@@ -5,10 +5,10 @@ import { Button } from '@/components/ui/button';
 import { DriftFlagsCard } from '@/components/dashboard/drift-flags-card';
 import { GoalsRow } from '@/components/dashboard/goals-row';
 import { InsightTeaserCard } from '@/components/dashboard/insight-teaser-card';
+import { Kpis } from '@/components/dashboard/kpis';
 import { NetWorthHero } from '@/components/dashboard/net-worth-hero';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { RecentActivityCard } from '@/components/dashboard/recent-activity-card';
-import { SplitCard } from '@/components/dashboard/split-card';
 import { UpcomingRecurringCard } from '@/components/dashboard/upcoming-recurring-card';
 import { MotionStack } from '@/components/motion/motion-stack';
 import { TrustStrip } from '@/components/sync/trust-strip';
@@ -18,6 +18,7 @@ import {
   forecastDailySeries,
   uncertaintyBand,
 } from '@/lib/forecast/trajectory';
+import { computeRunway, type MonthlyTotals } from '@/lib/forecast/runway';
 import { getCategoryOptions } from '@/lib/db/queries/categories';
 import {
   getDashboardSummary,
@@ -94,6 +95,20 @@ export default async function DashboardPage() {
   );
   const band = uncertaintyBand(historicalSeries, forecastSeries);
 
+  // Runway input: aggregate per-month outflow across all PFC categories;
+  // pair with same-index incomeHistory entry. ForecastHistory trims to
+  // TRAILING_MONTHS=3 already.
+  const incomeHistory = forecastHistory.incomeHistory ?? [];
+  const categoryHistory = forecastHistory.categoryHistory ?? {};
+  const trailingMonths: MonthlyTotals[] = incomeHistory.map((inflow, i) => {
+    const outflow = Object.values(categoryHistory).reduce(
+      (sum, arr) => sum + (arr[i] ?? 0),
+      0,
+    );
+    return { inflow, outflow };
+  });
+  const runwayWeeks = computeRunway(liquidBalance, trailingMonths);
+
   // T1 inline freshness approximation — T7 swaps this for formatFreshness().
   const todayLabel = `Today · ${new Date().toLocaleDateString('en-US', {
     weekday: 'short',
@@ -131,10 +146,11 @@ export default async function DashboardPage() {
           freshnessHeadline={freshnessHeadline}
         />
 
-        <SplitCard
+        <Kpis
           liquidBalance={liquidBalance}
           liquidAccountCount={liquidAccounts}
           eomProjected={eomProjected}
+          runwayWeeks={runwayWeeks}
         />
 
         <DriftFlagsCard flags={drift.currentlyElevated} />
