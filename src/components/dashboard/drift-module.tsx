@@ -47,7 +47,7 @@ export function DriftModule({ elevated }: Props) {
               <div className="font-medium text-[--text]">
                 {humanizeCategory(row.category)}
               </div>
-              <div className="relative h-1.5 w-32 overflow-hidden rounded-full bg-[--surface-2]">
+              <div className="relative h-1.5 w-32 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
                 {/* Baseline tick at fixed left offset per prototype */}
                 <div
                   className="absolute top-0 h-full w-px bg-[--text-3]"
@@ -55,12 +55,11 @@ export function DriftModule({ elevated }: Props) {
                   aria-hidden
                 />
                 <div
-                  className={
-                    isHot
-                      ? 'h-full rounded-full bg-[--accent]'
-                      : 'h-full rounded-full bg-[--text-3]'
-                  }
-                  style={{ width: `${widthPct}%` }}
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${widthPct}%`,
+                    background: isHot ? 'var(--accent)' : 'var(--text-3)',
+                  }}
                 />
               </div>
               <div className="font-mono tabular-nums text-[--text-2]">

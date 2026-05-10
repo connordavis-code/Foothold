@@ -51,8 +51,8 @@ function GoalTile({ goal }: { goal: GoalWithProgress }) {
   const onPaceOverCap = p.type === 'spend_cap' && !overCap && p.projectedMonthly > p.cap;
 
   // Spend-cap bar tone: positive/normal accent until pace warning kicks in
-  const barTone =
-    overCap || onPaceOverCap ? 'bg-[--caution]' : 'bg-[--accent]';
+  const barColor =
+    overCap || onPaceOverCap ? 'var(--caution)' : 'var(--accent)';
 
   const headValue =
     p.type === 'savings' ? formatCurrency(p.current) : formatCurrency(p.spent);
@@ -71,10 +71,10 @@ function GoalTile({ goal }: { goal: GoalWithProgress }) {
         <p className="truncate text-xs text-[--text-3]">{tileSubtitle(goal)}</p>
       </div>
       <div className="space-y-1.5">
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-[--surface-2]">
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
           <div
-            className={`h-full rounded-full ${barTone}`}
-            style={{ width: `${fraction * 100}%` }}
+            className="h-full rounded-full"
+            style={{ width: `${fraction * 100}%`, background: barColor }}
           />
         </div>
         <div className="flex items-baseline justify-between gap-2 font-mono text-[11px] tabular-nums">
