@@ -10,7 +10,9 @@ import { computeBaseline } from './baseline';
 import { computeGoalImpacts } from './goal-projection';
 import type { ProjectCashInput, ProjectionResult } from './types';
 
-const DEFAULT_HORIZON = 12;
+// Phase 1 reorientation: 24mo ceiling. Past that, the cash-flow-only
+// model breaks down (investment growth dominates, out of scope).
+const HORIZON_MONTHS = 24;
 
 /**
  * Engine entry point. Pure function:
@@ -37,10 +39,9 @@ const DEFAULT_HORIZON = 12;
  */
 export function projectCash(input: ProjectCashInput): ProjectionResult {
   const { history, overrides, currentMonth } = input;
-  const horizon = overrides.horizonMonths ?? DEFAULT_HORIZON;
 
   // Step 1: baseline (no overrides)
-  const baseline = computeBaseline(history, currentMonth, horizon);
+  const baseline = computeBaseline(history, currentMonth, HORIZON_MONTHS);
 
   // Steps 2-6: apply overrides in deterministic order (signed math)
   let scenario = baseline;
