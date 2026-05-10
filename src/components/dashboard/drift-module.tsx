@@ -61,12 +61,12 @@ export function DriftModule({ elevated }: Props) {
                 {humanizeCategory(row.category)}
               </div>
               <div className="relative h-2 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                {/* Baseline segment: theme-aware — --text-2 reads with enough
+                    contrast against the paper-tinted light card; --text-3 sits
+                    well on the dark slate without overpowering the amber drift. */}
                 <div
-                  className="absolute left-0 top-0 h-full"
-                  style={{
-                    width: `${baselinePct}%`,
-                    background: 'var(--text-3)',
-                  }}
+                  className="absolute left-0 top-0 h-full bg-[--text-2] dark:bg-[--text-3]"
+                  style={{ width: `${baselinePct}%` }}
                   aria-hidden
                 />
                 {driftPct > 0 && (
