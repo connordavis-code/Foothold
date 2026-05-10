@@ -7,8 +7,8 @@ import { GoalsRow } from '@/components/dashboard/goals-row';
 import { Kpis } from '@/components/dashboard/kpis';
 import { NetWorthHero } from '@/components/dashboard/net-worth-hero';
 import { PageHeader } from '@/components/dashboard/page-header';
-import { RecentActivityCard } from '@/components/dashboard/recent-activity-card';
-import { UpcomingRecurringCard } from '@/components/dashboard/upcoming-recurring-card';
+import { RecentActivity } from '@/components/dashboard/recent-activity';
+import { RecurringList } from '@/components/dashboard/recurring-list';
 import { WeekInsightCard } from '@/components/dashboard/week-insight-card';
 import { MotionStack } from '@/components/motion/motion-stack';
 import { TrustStrip } from '@/components/sync/trust-strip';
@@ -182,7 +182,7 @@ export default async function DashboardPage({
 
         <GoalsRow goals={goals} />
 
-        <UpcomingRecurringCard upcoming={upcomingRecurring} />
+        <RecurringList upcoming={upcomingRecurring} />
 
         <WeekInsightCard
           insight={insight}
@@ -190,7 +190,7 @@ export default async function DashboardPage({
           stats={briefStats}
         />
 
-        <RecentActivityCard
+        <RecentActivity
           transactions={recent}
           categoryOptions={categoryOptions}
         />

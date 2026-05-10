@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
-import { ProgressBar, spendCapTone } from '@/components/goals/progress-bar';
 import type { GoalWithProgress } from '@/lib/db/queries/goals';
 import { formatCurrency, formatPercent } from '@/lib/utils';
 
@@ -9,9 +8,9 @@ type Props = {
 };
 
 /**
- * Horizontally scrollable goals row — replaces the previous Card-list
- * shape. Each goal becomes a fixed-width tile; the row scrolls on
- * overflow. Mirrors the urgency sort that the old strip used.
+ * 2-up responsive grid per R.2 prototype. Replaces the horizontally-
+ * scrolling tile row. Each goal tile drills to /goals/[id]/edit. Urgency
+ * sort preserved from R.1 implementation.
  */
 export function GoalsRow({ goals }: Props) {
   if (goals.length === 0) return null;
@@ -20,29 +19,23 @@ export function GoalsRow({ goals }: Props) {
 
   return (
     <section className="space-y-3">
-      <header className="flex items-baseline justify-between gap-3 px-1">
+      <header className="flex items-baseline justify-between gap-3">
         <div>
-          <p className="text-eyebrow">
-            Goals
-          </p>
-          <h2 className="mt-1 text-sm font-medium">
+          <h3 className="text-sm font-semibold text-[--text]">Goals</h3>
+          <p className="text-xs text-[--text-3]">
             {sorted.length} active · sorted by urgency
-          </h2>
+          </p>
         </div>
         <Link
           href="/goals"
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors duration-fast ease-out-quart hover:text-foreground"
+          className="inline-flex items-center gap-1 text-xs text-[--text-2] hover:text-[--text]"
         >
           All goals
           <ArrowRight className="h-3 w-3" />
         </Link>
       </header>
 
-      <div
-        className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2"
-        // Each tile is a snap stop so the row reads as a deliberate
-        // collection, not a scrubby continuous strip.
-      >
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {sorted.map((g) => (
           <GoalTile key={g.id} goal={g} />
         ))}
@@ -54,48 +47,41 @@ export function GoalsRow({ goals }: Props) {
 function GoalTile({ goal }: { goal: GoalWithProgress }) {
   const p = goal.progress;
   const fraction = Math.min(1, p.fraction);
+  const overCap = p.type === 'spend_cap' && p.fraction > 1;
+  const onPaceOverCap = p.type === 'spend_cap' && !overCap && p.projectedMonthly > p.cap;
+
+  // Spend-cap bar tone: positive/normal accent until pace warning kicks in
+  const barTone =
+    overCap || onPaceOverCap ? 'bg-[--caution]' : 'bg-[--accent]';
 
   const headValue =
-    p.type === 'savings'
-      ? formatCurrency(p.current)
-      : formatCurrency(p.spent);
+    p.type === 'savings' ? formatCurrency(p.current) : formatCurrency(p.spent);
   const headTotal =
     p.type === 'savings' ? formatCurrency(p.target) : formatCurrency(p.cap);
 
   return (
     <Link
       href={`/goals/${goal.id}/edit`}
-      className="group flex w-64 shrink-0 snap-start flex-col gap-3 rounded-card border border-border bg-surface-elevated p-4 transition-colors duration-fast ease-out-quart hover:border-foreground/20"
+      className="group flex flex-col gap-3 rounded-card bg-[--surface] p-4 transition-colors hover:bg-[--surface-2]"
     >
       <div className="space-y-1">
-        <p className="truncate text-sm font-medium">{goal.name}</p>
-        <p className="truncate text-xs text-muted-foreground">
-          {tileSubtitle(goal)}
-        </p>
+        <h4 className="truncate text-sm font-medium text-[--text]">
+          {goal.name}
+        </h4>
+        <p className="truncate text-xs text-[--text-3]">{tileSubtitle(goal)}</p>
       </div>
       <div className="space-y-1.5">
-        <ProgressBar
-          fraction={fraction}
-          tone={
-            p.type === 'savings'
-              ? p.fraction >= 1
-                ? 'positive'
-                : 'neutral'
-              : spendCapTone(p.fraction)
-          }
-        />
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-[--surface-2]">
+          <div
+            className={`h-full rounded-full ${barTone}`}
+            style={{ width: `${fraction * 100}%` }}
+          />
+        </div>
         <div className="flex items-baseline justify-between gap-2 font-mono text-[11px] tabular-nums">
-          <span className="text-foreground">
-            {headValue}{' '}
-            <span className="text-muted-foreground">of {headTotal}</span>
+          <span className="text-[--text]">
+            {headValue} <span className="text-[--text-3]">of {headTotal}</span>
           </span>
-          <span
-            className={
-              p.type === 'spend_cap' && p.fraction > 1
-                ? 'text-destructive'
-                : 'text-muted-foreground'
-            }
-          >
+          <span className={overCap ? 'text-[--caution]' : 'text-[--text-3]'}>
             {formatPercent(p.fraction)}
           </span>
         </div>
@@ -131,10 +117,7 @@ function formatTargetDate(d: string): string {
   });
 }
 
-function urgencyCompare(
-  a: GoalWithProgress,
-  b: GoalWithProgress,
-): number {
+function urgencyCompare(a: GoalWithProgress, b: GoalWithProgress): number {
   return urgencyScore(b) - urgencyScore(a);
 }
 

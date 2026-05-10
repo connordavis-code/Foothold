@@ -10,41 +10,41 @@ type Props = {
 };
 
 /**
- * Replaces the old monthly-total stat with an actionable 7-day window.
- * Empty state is intentional: when nothing is scheduled, hiding is
- * preferable to "0 charges this week" — clutter without information.
+ * 7-day window of upcoming recurring charges. Empty state hides the
+ * section entirely (no clutter when nothing is scheduled). Each row
+ * drills to /transactions?q=<merchant>&from=<6mo> when a useful term is
+ * available; otherwise renders as a non-interactive row (honest affordance).
+ *
+ * Renamed from <UpcomingRecurringCard> in R.2 to match the prototype's
+ * naming. Data contract + drill heuristics preserved.
  */
-export function UpcomingRecurringCard({ upcoming, days = 7 }: Props) {
+export function RecurringList({ upcoming, days = 7 }: Props) {
   if (upcoming.length === 0) return null;
 
-  const total = upcoming.reduce(
-    (sum, r) => sum + (r.averageAmount ?? 0),
-    0,
-  );
+  const total = upcoming.reduce((sum, r) => sum + (r.averageAmount ?? 0), 0);
 
   return (
-    <section className="rounded-card border border-border bg-surface-elevated p-5 sm:p-6">
-      <header className="mb-4 flex items-baseline justify-between gap-3">
+    <section className="rounded-card bg-[--surface] p-5">
+      <header className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-eyebrow">
+          <div className="text-[10px] uppercase tracking-[0.16em] text-[--text-3]">
             Recurring · next {days} days
-          </p>
-          <h2 className="mt-1 text-sm font-medium">
-            {upcoming.length}{' '}
-            {upcoming.length === 1 ? 'charge' : 'charges'} expected ·{' '}
-            <span className="tabular-nums">{formatCurrency(total)}</span>
-          </h2>
+          </div>
+          <div className="mt-1 font-mono text-sm tabular-nums text-[--text]">
+            {upcoming.length} {upcoming.length === 1 ? 'charge' : 'charges'}{' '}
+            expected · {formatCurrency(total)}
+          </div>
         </div>
         <Link
           href="/recurring"
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors duration-fast ease-out-quart hover:text-foreground"
+          className="inline-flex items-center gap-1 text-xs text-[--text-2] hover:text-[--text]"
         >
           All recurring
           <ArrowRight className="h-3 w-3" />
         </Link>
       </header>
 
-      <ul className="space-y-1">
+      <ul className="mt-4 space-y-1">
         {upcoming.map((r) => (
           <RecurringRow key={r.id} r={r} />
         ))}
@@ -58,15 +58,17 @@ function RecurringRow({ r }: { r: UpcomingRecurringRow }) {
   const inner = (
     <>
       <div className="flex min-w-0 items-center gap-3">
-        <CalendarClock className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <CalendarClock className="h-4 w-4 shrink-0 text-[--text-3]" />
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium">{pickLabel(r)}</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="truncate text-sm font-medium text-[--text]">
+            {pickLabel(r)}
+          </p>
+          <p className="text-xs text-[--text-3]">
             {formatHitDate(r.predictedNextDate)}
           </p>
         </div>
       </div>
-      <p className="shrink-0 font-mono text-sm tabular-nums">
+      <p className="shrink-0 font-mono text-sm tabular-nums text-[--text]">
         {r.averageAmount != null ? formatCurrency(r.averageAmount) : '—'}
       </p>
     </>
@@ -77,7 +79,7 @@ function RecurringRow({ r }: { r: UpcomingRecurringRow }) {
       <li>
         <Link
           href={drillHref}
-          className="flex items-center justify-between gap-3 rounded-md px-2 py-2 transition-colors duration-fast ease-out-quart hover:bg-surface-sunken active:bg-surface-sunken"
+          className="flex items-center justify-between gap-3 rounded-md px-2 py-2 transition-colors hover:bg-[--surface-2]"
         >
           {inner}
         </Link>
@@ -93,11 +95,6 @@ function RecurringRow({ r }: { r: UpcomingRecurringRow }) {
   );
 }
 
-// Plaid sandbox commonly returns empty merchantName + empty description
-// for recurring streams (the /recurring table sees this too — most rows
-// fall back to category). Order: real merchant → description → humanized
-// category → generic literal. `||` instead of `??` so empty/whitespace
-// strings fall through, not just nulls.
 function pickLabel(r: {
   merchantName: string | null;
   description: string | null;
@@ -111,11 +108,6 @@ function pickLabel(r: {
   );
 }
 
-// Match the /recurring stream-row drill pattern: q= ILIKEs txn name +
-// merchantName, scoped to the last 180 days so we surface receipts
-// that actually correlate to the predicted hit. Falls through when
-// neither merchantName nor description is present — q=<category>
-// would surface every category-mate as noise.
 function drilldownHref(r: UpcomingRecurringRow): string | null {
   const term = r.merchantName?.trim() || r.description?.trim();
   if (!term) return null;
@@ -130,7 +122,6 @@ function sixMonthsAgoIso(): string {
   d.setDate(d.getDate() - 180);
   return d.toISOString().slice(0, 10);
 }
-
 
 function formatHitDate(yyyymmdd: string): string {
   const today = new Date().toISOString().slice(0, 10);
