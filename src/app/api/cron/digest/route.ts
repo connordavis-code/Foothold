@@ -58,10 +58,14 @@ export async function GET(request: NextRequest) {
     EXPECTED_BALANCE_RUNS;
   const insightMissing =
     isMondayUtc && !runs.some((r) => r.op === 'cron.insight');
+  const forecastSnapshotMissing = !runs.some(
+    (r) => r.op === 'cron.forecast_snapshot',
+  );
   const warningCount =
     (nightlyMissing ? 1 : 0) +
     (balanceShort ? 1 : 0) +
-    (insightMissing ? 1 : 0);
+    (insightMissing ? 1 : 0) +
+    (forecastSnapshotMissing ? 1 : 0);
 
   const userRows = await db.select().from(users);
 
@@ -190,6 +194,15 @@ function renderHealthSection(runs: ErrorLog[], isMondayUtc: boolean): string {
   } else if (isMondayUtc) {
     lines.push(`<li>Weekly insight: NOT SEEN in last 24h ⚠</li>`);
   }
+
+  const forecastSnapshot = runs.find(
+    (r) => r.op === 'cron.forecast_snapshot',
+  );
+  lines.push(
+    forecastSnapshot
+      ? `<li>Forecast snapshot: ran at ${formatTime(forecastSnapshot.occurredAt)} UTC — ${escapeHtml(forecastSnapshot.message)} ✓</li>`
+      : `<li>Forecast snapshot: NOT SEEN in last 24h ⚠</li>`,
+  );
 
   return `<h3 style="margin:24px 0 8px">Cron health</h3>
 <ul style="margin:0;padding-left:20px;line-height:1.8">${lines.join('')}</ul>`;

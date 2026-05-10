@@ -13,7 +13,7 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import type { AdapterAccount } from 'next-auth/adapters';
-import type { ScenarioOverrides } from '@/lib/forecast/types';
+import type { MonthlyProjection, ScenarioOverrides } from '@/lib/forecast/types';
 
 /**
  * Convention for this file:
@@ -573,6 +573,58 @@ export const forecastNarratives = pgTable(
 
 export type ForecastNarrative = typeof forecastNarratives.$inferSelect;
 export type ForecastNarrativeInsert = typeof forecastNarratives.$inferInsert;
+
+/**
+ * Daily snapshot of each user's BASELINE forecast projection (no overrides).
+ * Phase 1 simulator reorientation, PR 2 of 5.
+ *
+ * Two consumers planned:
+ *   - **Backtest accuracy** — "30 days ago we predicted $X for today;
+ *     actual is $Y; variance Z%." Compares row[idx_for_today].endCash from
+ *     a 30-day-old snapshot against today's net worth. Calendar-gated:
+ *     UI ships ~30 days after this table starts accumulating rows.
+ *   - **Dashboard trajectory line** — 90 days back from `forecastSnapshots`
+ *     (each row's `baselineProjection[0].endCash` is that day's start cash)
+ *     plus 90 days forward from a fresh `projectCash()` call.
+ *
+ * Storage shape: full `MonthlyProjection[]` rather than just
+ * `{month, endCash}[]`. JSONB cost is trivial (24 rows × ~5 fields per row),
+ * and storing the full projection means future analyses (per-category
+ * spend trajectory, inflow/outflow shape) don't require a schema migration.
+ * `goalImpacts` is excluded because it cross-references `goal.id` which
+ * may not exist at backtest time.
+ *
+ * Unique on (userId, snapshotDate) — at most one row per user per day.
+ * The cron upserts so re-runs within the same day overwrite (idempotent).
+ *
+ * `snapshotDate` is a calendar `date` derived in UTC at cron-run time.
+ * Vercel crons run in UTC, so this is the natural anchor.
+ */
+export const forecastSnapshots = pgTable(
+  'forecast_snapshot',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    snapshotDate: date('snapshot_date').notNull(),
+    baselineProjection: jsonb('baseline_projection')
+      .$type<MonthlyProjection[]>()
+      .notNull(),
+    generatedAt: ts('generated_at').notNull().defaultNow(),
+  },
+  (t) => ({
+    userDateUnique: uniqueIndex('forecast_snapshot_user_date_idx').on(
+      t.userId,
+      t.snapshotDate,
+    ),
+  }),
+);
+
+export type ForecastSnapshot = typeof forecastSnapshots.$inferSelect;
+export type ForecastSnapshotInsert = typeof forecastSnapshots.$inferInsert;
 
 /**
  * SnapTrade per-user credential. SnapTrade's auth model is per-USER
