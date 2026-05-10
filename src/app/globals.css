@@ -57,6 +57,13 @@
     --chart-4: 40 50% 50%;
     --chart-5: 20 55% 55%;
     --chart-6: 220 30% 55%;
+
+    /* R.1 redesign-bundle font aliases. --font-sans/-mono/-serif remain
+     * the canonical CSS variables (Tailwind utilities depend on them).
+     * Components introduced in R.2+ may reference --font-ui/-display per
+     * the bundle's naming; both resolve to the same next/font sources. */
+    --font-ui: var(--font-sans);
+    --font-display: var(--font-serif);
   }
 
   .dark {
@@ -116,6 +123,14 @@
   /* Tabular numerals for financial data */
   .tabular {
     font-variant-numeric: tabular-nums;
+  }
+  /* Numeral surface — explicit opt-in adds slashed zero (`zero`) and
+   * stylistic-set 1 (`ss01`) on top of the body-level `tnum`. Use on
+   * KPIs, table money columns, and the signature footer's coordinates
+   * cluster. Body text keeps just `tnum` from the body rule above. */
+  .num {
+    font-feature-settings: 'tnum' 1, 'zero' 1, 'ss01' 1;
+    font-variant-numeric: tabular-nums slashed-zero;
   }
 }
 

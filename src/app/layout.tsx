@@ -1,24 +1,34 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, JetBrains_Mono, Source_Serif_4 } from 'next/font/google';
+import { IBM_Plex_Mono, Inter_Tight, Fraunces } from 'next/font/google';
 import { ThemeProvider } from '@/components/theme-provider';
 import './globals.css';
 
-const inter = Inter({
-  subsets: ['latin'],
+// R.1 redesign typography. latin + latin-ext subset for EU multi-tenant
+// readiness (locked 2026-05-09, see docs/redesign/r1-foundation/PLAN.md).
+const interTight = Inter_Tight({
+  subsets: ['latin', 'latin-ext'],
+  weight: ['400', '500', '600', '700'],
+  style: ['normal', 'italic'],
   variable: '--font-sans',
   display: 'swap',
 });
 
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
+const ibmPlexMono = IBM_Plex_Mono({
+  subsets: ['latin', 'latin-ext'],
+  weight: ['400', '500'],
+  style: ['normal', 'italic'],
   variable: '--font-mono',
   display: 'swap',
 });
 
-// Editorial accent — used in narrative surfaces (insights, pull quotes).
-// Loaded globally so any component can opt in via `font-serif`.
-const sourceSerif = Source_Serif_4({
-  subsets: ['latin'],
+// Editorial accent — used italic-only as editorial punctuation per redesign
+// bundle (page titles, weekly brief, signature footer). Loaded globally;
+// components opt in via `font-serif`. Both normal + italic loaded for
+// safety; R.6 polish may tighten to italic-only after audit.
+const fraunces = Fraunces({
+  subsets: ['latin', 'latin-ext'],
+  weight: ['400', '500'],
+  style: ['normal', 'italic'],
   variable: '--font-serif',
   display: 'swap',
 });
@@ -45,7 +55,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${inter.variable} ${jetbrainsMono.variable} ${sourceSerif.variable} font-sans antialiased min-h-screen bg-background text-foreground`}
+        className={`${interTight.variable} ${ibmPlexMono.variable} ${fraunces.variable} font-sans antialiased min-h-screen bg-background text-foreground`}
       >
         <ThemeProvider
           attribute="class"
