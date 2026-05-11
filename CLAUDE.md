@@ -740,6 +740,49 @@ plan at `docs/superpowers/plans/2026-05-07-phase-3-pt3-goal-detail.md`)
   investments" CTA.
 
 ### In progress
+
+- **Foothold Redesign milestone** — wholesale visual + IA redesign per
+  Claude Design bundle (deep-forest dark theme, brand-green accent,
+  Fraunces editorial moments, terrain-contour FootholdMark, position-
+  dot motif, cartographic SignatureFooter). Long-lived `feat/redesign`
+  branch off main; each R.x sub-phase merges into it; full milestone
+  single-PRs to main after R.6 polish. Canonical refs:
+  [docs/redesign/README.md](docs/redesign/README.md) phase status,
+  [docs/redesign/SPEC.md](docs/redesign/SPEC.md) R.0 locked decisions,
+  [claude-design-context/](claude-design-context/) prototype reference.
+  **Status (2026-05-10):**
+  - **R.1 Foundation** ✓ shipped to `feat/redesign` (tokens, fonts,
+    `<FootholdMark>`, `<SignatureFooter>`, top-bar/sidebar restyle,
+    page-bg topo+grain textures)
+  - **R.2 Dashboard** ✓ shipped to `feat/redesign` (`<NetWorthHero>`
+    with 180d trajectory + sqrt(t) uncertainty band + count-up;
+    `<Kpis>` Liquid · EOM · Runway w/ "Net positive" fallback;
+    `<DriftModule>` folds /drift; `<WeekInsightCard>` folds /insights;
+    `formatFreshness` propagation helper; `/drift` + `/insights` +
+    `/insights/[week]` deleted with 308 redirects)
+  - **R.3.1 Goals** 🟡 in flight on `feat/r3-1-goals` — T1–T5 + 3 UAT
+    polish commits shipped (rich card-per-goal IA, `/goals/[id]`
+    deleted, coaching sentence fills Moves slot until R.4, archived
+    toggle, page-meta freshness). T6 (form restyle) + T7 (UAT polish)
+    remaining. [Resume point at top of PLAN](docs/redesign/r3-1-goals/PLAN.md).
+  - **R.3.2–R.3.6** not started (Recurring, Transactions, Investments,
+    Simulator, Settings — per-page sweep, one PR each)
+  - **R.4 Moves + scenario unification** not started; **R.5 mobile
+    rebuild** not started; **R.6 polish** not started
+  - **Dual-token gotcha worth knowing:** Foothold tokens come in two
+    shapes. Complete-color tokens (`--surface`, `--text-3`,
+    `--semantic-success`, `--semantic-caution`, `--dot-halo`) work as
+    raw `var()`. Shadcn-legacy HSL fragments (`--accent`, `--positive`,
+    `--background`) need `hsl(var(--x))` wrapping or Tailwind config
+    mapping (`bg-accent` works via `tailwind.config.ts`). The
+    arbitrary-value syntax `bg-[--accent]` silently generates invalid
+    CSS for HSL fragments. R.2 hit this trap (commits 986c822 + 02e4f81)
+    and absorbed the rule into R.3.1's plan. Rule of thumb: inline-style
+    `var(--semantic-*)` for decorative pixel elements; Tailwind config
+    classes for shadcn-mapped tokens; `bg-[--text-2] dark:bg-[--text-3]`
+    Tailwind arbitrary-value works ONLY for complete-color Foothold
+    tokens, not HSL fragments.
+
 - **Reliability initiative** — make Foothold trustworthy enough to
   replace checking multiple finance apps. Six-phase plan + canonical
   handoff in `docs/reliability/implementation-plan.md` and

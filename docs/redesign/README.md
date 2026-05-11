@@ -16,12 +16,17 @@ This milestone replaces the visual + IA layer wholesale while preserving the dat
 | Phase | Status |
 |---|---|
 | R.0 | ✓ specced ([SPEC.md](SPEC.md)) |
-| R.1 | ✓ planned ([r1-foundation/PLAN.md](r1-foundation/PLAN.md)) — ready to execute on `feat/redesign` branch |
-| R.2 | not started |
-| R.3 | not started |
-| R.4 | not started |
-| R.5 | not started |
-| R.6 | not started |
+| R.1 Foundation | ✓ shipped — merged to `feat/redesign` (tokens, fonts, FootholdMark, SignatureFooter, sidebar/top-bar restyle, page-bg textures) |
+| R.2 Dashboard | ✓ shipped — merged to `feat/redesign` (NetWorthHero w/ trajectory + uncertainty band, KPIs w/ Runway, drift module fold, weekly brief editorial card fold, formatFreshness helper). [r2-dashboard/SPEC.md](r2-dashboard/SPEC.md) + [PLAN.md](r2-dashboard/PLAN.md) |
+| R.3.1 Goals | 🟡 in flight on `feat/r3-1-goals` — T1–T5 done + 3 UAT polish commits; T6 (form restyle) + T7 (UAT polish reservation) remaining. [r3-1-goals/SPEC.md](r3-1-goals/SPEC.md) + [PLAN.md](r3-1-goals/PLAN.md) (resume point at top of plan) |
+| R.3.2 Recurring | not started |
+| R.3.3 Transactions | not started |
+| R.3.4 Investments | not started |
+| R.3.5 Simulator | not started |
+| R.3.6 Settings | not started |
+| R.4 Goals Moves + scenario unification | not started |
+| R.5 Mobile rebuild | not started |
+| R.6 Polish | not started |
 
 ## Parallel multi-user readiness track
 

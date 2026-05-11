@@ -11,8 +11,34 @@
 **Date**: 2026-05-10
 **Depends on**: [docs/redesign/r3-1-goals/SPEC.md](SPEC.md) (5 locked brainstorming decisions), [docs/redesign/SPEC.md](../SPEC.md) (R.0 master), [docs/redesign/r2-dashboard/PLAN.md](../r2-dashboard/PLAN.md) (precedent execution rhythm)
 **Bundle reference**: [claude-design-context/foothold-goals.jsx](../../../claude-design-context/foothold-goals.jsx)
-**Branch**: `feat/r3-1-goals` (already cut, SPEC committed at `0fd2c31`)
+**Branch**: `feat/r3-1-goals` (cut from `feat/redesign`)
 **Estimate**: ~1 week
+
+---
+
+## ▶ Resume point (as of 2026-05-10 evening)
+
+**T1–T5 + 3 UAT polish commits shipped.** T6 + T7 remaining.
+
+| Task | Status | Commit |
+|---|---|---|
+| SPEC | ✅ | `0fd2c31` |
+| PLAN | ✅ | `fad3089` |
+| **T1** Page header + summary strip | ✅ | `7c8c342` |
+| **T2+T3** GoalCard + GoalProgress + buildCoachingInput (combined) | ✅ | `832cc59` |
+| **T4** /goals route rewrite + archived toggle | ✅ | `4cf4a83` |
+| **T5** Delete /goals/[id] + obsolete components | ✅ | `5a5c2d3` |
+| UAT polish: % label tracks dot horizontally | ✅ | `cd97a82` |
+| UAT polish: `/goals/:id` redirect regex tightened | ✅ | `cbf051e` |
+| UAT polish: % label moved above bar (no edge collision) | ✅ | `5dc3b35` |
+| **T6** Restyle /goals/new + /goals/[id]/edit forms | ⏳ pending | — |
+| **T7** UAT polish reservation | ⏳ pending (browser) | — |
+
+**Test count:** 549 passing (started session at 542; +11 from coaching-input.test.ts, −4 from deleted trajectory.test.ts).
+
+**To resume:** check out `feat/r3-1-goals`, jump to T6 below. /goals page is fully shipped and UAT-validated (user walked through, three polish commits absorbed). T6 restyles the two surviving form pages with Foothold tokens; T7 catches any UAT findings on the restyled forms.
+
+---
 
 ---
 
