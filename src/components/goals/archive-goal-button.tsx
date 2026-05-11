@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { Archive, ArchiveRestore } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -23,7 +24,12 @@ type Props = {
   goalName: string;
   /** True when the goal is currently archived; the button becomes Restore. */
   isArchived: boolean;
+  /** When true, renders as a 28px icon-only square (for use in <GoalCard> header). */
+  iconOnly?: boolean;
 };
+
+const ICON_BUTTON_CLASS =
+  'grid h-7 w-7 place-items-center rounded text-[--text-3] hover:bg-[--surface-2] hover:text-[--text]';
 
 /**
  * Archive ↔ Restore toggle for a single goal. Soft-archive (flips
@@ -33,7 +39,7 @@ type Props = {
  * silently move a goal off the leaderboard. Restore is the inverse and
  * intentionally NOT confirmed (cheap to undo by re-archiving).
  */
-export function ArchiveGoalButton({ goalId, goalName, isArchived }: Props) {
+export function ArchiveGoalButton({ goalId, goalName, isArchived, iconOnly }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -77,6 +83,19 @@ export function ArchiveGoalButton({ goalId, goalName, isArchived }: Props) {
   };
 
   if (isArchived) {
+    if (iconOnly) {
+      return (
+        <button
+          type="button"
+          onClick={onRestore}
+          disabled={isPending}
+          className={ICON_BUTTON_CLASS}
+          aria-label={`Restore "${goalName}"`}
+        >
+          <ArchiveRestore className="h-3.5 w-3.5" />
+        </button>
+      );
+    }
     return (
       <Button
         variant="ghost"
@@ -93,13 +112,23 @@ export function ArchiveGoalButton({ goalId, goalName, isArchived }: Props) {
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground hover:text-foreground"
-        >
-          Archive
-        </Button>
+        {iconOnly ? (
+          <button
+            type="button"
+            className={ICON_BUTTON_CLASS}
+            aria-label={`Archive "${goalName}"`}
+          >
+            <Archive className="h-3.5 w-3.5" />
+          </button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Archive
+          </Button>
+        )}
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
