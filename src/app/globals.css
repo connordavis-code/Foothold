@@ -449,3 +449,37 @@ body::after {
     );
   }
 }
+
+/* Editorial scrollbar: slim, hairline-tinted, transparent track. Applies
+ * to both the page-level scrollbar (when "Always show scrollbars" is on
+ * in macOS Sys Prefs) and any inner overflow:auto containers — table
+ * scroll, drawer scroll, etc. — so they read as one quiet system rather
+ * than chrome. Firefox uses scrollbar-* shorthand; WebKit needs the
+ * pseudo-element ladder.
+ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--hairline-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--hairline-strong);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-3);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
