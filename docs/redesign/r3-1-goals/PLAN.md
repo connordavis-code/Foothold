@@ -18,7 +18,7 @@
 
 ## ▶ Resume point (as of 2026-05-10 evening)
 
-**T1–T5 + 3 UAT polish commits shipped.** T6 + T7 remaining.
+**R.3.1 COMPLETE.** All 7 tasks shipped on `feat/r3-1-goals`; UAT pass clean; merged into `feat/redesign`.
 
 | Task | Status | Commit |
 |---|---|---|
@@ -31,12 +31,14 @@
 | UAT polish: % label tracks dot horizontally | ✅ | `cd97a82` |
 | UAT polish: `/goals/:id` redirect regex tightened | ✅ | `cbf051e` |
 | UAT polish: % label moved above bar (no edge collision) | ✅ | `5dc3b35` |
-| **T6** Restyle /goals/new + /goals/[id]/edit forms | ⏳ pending | — |
-| **T7** UAT polish reservation | ⏳ pending (browser) | — |
+| **T6** Restyle /goals/new + /goals/[id]/edit forms | ✅ | `73be5e3` |
+| **T7** UAT polish reservation | ✅ (zero polish commits — UAT pass clean) | — |
 
-**Test count:** 549 passing (started session at 542; +11 from coaching-input.test.ts, −4 from deleted trajectory.test.ts).
+**Test count:** 549 passing (started session at 542; +11 from coaching-input.test.ts, −4 from deleted trajectory.test.ts). Net above the predicted 539–542 budget because trajectory.test.ts only shed 4 cases instead of the 5–10 forecast.
 
-**To resume:** check out `feat/r3-1-goals`, jump to T6 below. /goals page is fully shipped and UAT-validated (user walked through, three polish commits absorbed). T6 restyles the two surviving form pages with Foothold tokens; T7 catches any UAT findings on the restyled forms.
+**Acceptance gates:** all 10 met (typecheck clean, prod build clean — 27/27 pages — RSC grep clean, browser UAT pass, redirect curls verified pre-T6 via `cbf051e`).
+
+**Outcome:** `feat/r3-1-goals` merged to `feat/redesign` + pushed. Next sub-phase: R.3.2 (Recurring) — see [docs/redesign/README.md](../README.md) for sub-phase queue.
 
 ---
 

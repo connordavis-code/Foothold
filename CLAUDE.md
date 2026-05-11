@@ -760,11 +760,14 @@ plan at `docs/superpowers/plans/2026-05-07-phase-3-pt3-goal-detail.md`)
     `<DriftModule>` folds /drift; `<WeekInsightCard>` folds /insights;
     `formatFreshness` propagation helper; `/drift` + `/insights` +
     `/insights/[week]` deleted with 308 redirects)
-  - **R.3.1 Goals** 🟡 in flight on `feat/r3-1-goals` — T1–T5 + 3 UAT
-    polish commits shipped (rich card-per-goal IA, `/goals/[id]`
-    deleted, coaching sentence fills Moves slot until R.4, archived
-    toggle, page-meta freshness). T6 (form restyle) + T7 (UAT polish)
-    remaining. [Resume point at top of PLAN](docs/redesign/r3-1-goals/PLAN.md).
+  - **R.3.1 Goals** ✓ shipped to `feat/redesign` (rich card-per-goal IA,
+    `/goals/[id]` deleted with 308 redirect, coaching sentence fills the
+    Moves slot until R.4, archived toggle below active list, page-meta
+    freshness mirroring R.2 PageHeader pattern; T6 restyled /goals/new +
+    /goals/[id]/edit forms with editorial Plan-eyebrow header + Foothold
+    tokens replacing rogue `text-muted-foreground` defaults; T7 UAT pass
+    clean — zero polish commits needed beyond the three shipped pre-T6).
+    549 vitest passing; clean prod build (27/27 pages).
   - **R.3.2–R.3.6** not started (Recurring, Transactions, Investments,
     Simulator, Settings — per-page sweep, one PR each)
   - **R.4 Moves + scenario unification** not started; **R.5 mobile
