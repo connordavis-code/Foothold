@@ -68,10 +68,19 @@ export function GoalProgress({ goal, verdict }: Props) {
         )}
       </div>
 
-      <div className="mt-2 flex items-baseline justify-between gap-2 font-mono text-[11px] tabular-nums text-[--text-2]">
-        <span>{formatCurrencyCompact(currentValue)}</span>
+      {/* Below-bar labels: current (left) + pct (tracks the dot position) +
+          target (right). Pct uses absolute positioning so it follows the
+          fill-edge instead of sitting at the geometric center — reads as
+          "you are HERE, at N%" instead of "the middle of the bar is N%". */}
+      <div className="relative mt-2 h-4 font-mono text-[11px] tabular-nums text-[--text-2]">
+        <span className="absolute left-0">
+          {formatCurrencyCompact(currentValue)}
+        </span>
         <span
+          className="absolute"
           style={{
+            left: `${Math.max(0, Math.min(100, fraction * 100))}%`,
+            transform: 'translateX(-50%)',
             color:
               verdict === 'over' || verdict === 'behind'
                 ? 'var(--semantic-caution)'
@@ -80,7 +89,9 @@ export function GoalProgress({ goal, verdict }: Props) {
         >
           {pct}%
         </span>
-        <span>{formatCurrencyCompact(targetValue)}</span>
+        <span className="absolute right-0">
+          {formatCurrencyCompact(targetValue)}
+        </span>
       </div>
     </div>
   );
