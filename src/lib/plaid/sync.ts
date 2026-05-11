@@ -16,6 +16,7 @@ import {
   securities,
   transactions,
 } from '@/lib/db/schema';
+import { hasInvestmentAccounts } from './capabilities';
 import { plaid } from './client';
 import { syncRecurringForItem } from './recurring';
 
@@ -281,7 +282,7 @@ async function syncInvestmentsForItem(
   item: PlaidExternalItem,
   accs: FinancialAccount[],
 ): Promise<{ holdings: number; transactions: number; securities: number }> {
-  if (!accs.some((a) => a.type === 'investment')) {
+  if (!hasInvestmentAccounts(accs)) {
     return { holdings: 0, transactions: 0, securities: 0 };
   }
   const acctIdByProviderId = new Map(accs.map((a) => [a.providerAccountId, a.id]));
