@@ -1,13 +1,6 @@
 import { auth } from '@/auth';
 import { GoalForm } from '@/components/goals/goal-form';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
   getDistinctCategories,
   getUserAccounts,
 } from '@/lib/db/queries/transactions';
@@ -27,25 +20,26 @@ export default async function NewGoalPage({
   ]);
 
   return (
-    <div className="px-8 py-8 max-w-2xl mx-auto">
-      <Card>
-        <CardHeader>
-          <CardTitle>New goal</CardTitle>
-          <CardDescription>
-            Pick a type, scope it to the right accounts, and we'll track
-            progress automatically.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <GoalForm
-            action={createGoal}
-            accounts={accounts}
-            categories={categories}
-            errorMessage={searchParams.error}
-            submitLabel="Create goal"
-          />
-        </CardContent>
-      </Card>
+    <div className="mx-auto max-w-2xl space-y-6 px-4 py-6 sm:px-8 sm:py-8">
+      <header>
+        <div className="text-xs uppercase tracking-[0.16em] text-[--text-3]">
+          Plan
+        </div>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[--text]">
+          New goal
+        </h1>
+        <p className="mt-1 text-sm text-[--text-2]">
+          Pick a type, scope it to the right accounts, and we'll track
+          progress automatically.
+        </p>
+      </header>
+      <GoalForm
+        action={createGoal}
+        accounts={accounts}
+        categories={categories}
+        errorMessage={searchParams.error}
+        submitLabel="Create goal"
+      />
     </div>
   );
 }
