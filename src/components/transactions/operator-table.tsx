@@ -81,7 +81,7 @@ export function OperatorTable({
   }
 
   return (
-    <div className="overflow-hidden rounded-card border border-[--border] bg-[--surface]">
+    <div className="overflow-hidden rounded-card border border-border bg-[--surface]">
       <div className="max-h-[calc(100vh-18rem)] overflow-auto">
         <table className="w-full text-sm">
           <colgroup>
@@ -93,7 +93,7 @@ export function OperatorTable({
             <col className="w-[120px]" />
           </colgroup>
           <thead className="sticky top-0 z-10 bg-[--surface]/95 backdrop-blur">
-            <tr className="border-b border-[--border] text-[10px] uppercase tracking-[0.12em] text-[--text-3]">
+            <tr className="border-b border-border text-[10px] uppercase tracking-[0.12em] text-[--text-3]">
               <Th>
                 <SelectAllCheckbox
                   allChecked={allChecked}
@@ -113,7 +113,7 @@ export function OperatorTable({
             <tbody key={group.dateIso}>
               <tr
                 aria-hidden
-                className="border-y border-[--border]/70 bg-[--surface-sunken]/40"
+                className="border-y border-border/70 bg-[--surface-sunken]/40"
               >
                 <td colSpan={5} className="px-3 py-1.5">
                   <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[--text-2]">
@@ -215,7 +215,7 @@ function SelectAllCheckbox({
       data-state={state}
       aria-label={label}
       onChange={onToggle}
-      className="h-3.5 w-3.5 cursor-pointer rounded border-[--border] text-[--text] accent-[--text] disabled:cursor-not-allowed disabled:opacity-40"
+      className="h-3.5 w-3.5 cursor-pointer rounded border-border text-[--text] accent-[--text] disabled:cursor-not-allowed disabled:opacity-40"
     />
   );
 }
@@ -227,7 +227,7 @@ function NoMatchEmpty() {
   const hasFilters = params.size > 0;
 
   return (
-    <div className="flex flex-col items-center justify-center gap-4 rounded-card border border-[--border] bg-[--surface] px-6 py-16 text-center">
+    <div className="flex flex-col items-center justify-center gap-4 rounded-card border border-border bg-[--surface] px-6 py-16 text-center">
       <span className="grid h-12 w-12 place-items-center rounded-pill bg-[--surface-sunken] text-[--text-2]">
         <SearchX className="h-5 w-5" />
       </span>
@@ -285,7 +285,7 @@ function Row({
       aria-selected={isSelected}
       data-checked={isChecked}
       className={cn(
-        'group border-b border-[--border]/60 transition-colors duration-fast ease-out-quart last:border-b-0',
+        'group border-b border-border/60 transition-colors duration-fast ease-out-quart last:border-b-0',
         isChecked
           ? 'bg-[--accent]/20 hover:bg-[--accent]/30'
           : isSelected
@@ -301,7 +301,7 @@ function Row({
           onClick={handleCheckboxClick}
           onChange={() => undefined}
           className={cn(
-            'h-3.5 w-3.5 cursor-pointer rounded border-[--border] text-[--text] accent-[--text]',
+            'h-3.5 w-3.5 cursor-pointer rounded border-border text-[--text] accent-[--text]',
             'opacity-0 group-hover:opacity-100 group-data-[checked=true]:opacity-100 focus-visible:opacity-100',
           )}
         />

@@ -141,7 +141,7 @@ export function MobileTransactionsShell({
 
   return (
     <div className="space-y-3 md:hidden">
-      <div className="sticky top-14 z-10 -mx-4 flex items-center gap-2 border-b border-[--border] bg-[--surface]/95 px-4 py-2 backdrop-blur sm:-mx-8 sm:px-8">
+      <div className="sticky top-14 z-10 -mx-4 flex items-center gap-2 border-b border-border bg-[--surface]/95 px-4 py-2 backdrop-blur sm:-mx-8 sm:px-8">
         <div className="relative flex-1">
           <Search
             aria-hidden
@@ -152,7 +152,7 @@ export function MobileTransactionsShell({
             placeholder="Search transactions"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-11 w-full rounded-pill border border-[--border] bg-[--surface] pl-9 pr-3 font-mono text-sm text-[--text] placeholder:font-sans placeholder:text-[--text-3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="h-11 w-full rounded-pill border border-border bg-[--surface] pl-9 pr-3 font-mono text-sm text-[--text] placeholder:font-sans placeholder:text-[--text-3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
         </div>
         <MobileFilterSheet accounts={accounts} categories={categories} />
@@ -164,7 +164,7 @@ export function MobileTransactionsShell({
       </p>
 
       {groups.length === 0 ? (
-        <div className="rounded-card border border-[--border] bg-[--surface] px-4 py-12 text-center text-sm text-[--text-2]">
+        <div className="rounded-card border border-border bg-[--surface] px-4 py-12 text-center text-sm text-[--text-2]">
           {params.size > 0
             ? 'No transactions match these filters.'
             : 'No transactions synced yet.'}
@@ -195,7 +195,7 @@ export function MobileTransactionsShell({
                   {formatCurrency(-group.dayNet, { signed: true })}
                 </span>
               </header>
-              <ul className="overflow-hidden rounded-card border border-[--border] bg-[--surface]">
+              <ul className="overflow-hidden rounded-card border border-border bg-[--surface]">
                 {group.rows.map((r) => (
                   <li key={r.id}>
                     <button

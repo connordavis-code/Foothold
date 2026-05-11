@@ -120,7 +120,7 @@ export function TransactionDetailSheet({
           aria-describedby={undefined}
           className={cn(
             'fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] flex-col',
-            'rounded-t-card border-t border-[--border] bg-[--surface]',
+            'rounded-t-card border-t border-border bg-[--surface]',
             'pb-[env(safe-area-inset-bottom)]',
             'outline-none',
           )}

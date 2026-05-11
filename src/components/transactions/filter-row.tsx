@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 export const SEARCH_INPUT_ID = 'tx-search';
 
 const CHIP_BASE = cn(
-  'inline-flex h-9 items-center rounded-pill border border-[--border] bg-[--surface] px-3 text-sm text-[--text]',
+  'inline-flex h-9 items-center rounded-pill border border-border bg-[--surface] px-3 text-sm text-[--text]',
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
   'transition-colors duration-fast ease-out-quart',
 );
