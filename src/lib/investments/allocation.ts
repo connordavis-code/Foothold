@@ -12,11 +12,17 @@ export type AllocationSegment = {
   pct: number;
 };
 
-// Observed distinct `securities.type` values in dev DB at time of
-// write: etf, equity, mutual fund, fixed income, cash (audit step
-// in PLAN T3.1). Anything else falls through to Other — including
-// 'crypto' if it ever shows up via SnapTrade.
+// Observed `securities.type` values by provider:
+//   Plaid:     etf, equity, stock, mutual fund, fixed income, cash
+//              (and *_underscore variants observed in some Plaid envs)
+//   SnapTrade: cs (common stock), et (ETF), oef (open-end fund),
+//              ad (ADR), bnd (bond), crypto (cryptocurrency)
+// SnapTrade writes `symbol.type.code` directly per snaptrade/sync.ts;
+// codes mirror FIGI / ISO short-form. R.3.4 UAT surfaced every holding
+// landing in 'Other' because the original lookup only covered Plaid's
+// long-form values. Anything still unknown falls through to 'Other'.
 const TYPE_LOOKUP: Record<string, AllocationClass> = {
+  // Plaid + long-form
   etf: 'ETF',
   equity: 'Equity',
   stock: 'Equity',
@@ -28,6 +34,12 @@ const TYPE_LOOKUP: Record<string, AllocationClass> = {
   bond_fund: 'Bond / fixed income',
   cash: 'Cash',
   'money market': 'Cash',
+  // SnapTrade short codes
+  cs: 'Equity',
+  ad: 'Equity',
+  et: 'ETF',
+  oef: 'Mutual fund',
+  bnd: 'Bond / fixed income',
 };
 
 export function classifyHolding(securityType: string | null): AllocationClass {
