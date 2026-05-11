@@ -157,7 +157,7 @@ export function GoalForm({
             : 'Accounts to track (leave all unchecked for any account)'}
         </Label>
         {accountsForType.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-[--text-2]">
             No eligible accounts. Connect one in Settings first.
           </p>
         ) : (
@@ -175,12 +175,12 @@ export function GoalForm({
                   <span className="flex-1">
                     <span className="text-sm font-medium">{a.name}</span>
                     {a.mask && (
-                      <span className="text-sm text-muted-foreground">
+                      <span className="text-sm text-[--text-3]">
                         {' ····'}
                         {a.mask}
                       </span>
                     )}
-                    <span className="ml-2 text-xs text-muted-foreground capitalize">
+                    <span className="ml-2 text-xs text-[--text-3] capitalize">
                       {a.subtype ?? a.type}
                     </span>
                   </span>
@@ -195,7 +195,7 @@ export function GoalForm({
         <div className="space-y-2">
           <Label>Category filter (leave all unchecked for all categories)</Label>
           {categories.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-[--text-2]">
               No categorized transactions yet. Once you sync, categories
               will appear here.
             </p>
@@ -257,7 +257,7 @@ function TypeRadio({
       )}
     >
       <p className="text-sm font-medium">{title}</p>
-      <p className="text-xs text-muted-foreground mt-1">{description}</p>
+      <p className="text-xs text-[--text-3] mt-1">{description}</p>
     </button>
   );
 }

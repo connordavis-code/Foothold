@@ -12,6 +12,16 @@ const nextConfig = {
         destination: '/dashboard?week=:week',
         permanent: true,
       },
+      // R.3.1: /goals/[id] detail page folded into /goals card list.
+      // Regex constraint: (?!new$) excludes /goals/new from matching;
+      // [^/]+ keeps :id single-segment so /goals/:id/edit (deeper path)
+      // is NOT consumed. Previous `.*` regex matched across slashes and
+      // swallowed /goals/<id>/edit URLs.
+      {
+        source: '/goals/:id((?!new$)[^/]+)',
+        destination: '/goals',
+        permanent: true,
+      },
     ];
   },
 };

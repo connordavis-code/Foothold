@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -22,6 +23,8 @@ import { cn } from '@/lib/utils';
 type Props = {
   goalId: string;
   goalName: string;
+  /** When true, renders as a 28px icon-only square (for use in <GoalCard> header). */
+  iconOnly?: boolean;
 };
 
 /**
@@ -30,7 +33,7 @@ type Props = {
  * click doesn't nuke a goal + its progress history. Sonner surfaces
  * success/failure; router.refresh re-renders the goals grid.
  */
-export function DeleteGoalButton({ goalId, goalName }: Props) {
+export function DeleteGoalButton({ goalId, goalName, iconOnly }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -51,13 +54,23 @@ export function DeleteGoalButton({ goalId, goalName }: Props) {
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground hover:text-destructive"
-        >
-          Delete
-        </Button>
+        {iconOnly ? (
+          <button
+            type="button"
+            className="grid h-7 w-7 place-items-center rounded text-[--text-3] hover:bg-[--surface-2] hover:text-[--text]"
+            aria-label={`Delete "${goalName}"`}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-destructive"
+          >
+            Delete
+          </Button>
+        )}
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
