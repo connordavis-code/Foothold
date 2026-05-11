@@ -47,7 +47,10 @@ jobs:
           AUTH_EMAIL_FROM: ci@example.com
           PLAID_CLIENT_ID: ci-dummy
           PLAID_SECRET: ci-dummy
-          PLAID_TOKEN_ENCRYPTION_KEY: ci-dummy-32-byte-encryption-key-pad
+          # 32 zero bytes, base64-encoded (44 chars w/ padding). The crypto
+          # module validates the decoded length is exactly 32 bytes — a
+          # plain string fails. Real key lives encrypted in Vercel.
+          PLAID_TOKEN_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
           CRON_SECRET: ci-build-32char-cron-secret-padded-out
           NEXT_PUBLIC_APP_URL: http://localhost:3000
 
