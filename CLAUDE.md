@@ -361,6 +361,58 @@ honestly. **Whenever adding a new Plaid endpoint, check Plaid docs for
 the required product, then verify it's in `PLAID_PRODUCTS` AND
 authorized in Plaid Dashboard before deploying.**
 
+**Empirical correction (2026-05-11):** when Plaid approved Balance and
+the env was updated, the very next cron tick succeeded for ALL existing
+items WITHOUT any Link update-mode reconnect. The "(A) reconnect
+existing items" step above is unnecessary for `balance` specifically
+— Plaid auto-grants the new product consent to already-connected
+items when enabled at the app level. Other products may behave
+differently; rule of thumb is "enable + watch the next cron, only
+reconnect if it 400s with INVALID_PRODUCT."
+
+### Don't pass `balance` to Plaid `additional_consented_products` (2026-05-11)
+Plaid's `linkTokenCreate` accepts a specific list in
+`additional_consented_products` (auth, employment, identity,
+investments, liabilities, transactions, transfer, etc.). `balance`
+is NOT in that list — passing it returns HTTP 400 on every Link token
+mint. Symptom in our codebase: persistent "Server Components render"
+error on `/settings` plus POST 500s in Vercel logs
+(`AxiosError: Request failed with status code 400`) traced to
+`createLinkToken` mounting on every page load. Root cause was
+[src/lib/plaid/actions.ts] doing
+`optionalProducts = plaidProducts.filter(p => p !== 'transactions')`
+which blindly forwarded everything in `PLAID_PRODUCTS` env to Link,
+including `balance` after we added it for the cron's
+`accountsBalanceGet` call. Fix: pure helper
+[`linkConsentedProducts(envProducts)`](src/lib/plaid/products.ts)
+filters out `balance` (and any future non-link-consentable values
+added to the `NON_LINK_CONSENTABLE` set). 7 regression tests in
+`products.test.ts`. Wired into both `createLinkToken` and
+`createLinkTokenForUpdate`. **When adding a new Plaid product to
+`PLAID_PRODUCTS` env: verify whether it's link-consentable. If not
+(app-level only, like `balance`), add it to `NON_LINK_CONSENTABLE`
+in the same PR as the env change.**
+
+### Don't auto-merge Dependabot major-version bumps (2026-05-11)
+Four dependabot PRs (eslint-config-next 14→16, tailwindcss 3→4,
+typescript 5→6, zod 3→4) auto-merged to main on 2026-05-10 without
+build verification. THREE were incompatible with the Next 14 codebase:
+eslint-config-next 16 requires `eslint@>=9` (we pin `^8.57.1`);
+tailwindcss 4 needs `@tailwindcss/postcss` separate install + a
+`globals.css` rewrite (Tailwind 3 directives no longer work); zod 4
+changed `ZodIssue.path` from `(string|number)[]` to `PropertyKey[]`
+(includes `symbol`) which broke `formatZodIssue` type-checks. Production
+was frozen on a 2-day-old deploy for ~20h; recovery took 4 atomic
+reverts + ~90 minutes. Symptom: every push (including unrelated
+work) failed at Vercel because all branches inherited the broken
+`package.json` from main. **Fix shipped 2026-05-11: `.github/dependabot.yml`
+ignores major bumps for the four packages that bit, and
+`.github/workflows/build.yml` runs `npm run build` on every PR so
+broken bumps fail PR checks instead of merging silently.** When you
+DO want a major bump (e.g., Tailwind 4 after the redesign milestone
+ships), do it as its own intentional sprint with a migration plan,
+not a passive auto-merge.
+
 ---
 
 ## Coding conventions
