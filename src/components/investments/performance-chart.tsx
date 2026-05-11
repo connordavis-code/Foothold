@@ -108,7 +108,7 @@ export function PerformanceChart({ history }: { history: PortfolioHistory }) {
                 <Line
                   type="monotone"
                   dataKey="valueEstimated"
-                  stroke="var(--accent)"
+                  stroke="hsl(var(--accent))"
                   strokeOpacity={0.55}
                   strokeWidth={1.5}
                   strokeDasharray="4 4"
@@ -119,7 +119,7 @@ export function PerformanceChart({ history }: { history: PortfolioHistory }) {
                 <Line
                   type="monotone"
                   dataKey="valueReal"
-                  stroke="var(--accent)"
+                  stroke="hsl(var(--accent))"
                   strokeWidth={1.8}
                   dot={false}
                   connectNulls={false}
@@ -169,7 +169,7 @@ function RangeTabs({
             onClick={() => onChange(r)}
             className={cn(
               'rounded-full px-3 py-1 font-mono text-xs tabular-nums transition-colors',
-              active && 'bg-[--accent]/12 text-[--accent]',
+              active && 'bg-accent/12 text-accent',
               !active && !disabled && 'text-[--text-2] hover:text-[--text]',
               disabled && 'cursor-not-allowed text-[--text-3] opacity-50',
             )}
