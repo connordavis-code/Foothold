@@ -10,3 +10,19 @@ updates:
         update-types:
           - minor
           - patch
+    # Major-version bumps are silenced from auto-PR creation. They've
+    # historically been incompatible with the locked Next.js 14 stack
+    # (eslint-config-next 16 needs eslint 9; tailwindcss 4 is a CSS-
+    # first rewrite; zod 4 changes type-level path APIs; etc.) and the
+    # ~9-hour incident on 2026-05-10 that froze production for 20h
+    # was caused by four major bumps auto-merging into main without
+    # build verification. See CLAUDE.md > Lessons learned > "Don't
+    # auto-merge Dependabot major-version bumps (2026-05-11)".
+    #
+    # When you DO want a major bump, do it as an intentional sprint:
+    # `npm install <package>@latest`, validate locally with
+    # `npm run build`, ship as its own PR with a real review.
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major

@@ -1,0 +1,57 @@
+name: build
+
+# Runs on every PR and on every push to main. Catches dependency
+# incompatibilities (npm ci ERESOLVE) and code-level breakage
+# (npm run build → next build → typecheck + compile + lint) BEFORE
+# they reach Vercel. Added 2026-05-11 in response to the four-PR
+# Dependabot incident that froze production for 20h. See CLAUDE.md
+# > Lessons learned > "Don't auto-merge Dependabot major-version
+# bumps".
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm ci` enforces strict package-lock consistency and fails
+      # ERESOLVE if peer-dep constraints are violated. This alone
+      # would have caught the eslint-config-next 16 vs eslint 8 PR.
+      - name: Install dependencies
+        run: npm ci
+
+      # `next build` runs typecheck, compile, and route-render. Catches
+      # tailwindcss 4 PostCSS errors, typescript breaking changes,
+      # zod API breakage, and anything else that would 500 on Vercel.
+      - name: Build
+        run: npm run build
+        env:
+          # Dummy values that satisfy the zod schema in src/lib/env.ts.
+          # Real values live in Vercel's encrypted env. Build doesn't
+          # make outbound API calls so dummies are sufficient — only
+          # validation has to pass at module load.
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+          AUTH_SECRET: ci-build-32char-secret-padded-out-here
+          AUTH_RESEND_KEY: ci-dummy
+          AUTH_EMAIL_FROM: ci@example.com
+          PLAID_CLIENT_ID: ci-dummy
+          PLAID_SECRET: ci-dummy
+          PLAID_TOKEN_ENCRYPTION_KEY: ci-dummy-32-byte-encryption-key-pad
+          CRON_SECRET: ci-build-32char-cron-secret-padded-out
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+
+      # Vitest runs against pure helpers — no DB / network. Catches
+      # behavior regressions in lib/* code paths.
+      - name: Test
+        run: npx vitest run
