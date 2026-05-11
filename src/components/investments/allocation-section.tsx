@@ -1,18 +1,33 @@
 import type { AllocationSegment, AllocationClass } from '@/lib/investments/allocation';
 import { formatCurrency } from '@/lib/utils';
 
-// Restrained palette per DESIGN.md restraint floor. Single accent-green
-// family graded by class importance; bond uses the only signal hue;
-// cash + other slide into muted text/neutral. Avoids "Christmas tree".
+// Allocation palette. Original attempt used a single accent-green
+// family graded by lightness/alpha — UAT in dark mode showed the steps
+// were too narrow; ETF, Equity, Mutual fund all read as identical
+// greens. Swapped to the editorial chart palette (`--chart-1..6`,
+// three hue families × two lightness levels — see globals.css).
 //
-// `--accent` is bare HSL (`99 21% 45%`) per globals.css, so we wrap it
-// in `hsl(...)` here. Alpha grading uses modern CSS slash syntax —
-// Tailwind's `/70` shorthand only works in className strings, not in
-// inline `style` values.
+// Hue assignments are SEMANTIC, not by-segment-size:
+//   Equity     → chart-1 (foothold-green) — primary asset class, gets
+//                the brand hue.
+//   ETF        → chart-3 (warm copper) — wraps equities but reads as a
+//                distinct vehicle; copper differentiates without
+//                pulling away from the green family entirely.
+//   Mutual fund → chart-2 (cool slate) — third hue family for clean
+//                three-way differentiation.
+//   Bond       → semantic-caution (amber). Bonds aren't a chart-hue
+//                position; they're a signal-hue asset class
+//                (income-yielding, risk-averse — caution reads right).
+//   Cash / Other → muted neutrals. These are residual buckets, not
+//                  asset class positions; low saturation reinforces
+//                  the semantic difference.
+//
+// All HSL refs use `hsl(var(--x))` because the chart tokens are bare
+// HSL per globals.css convention.
 const CLASS_PALETTE: Record<AllocationClass, string> = {
-  Equity: 'var(--accent-strong)',
-  ETF: 'hsl(var(--accent))',
-  'Mutual fund': 'hsl(var(--accent) / 0.7)',
+  Equity: 'hsl(var(--chart-1))',
+  ETF: 'hsl(var(--chart-3))',
+  'Mutual fund': 'hsl(var(--chart-2))',
   'Bond / fixed income': 'var(--semantic-caution)',
   Cash: 'var(--text-3)',
   Other: 'color-mix(in srgb, var(--text-3) 60%, transparent)',
