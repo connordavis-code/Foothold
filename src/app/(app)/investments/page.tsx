@@ -44,7 +44,7 @@ export default async function InvestmentsPage() {
         <InvestmentTxnsTable transactions={txns} />
       </div>
 
-      <MobileInvestments holdings={holdings} transactions={txns} />
+      <MobileInvestments transactions={txns} />
     </div>
   );
 }
