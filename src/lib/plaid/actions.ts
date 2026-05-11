@@ -142,6 +142,7 @@ export async function syncItemAction(
   revalidatePath('/settings');
   revalidatePath('/dashboard');
   revalidatePath('/recurring');
+  revalidatePath('/transactions');
   return result;
 }
 
@@ -184,6 +185,7 @@ export async function syncAllItemsAction(): Promise<{
   revalidatePath('/settings');
   revalidatePath('/dashboard');
   revalidatePath('/recurring');
+  revalidatePath('/transactions');
 
   return {
     synced: results.filter((r) => r.status === 'fulfilled').length,
