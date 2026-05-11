@@ -1,9 +1,13 @@
 import { ArrowRight, Plus, Target } from 'lucide-react';
 import Link from 'next/link';
 import { auth } from '@/auth';
+import { GoalsPageHeader } from '@/components/goals/goals-page-header';
+import { GoalsSummaryStrip } from '@/components/goals/goals-summary-strip';
 import { PaceLeaderboard } from '@/components/goals/pace-leaderboard';
 import { Button } from '@/components/ui/button';
 import { getGoalsWithProgress } from '@/lib/db/queries/goals';
+import { getSourceHealth } from '@/lib/db/queries/health';
+import { formatFreshness } from '@/lib/format/freshness';
 
 export default async function GoalsPage() {
   const session = await auth();
@@ -11,29 +15,33 @@ export default async function GoalsPage() {
 
   // includeInactive so the leaderboard's Archived section can render. The
   // partition step inside <PaceLeaderboard> bucketizes by isActive first.
-  const goals = await getGoalsWithProgress(session.user.id, {
-    includeInactive: true,
-  });
+  const [goals, sourceHealth] = await Promise.all([
+    getGoalsWithProgress(session.user.id, { includeInactive: true }),
+    getSourceHealth(session.user.id),
+  ]);
 
   if (goals.length === 0) {
     return <EmptyState />;
   }
 
+  const active = goals.filter((g) => g.isActive);
+  const freshness = formatFreshness({
+    sources: sourceHealth.map((s) => ({
+      name: s.institutionName ?? 'Source',
+      lastSyncAt: s.lastSuccessfulSyncAt,
+    })),
+  });
+
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-8 sm:py-8">
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1.5">
-          <p className="text-eyebrow">Plan</p>
-          <h1 className="text-xl font-semibold tracking-tight">Goals</h1>
-        </div>
-        <Button asChild size="sm">
-          <Link href="/goals/new">
-            <Plus className="h-4 w-4" />
-            New goal
-          </Link>
-        </Button>
-      </div>
+      <GoalsPageHeader
+        freshnessHeadline={freshness.headline}
+        freshnessCaveat={freshness.caveat}
+      />
+      <p className="text-sm text-[--text-2]">Targets you've committed to.</p>
+      <GoalsSummaryStrip activeGoals={active} />
 
+      {/* T4 swaps PaceLeaderboard for the new card list + archived toggle. */}
       <PaceLeaderboard goals={goals} />
     </div>
   );
