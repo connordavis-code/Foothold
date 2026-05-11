@@ -1,10 +1,12 @@
 import { and, eq, gte, lt, notInArray, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { sourceScopeWhere } from '@/lib/db/source-scope';
 import {
   financialAccounts,
   externalItems,
   transactions,
 } from '@/lib/db/schema';
+import { currentMonthRange } from '@/lib/format/date';
 
 export type MonthlyTransactionTotals = {
   /** Sum of outflow amounts in the current month (Plaid: amount > 0). */
@@ -14,19 +16,6 @@ export type MonthlyTransactionTotals = {
   /** income − spend. Positive when earning > spending this month. */
   net: number;
 };
-
-/** First/last day of the current calendar month as YYYY-MM-DD strings.
- *  Duplicated from dashboard.ts to avoid touching that file in this
- *  commit; consolidate to a shared helper if a 3rd consumer lands. */
-function currentMonthRange() {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  return {
-    start: start.toISOString().slice(0, 10),
-    end: end.toISOString().slice(0, 10),
-  };
-}
 
 /**
  * Month-to-date Spend / Income / Net for the /transactions KPI strip.
@@ -63,7 +52,7 @@ export async function getMonthlyTransactionTotals(
     .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
     .where(
       and(
-        eq(externalItems.userId, userId),
+        sourceScopeWhere(userId),
         gte(transactions.date, start),
         lt(transactions.date, end),
         notInArray(financialAccounts.type, ['investment']),

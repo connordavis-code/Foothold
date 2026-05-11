@@ -1,12 +1,13 @@
 'use server';
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { auth } from '@/auth';
 import { db } from '@/lib/db';
-import { goals } from '@/lib/db/schema';
+import { sourceScopeWhere } from '@/lib/db/source-scope';
+import { externalItems, financialAccounts, goals } from '@/lib/db/schema';
 
 const SavingsInput = z.object({
   type: z.literal('savings'),
@@ -34,6 +35,8 @@ const SpendCapInput = z.object({
 });
 
 const GoalInput = z.discriminatedUnion('type', [SavingsInput, SpendCapInput]);
+const SAVINGS_ACCOUNT_TYPES = new Set(['depository', 'investment']);
+const SPEND_CAP_ACCOUNT_TYPES = new Set(['depository', 'credit']);
 
 export type GoalFormState =
   | { kind: 'idle' }
@@ -78,6 +81,46 @@ function parseFormData(fd: FormData) {
   return null;
 }
 
+async function validateGoalAccountIds(
+  userId: string,
+  type: z.infer<typeof GoalInput>['type'],
+  accountIds: string[] | undefined,
+): Promise<{ accountIds: string[] | null } | { error: string }> {
+  const ids = Array.from(new Set(accountIds ?? []));
+  if (ids.length === 0) return { accountIds: null };
+
+  const rows = await db
+    .select({
+      id: financialAccounts.id,
+      type: financialAccounts.type,
+    })
+    .from(financialAccounts)
+    .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
+    .where(
+      and(
+        sourceScopeWhere(userId),
+        inArray(financialAccounts.id, ids),
+      ),
+    );
+
+  if (rows.length !== ids.length) {
+    return { error: 'One or more selected accounts is no longer available.' };
+  }
+
+  const allowed =
+    type === 'savings' ? SAVINGS_ACCOUNT_TYPES : SPEND_CAP_ACCOUNT_TYPES;
+  if (rows.some((row) => !allowed.has(row.type))) {
+    return {
+      error:
+        type === 'savings'
+          ? 'Savings goals can only use cash or investment accounts.'
+          : 'Spend caps can only use cash or credit accounts.',
+    };
+  }
+
+  return { accountIds: ids };
+}
+
 export async function createGoal(formData: FormData) {
   const session = await auth();
   if (!session?.user) throw new Error('Unauthorized');
@@ -90,21 +133,42 @@ export async function createGoal(formData: FormData) {
 
   const data = parsed.data;
   if (data.type === 'savings') {
+    const accountScope = await validateGoalAccountIds(
+      session.user.id,
+      data.type,
+      data.accountIds,
+    );
+    if ('error' in accountScope) {
+      redirect(`/goals/new?error=${encodeURIComponent(accountScope.error)}`);
+    }
+    if (!accountScope.accountIds) {
+      redirect(
+        `/goals/new?error=${encodeURIComponent('Pick at least one account')}`,
+      );
+    }
     await db.insert(goals).values({
       userId: session.user.id,
       name: data.name,
       type: 'savings',
       targetAmount: data.targetAmount,
-      accountIds: data.accountIds,
+      accountIds: accountScope.accountIds,
       targetDate: data.targetDate,
     });
   } else {
+    const accountScope = await validateGoalAccountIds(
+      session.user.id,
+      data.type,
+      data.accountIds,
+    );
+    if ('error' in accountScope) {
+      redirect(`/goals/new?error=${encodeURIComponent(accountScope.error)}`);
+    }
     await db.insert(goals).values({
       userId: session.user.id,
       name: data.name,
       type: 'spend_cap',
       monthlyAmount: data.monthlyAmount,
-      accountIds: data.accountIds && data.accountIds.length > 0 ? data.accountIds : null,
+      accountIds: accountScope.accountIds,
       categoryFilter:
         data.categoryFilter && data.categoryFilter.length > 0
           ? data.categoryFilter
@@ -134,26 +198,50 @@ export async function updateGoal(goalId: string, formData: FormData) {
 
   const data = parsed.data;
   if (data.type === 'savings') {
+    const accountScope = await validateGoalAccountIds(
+      session.user.id,
+      data.type,
+      data.accountIds,
+    );
+    if ('error' in accountScope) {
+      redirect(
+        `/goals/${goalId}/edit?error=${encodeURIComponent(accountScope.error)}`,
+      );
+    }
+    if (!accountScope.accountIds) {
+      redirect(
+        `/goals/${goalId}/edit?error=${encodeURIComponent('Pick at least one account')}`,
+      );
+    }
     await db
       .update(goals)
       .set({
         name: data.name,
         targetAmount: data.targetAmount,
-        accountIds: data.accountIds,
+        accountIds: accountScope.accountIds,
         targetDate: data.targetDate,
         monthlyAmount: null,
         categoryFilter: null,
         updatedAt: new Date(),
       })
-      .where(eq(goals.id, goalId));
+      .where(and(eq(goals.id, goalId), eq(goals.userId, session.user.id)));
   } else {
+    const accountScope = await validateGoalAccountIds(
+      session.user.id,
+      data.type,
+      data.accountIds,
+    );
+    if ('error' in accountScope) {
+      redirect(
+        `/goals/${goalId}/edit?error=${encodeURIComponent(accountScope.error)}`,
+      );
+    }
     await db
       .update(goals)
       .set({
         name: data.name,
         monthlyAmount: data.monthlyAmount,
-        accountIds:
-          data.accountIds && data.accountIds.length > 0 ? data.accountIds : null,
+        accountIds: accountScope.accountIds,
         categoryFilter:
           data.categoryFilter && data.categoryFilter.length > 0
             ? data.categoryFilter
@@ -162,7 +250,7 @@ export async function updateGoal(goalId: string, formData: FormData) {
         targetDate: null,
         updatedAt: new Date(),
       })
-      .where(eq(goals.id, goalId));
+      .where(and(eq(goals.id, goalId), eq(goals.userId, session.user.id)));
   }
 
   revalidatePath('/goals');

@@ -1,3 +1,48 @@
+export const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function toIsoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+export function startOfUtcDay(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
+
+export function parseIsoDateUtc(yyyymmdd: string): Date {
+  const [y, m, d] = yyyymmdd.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d));
+}
+
+export function endOfThisWeekUtc(today: Date): Date {
+  // Week ends Sunday. JS getUTCDay: 0=Sun, 1=Mon, ..., 6=Sat.
+  // If today is Sunday, end-of-week IS today.
+  const dow = today.getUTCDay();
+  const daysUntilSunday = dow === 0 ? 0 : 7 - dow;
+  const eow = new Date(today);
+  eow.setUTCDate(today.getUTCDate() + daysUntilSunday);
+  return eow;
+}
+
+export function endOfCurrentMonthUtc(today: Date): Date {
+  return new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0));
+}
+
+export function endOfNextMonthUtc(today: Date): Date {
+  return new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 2, 0));
+}
+
+/** First/last day of the current local calendar month as YYYY-MM-DD strings. */
+export function currentMonthRange(now: Date = new Date()) {
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  return {
+    start: toIsoDate(start),
+    end: toIsoDate(end),
+    daysInMonth: Math.round((end.getTime() - start.getTime()) / DAY_MS),
+    dayOfMonth: now.getDate(),
+  };
+}
+
 /**
  * Humanize a YYYY-MM-DD calendar date for mobile section headers.
  *
@@ -12,7 +57,7 @@ export function humanizeDate(
   yyyymmdd: string,
   now: Date = new Date(),
 ): string {
-  const target = new Date(`${yyyymmdd}T00:00:00Z`);
+  const target = parseIsoDateUtc(yyyymmdd);
   if (Number.isNaN(target.getTime())) return yyyymmdd;
 
   const todayUtc = Date.UTC(

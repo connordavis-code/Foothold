@@ -1,5 +1,6 @@
 import { and, eq, gte } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { sourceScopeWhere } from '@/lib/db/source-scope';
 import {
   financialAccounts,
   goals,
@@ -98,7 +99,7 @@ export async function getForecastHistory(userId: string): Promise<ForecastHistor
       })
       .from(financialAccounts)
       .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
-      .where(eq(externalItems.userId, userId)),
+      .where(sourceScopeWhere(userId)),
 
     // Active recurring streams: join externalItems for userId scope
     db
@@ -119,7 +120,7 @@ export async function getForecastHistory(userId: string): Promise<ForecastHistor
       .innerJoin(externalItems, eq(externalItems.id, recurringStreams.itemId))
       .where(
         and(
-          eq(externalItems.userId, userId),
+          sourceScopeWhere(userId),
           eq(recurringStreams.isActive, true),
         ),
       ),
@@ -136,7 +137,7 @@ export async function getForecastHistory(userId: string): Promise<ForecastHistor
       .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
       .where(
         and(
-          eq(externalItems.userId, userId),
+          sourceScopeWhere(userId),
           gte(transactions.date, sinceDate),
         ),
       ),

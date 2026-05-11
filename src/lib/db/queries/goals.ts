@@ -1,11 +1,13 @@
 import { and, eq, gte, inArray, lt, sql, type SQL } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { sourceScopeWhere } from '@/lib/db/source-scope';
 import {
   financialAccounts,
   goals,
   externalItems,
   transactions,
 } from '@/lib/db/schema';
+import { currentMonthRange, DAY_MS, toIsoDate } from '@/lib/format/date';
 
 export type GoalType = 'savings' | 'spend_cap';
 
@@ -61,30 +63,13 @@ export type GoalWithProgress = {
   progress: GoalProgress;
 };
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-/** First/last day of the current calendar month as YYYY-MM-DD strings. */
-function currentMonthRange() {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  return {
-    start: start.toISOString().slice(0, 10),
-    end: end.toISOString().slice(0, 10),
-    daysInMonth: Math.round((end.getTime() - start.getTime()) / DAY_MS),
-    dayOfMonth: now.getDate(),
-  };
-}
-
 /** Net monthly inflow on a set of accounts over the trailing 90 days. */
 async function getMonthlyVelocity(
   userId: string,
   accountIds: string[],
 ): Promise<number> {
   if (accountIds.length === 0) return 0;
-  const ninetyDaysAgo = new Date(Date.now() - 90 * DAY_MS)
-    .toISOString()
-    .slice(0, 10);
+  const ninetyDaysAgo = toIsoDate(new Date(Date.now() - 90 * DAY_MS));
 
   const [row] = await db
     .select({
@@ -98,7 +83,7 @@ async function getMonthlyVelocity(
     .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
     .where(
       and(
-        eq(externalItems.userId, userId),
+        sourceScopeWhere(userId),
         inArray(transactions.accountId, accountIds),
         gte(transactions.date, ninetyDaysAgo),
       ),
@@ -138,7 +123,7 @@ export async function getGoalsWithProgress(
       })
       .from(financialAccounts)
       .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
-      .where(eq(externalItems.userId, userId)),
+      .where(sourceScopeWhere(userId)),
   ]);
 
   const accountById = new Map(accs.map((a) => [a.id, a]));
@@ -151,7 +136,7 @@ export async function getGoalsWithProgress(
 
   for (const g of spendCapGoals) {
     const conds = [
-      eq(externalItems.userId, userId),
+      sourceScopeWhere(userId),
       gte(transactions.date, monthRange.start),
       lt(transactions.date, monthRange.end),
       sql`${transactions.amount}::numeric > 0`,
@@ -217,7 +202,7 @@ export async function getGoalsWithProgress(
         monthsToTarget = remaining / monthlyVelocity;
         const t = new Date();
         t.setMonth(t.getMonth() + Math.ceil(monthsToTarget));
-        projectedDate = t.toISOString().slice(0, 10);
+        projectedDate = toIsoDate(t);
       }
 
       progress = {

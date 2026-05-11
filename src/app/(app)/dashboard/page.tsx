@@ -37,6 +37,7 @@ import {
 } from '@/lib/db/queries/insights';
 import { getUpcomingRecurringOutflows } from '@/lib/db/queries/recurring';
 import { db } from '@/lib/db';
+import { sourceScopeWhere } from '@/lib/db/source-scope';
 import { financialAccounts, externalItems } from '@/lib/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { projectCash } from '@/lib/forecast/engine';
@@ -206,7 +207,7 @@ async function countLiquidAccounts(userId: string): Promise<number> {
     .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
     .where(
       and(
-        eq(externalItems.userId, userId),
+        sourceScopeWhere(userId),
         eq(financialAccounts.type, 'depository'),
       ),
     );

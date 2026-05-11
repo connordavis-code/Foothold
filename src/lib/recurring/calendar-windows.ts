@@ -1,4 +1,11 @@
 import type { RecurringStreamRow } from '@/lib/db/queries/recurring';
+import {
+  endOfCurrentMonthUtc,
+  endOfNextMonthUtc,
+  endOfThisWeekUtc,
+  parseIsoDateUtc,
+  startOfUtcDay,
+} from '@/lib/format/date';
 
 export type CalendarBuckets = {
   thisWeek: RecurringStreamRow[];
@@ -38,7 +45,7 @@ export function groupByDateWindow(
 
   for (const s of streams) {
     if (!s.predictedNextDate) continue;
-    const d = parseUtcDate(s.predictedNextDate);
+    const d = parseIsoDateUtc(s.predictedNextDate);
     if (d < todayUtc) continue;
 
     if (d <= sundayThisWeek) {
@@ -74,7 +81,7 @@ export function pickNextCharge(
   let best: { stream: RecurringStreamRow; dateIso: string } | null = null;
   for (const s of streams) {
     if (!s.predictedNextDate) continue;
-    const d = parseUtcDate(s.predictedNextDate);
+    const d = parseIsoDateUtc(s.predictedNextDate);
     if (d < todayUtc) continue;
     if (!best || s.predictedNextDate < best.dateIso) {
       best = { stream: s, dateIso: s.predictedNextDate };
@@ -97,34 +104,4 @@ export function trendIndicator(stream: RecurringStreamRow): Trend {
   if (last > avg * 1.05) return 'up';
   if (last < avg * 0.95) return 'down';
   return 'flat';
-}
-
-// ---------- internal date helpers (UTC, no timezone drift) ----------
-
-function startOfUtcDay(d: Date): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-}
-
-function parseUtcDate(iso: string): Date {
-  // iso is "YYYY-MM-DD"; UTC-anchor it to avoid local-timezone bucket drift.
-  const [y, m, d] = iso.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d));
-}
-
-function endOfThisWeekUtc(today: Date): Date {
-  // Week ends Sunday. JS getUTCDay: 0=Sun, 1=Mon, ..., 6=Sat.
-  // If today is Sunday, end-of-week IS today.
-  const dow = today.getUTCDay();
-  const daysUntilSunday = dow === 0 ? 0 : 7 - dow;
-  const eow = new Date(today);
-  eow.setUTCDate(today.getUTCDate() + daysUntilSunday);
-  return eow;
-}
-
-function endOfCurrentMonthUtc(today: Date): Date {
-  return new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0));
-}
-
-function endOfNextMonthUtc(today: Date): Date {
-  return new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 2, 0));
 }

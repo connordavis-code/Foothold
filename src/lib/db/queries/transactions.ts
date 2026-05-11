@@ -10,6 +10,7 @@ import {
   sql,
 } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { sourceScopeWhere } from '@/lib/db/source-scope';
 import {
   categories,
   financialAccounts,
@@ -63,7 +64,7 @@ const MAX_PAGE_SIZE = 200;
  * query so they can never get out of sync.
  */
 function buildWhere(userId: string, f: TransactionFilters): SQL {
-  const conds: SQL[] = [eq(externalItems.userId, userId)];
+  const conds: SQL[] = [sourceScopeWhere(userId)];
   if (f.accountId) conds.push(eq(transactions.accountId, f.accountId));
   if (f.category) conds.push(eq(transactions.primaryCategory, f.category));
   if (f.dateFrom) conds.push(gte(transactions.date, f.dateFrom));
@@ -158,7 +159,7 @@ export async function getDistinctCategories(userId: string): Promise<string[]> {
     .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
     .where(
       and(
-        eq(externalItems.userId, userId),
+        sourceScopeWhere(userId),
         sql`${transactions.primaryCategory} IS NOT NULL`,
       ),
     )
@@ -186,6 +187,6 @@ export async function getUserAccounts(userId: string): Promise<AccountOption[]> 
     })
     .from(financialAccounts)
     .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
-    .where(eq(externalItems.userId, userId))
+    .where(sourceScopeWhere(userId))
     .orderBy(financialAccounts.type, financialAccounts.name);
 }

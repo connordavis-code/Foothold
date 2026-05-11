@@ -1,11 +1,13 @@
 import { and, desc, eq, gte, lt, lte, notInArray, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { sourceScopeWhere } from '@/lib/db/source-scope';
 import {
   categories,
   financialAccounts,
   externalItems,
   transactions,
 } from '@/lib/db/schema';
+import { currentMonthRange, toIsoDate } from '@/lib/format/date';
 
 /**
  * Account-type buckets. depository + investment count as assets in net
@@ -14,17 +16,6 @@ import {
  */
 export const ASSET_TYPES = ['depository', 'investment'] as const;
 export const LIABILITY_TYPES = ['credit', 'loan'] as const;
-
-/** First/last day of the current calendar month as YYYY-MM-DD strings. */
-function currentMonthRange() {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  return {
-    start: start.toISOString().slice(0, 10),
-    end: end.toISOString().slice(0, 10),
-  };
-}
 
 export type DashboardSummary = {
   assets: number;
@@ -50,7 +41,7 @@ export async function getDashboardSummary(
     })
     .from(financialAccounts)
     .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
-    .where(eq(externalItems.userId, userId))
+    .where(sourceScopeWhere(userId))
     .groupBy(financialAccounts.type);
 
   let assets = 0;
@@ -77,7 +68,7 @@ export async function getDashboardSummary(
     .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
     .where(
       and(
-        eq(externalItems.userId, userId),
+        sourceScopeWhere(userId),
         gte(transactions.date, start),
         lt(transactions.date, end),
         sql`${transactions.amount}::numeric > 0`,
@@ -91,7 +82,7 @@ export async function getDashboardSummary(
   const [itemCheck] = await db
     .select({ id: externalItems.id })
     .from(externalItems)
-    .where(eq(externalItems.userId, userId))
+    .where(sourceScopeWhere(userId))
     .limit(1);
 
   return {
@@ -150,7 +141,7 @@ export async function getRecentTransactions(
     )
     .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
     .leftJoin(categories, eq(categories.id, transactions.categoryOverrideId))
-    .where(eq(externalItems.userId, userId))
+    .where(sourceScopeWhere(userId))
     .orderBy(desc(transactions.date), desc(transactions.createdAt))
     .limit(limit);
 
@@ -193,7 +184,7 @@ export async function getNetWorthMonthlyDelta(userId: string): Promise<number> {
     .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
     .where(
       and(
-        eq(externalItems.userId, userId),
+        sourceScopeWhere(userId),
         gte(transactions.date, start),
         lt(transactions.date, end),
         notInArray(financialAccounts.type, ['investment']),
@@ -228,7 +219,7 @@ export async function getNetWorthSparkline(
   const today = new Date();
   const startDate = new Date(today);
   startDate.setDate(today.getDate() - (days - 1));
-  const startStr = startDate.toISOString().slice(0, 10);
+  const startStr = toIsoDate(startDate);
 
   // Anchor: signed sum of currentBalance from non-investment accounts
   // that already existed at window start. New accounts are excluded
@@ -241,9 +232,9 @@ export async function getNetWorthSparkline(
     })
     .from(financialAccounts)
     .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
-    .where(
+      .where(
       and(
-        eq(externalItems.userId, userId),
+        sourceScopeWhere(userId),
         notInArray(financialAccounts.type, ['investment']),
         lte(financialAccounts.createdAt, startDate),
       ),
@@ -279,7 +270,7 @@ export async function getNetWorthSparkline(
     .innerJoin(externalItems, eq(externalItems.id, financialAccounts.itemId))
     .where(
       and(
-        eq(externalItems.userId, userId),
+        sourceScopeWhere(userId),
         gte(transactions.date, startStr),
         notInArray(financialAccounts.type, ['investment']),
         // Same scope as the anchor: stable accounts only.
@@ -297,12 +288,10 @@ export async function getNetWorthSparkline(
   // that day's inflows (negative).
   const series: SparklinePoint[] = [];
   let runningNetWorth = anchorNetWorth;
-  const yyyymmdd = (d: Date) => d.toISOString().slice(0, 10);
-
   for (let i = 0; i < days; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() - i);
-    const key = yyyymmdd(d);
+    const key = toIsoDate(d);
     series.push({ date: key, netWorth: runningNetWorth });
     runningNetWorth += dailyDelta.get(key) ?? 0;
   }

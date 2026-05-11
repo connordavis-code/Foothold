@@ -104,66 +104,86 @@ export const verificationTokens = pgTable(
  * [src/lib/crypto.ts]; encrypt at write in the connect handler, decrypt at
  * read in the provider's sync orchestrator (single boundary).
  */
-export const externalItems = pgTable('external_item', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  userId: text('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  // 'plaid' | 'snaptrade'
-  provider: text('provider').notNull(),
-  // Provider's identifier for this connection. Plaid → item_id.
-  // SnapTrade → brokerageAuthorizationId. UUIDs from SnapTrade and
-  // Plaid-namespaced ids from Plaid don't collide.
-  providerItemId: text('provider_item_id').unique().notNull(),
-  // Plaid → ins_*. SnapTrade → brokerage slug. Optional (some providers
-  // don't surface a stable institution id).
-  providerInstitutionId: text('provider_institution_id'),
-  institutionName: text('institution_name'),
-  // Encrypted long-lived credential. See header comment.
-  // Nullable: SnapTrade rows leave this NULL because their per-user
-  // `userSecret` lives on `snaptrade_user` (1:1 with users.id) — the
-  // credential isn't per-connection there. Plaid rows always set it
-  // (per-item access_token).
-  secret: text('secret'),
-  // Per-provider mutable state. Plaid carries `transactionsCursor` here.
-  // Always non-null (defaults to empty object) so readers can index in
-  // without a null guard.
-  providerState: jsonb('provider_state').notNull().default({}),
-  // 'active' | 'login_required' | 'pending_expiration' | 'permission_revoked'
-  // | 'error'. Driven by provider webhooks; surfaces the reauth banner.
-  // Sync dispatcher only runs on 'active' rows.
-  status: text('status').notNull().default('active'),
-  createdAt: ts('created_at').defaultNow().notNull(),
-  lastSyncedAt: ts('last_synced_at'),
-});
+export const externalItems = pgTable(
+  'external_item',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    // 'plaid' | 'snaptrade'
+    provider: text('provider').notNull(),
+    // Provider's identifier for this connection. Plaid → item_id.
+    // SnapTrade → brokerageAuthorizationId. UUIDs from SnapTrade and
+    // Plaid-namespaced ids from Plaid don't collide.
+    providerItemId: text('provider_item_id').unique().notNull(),
+    // Plaid → ins_*. SnapTrade → brokerage slug. Optional (some providers
+    // don't surface a stable institution id).
+    providerInstitutionId: text('provider_institution_id'),
+    institutionName: text('institution_name'),
+    // Encrypted long-lived credential. See header comment.
+    // Nullable: SnapTrade rows leave this NULL because their per-user
+    // `userSecret` lives on `snaptrade_user` (1:1 with users.id) — the
+    // credential isn't per-connection there. Plaid rows always set it
+    // (per-item access_token).
+    secret: text('secret'),
+    // Per-provider mutable state. Plaid carries `transactionsCursor` here.
+    // Always non-null (defaults to empty object) so readers can index in
+    // without a null guard.
+    providerState: jsonb('provider_state').notNull().default({}),
+    // 'active' | 'login_required' | 'pending_expiration' | 'permission_revoked'
+    // | 'error'. Driven by provider webhooks; surfaces the reauth banner.
+    // Sync dispatcher only runs on 'active' rows.
+    status: text('status').notNull().default('active'),
+    createdAt: ts('created_at').defaultNow().notNull(),
+    lastSyncedAt: ts('last_synced_at'),
+  },
+  (item) => ({
+    userStatusIdx: index('external_item_user_status_idx').on(
+      item.userId,
+      item.status,
+    ),
+    userCreatedIdx: index('external_item_user_created_at_idx').on(
+      item.userId,
+      item.createdAt,
+    ),
+  }),
+);
 
 /**
  * Plaid's "accounts" — checking, savings, credit cards, brokerages, 401k, etc.
  * One Plaid item can expose many accounts.
  */
-export const financialAccounts = pgTable('financial_account', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  itemId: text('item_id')
-    .notNull()
-    .references(() => externalItems.id, { onDelete: 'cascade' }),
-  providerAccountId: text('provider_account_id').unique().notNull(),
-  name: text('name').notNull(),
-  officialName: text('official_name'),
-  mask: text('mask'),
-  // depository | credit | investment | loan | other
-  type: text('type').notNull(),
-  // checking | savings | credit_card | brokerage | 401k | ira | etc.
-  subtype: text('subtype'),
-  currentBalance: numeric('current_balance', { precision: 14, scale: 2 }),
-  availableBalance: numeric('available_balance', { precision: 14, scale: 2 }),
-  isoCurrencyCode: text('iso_currency_code').default('USD'),
-  createdAt: ts('created_at').defaultNow().notNull(),
-  updatedAt: ts('updated_at').defaultNow().notNull(),
-});
+export const financialAccounts = pgTable(
+  'financial_account',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    itemId: text('item_id')
+      .notNull()
+      .references(() => externalItems.id, { onDelete: 'cascade' }),
+    providerAccountId: text('provider_account_id').unique().notNull(),
+    name: text('name').notNull(),
+    officialName: text('official_name'),
+    mask: text('mask'),
+    // depository | credit | investment | loan | other
+    type: text('type').notNull(),
+    // checking | savings | credit_card | brokerage | 401k | ira | etc.
+    subtype: text('subtype'),
+    currentBalance: numeric('current_balance', { precision: 14, scale: 2 }),
+    availableBalance: numeric('available_balance', { precision: 14, scale: 2 }),
+    isoCurrencyCode: text('iso_currency_code').default('USD'),
+    createdAt: ts('created_at').defaultNow().notNull(),
+    updatedAt: ts('updated_at').defaultNow().notNull(),
+  },
+  (a) => ({
+    itemIdx: index('financial_account_item_idx').on(a.itemId),
+    itemTypeIdx: index('financial_account_item_type_idx').on(a.itemId, a.type),
+  }),
+);
 
 /**
  * User-defined categories (overlay on top of Plaid PFC). System categories
@@ -226,6 +246,10 @@ export const transactions = pgTable(
   },
   (t) => ({
     accountIdx: index('transaction_account_idx').on(t.accountId),
+    accountDateIdx: index('transaction_account_date_idx').on(
+      t.accountId,
+      t.date,
+    ),
     dateIdx: index('transaction_date_idx').on(t.date),
   }),
 );
@@ -311,35 +335,45 @@ export const holdings = pgTable(
  * Type-specific columns are nullable; the page-level form decides which
  * to render based on `type`.
  */
-export const goals = pgTable('goal', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  userId: text('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  // 'savings' | 'spend_cap'
-  type: text('type').notNull(),
-  // For savings goals: dollar amount to accumulate
-  targetAmount: numeric('target_amount', { precision: 14, scale: 2 }),
-  // For spend_cap goals: monthly limit
-  monthlyAmount: numeric('monthly_amount', { precision: 14, scale: 2 }),
-  // For savings: which financial_account.id values count toward progress.
-  // For spend_cap: optional account scope. Stored as text[]; we don't FK
-  // these at the row level because Postgres can't FK array elements.
-  // Stale ids are filtered out when computing progress.
-  accountIds: text('account_ids').array(),
-  // For spend_cap: optional Plaid PFC primary_category filter (e.g.,
-  // ['FOOD_AND_DRINK', 'ENTERTAINMENT'] for a "fun money" cap). NULL
-  // means "all categories".
-  categoryFilter: text('category_filter').array(),
-  // Optional "by when" date for savings goals
-  targetDate: date('target_date'),
-  isActive: boolean('is_active').notNull().default(true),
-  createdAt: ts('created_at').defaultNow().notNull(),
-  updatedAt: ts('updated_at').defaultNow().notNull(),
-});
+export const goals = pgTable(
+  'goal',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    // 'savings' | 'spend_cap'
+    type: text('type').notNull(),
+    // For savings goals: dollar amount to accumulate
+    targetAmount: numeric('target_amount', { precision: 14, scale: 2 }),
+    // For spend_cap goals: monthly limit
+    monthlyAmount: numeric('monthly_amount', { precision: 14, scale: 2 }),
+    // For savings: which financial_account.id values count toward progress.
+    // For spend_cap: optional account scope. Stored as text[]; we don't FK
+    // these at the row level because Postgres can't FK array elements.
+    // Stale ids are filtered out when computing progress.
+    accountIds: text('account_ids').array(),
+    // For spend_cap: optional Plaid PFC primary_category filter (e.g.,
+    // ['FOOD_AND_DRINK', 'ENTERTAINMENT'] for a "fun money" cap). NULL
+    // means "all categories".
+    categoryFilter: text('category_filter').array(),
+    // Optional "by when" date for savings goals
+    targetDate: date('target_date'),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: ts('created_at').defaultNow().notNull(),
+    updatedAt: ts('updated_at').defaultNow().notNull(),
+  },
+  (g) => ({
+    userActiveCreatedIdx: index('goal_user_active_created_at_idx').on(
+      g.userId,
+      g.isActive,
+      g.createdAt,
+    ),
+  }),
+);
 
 /**
  * Recurring transaction streams detected by Plaid (subscriptions, payroll,
@@ -352,38 +386,50 @@ export const goals = pgTable('goal', {
  * `status` reflects Plaid's confidence: MATURE (proven recurring),
  * EARLY_DETECTION (likely but not confirmed), TOMBSTONED (cancelled).
  */
-export const recurringStreams = pgTable('recurring_stream', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  itemId: text('item_id')
-    .notNull()
-    .references(() => externalItems.id, { onDelete: 'cascade' }),
-  accountId: text('account_id')
-    .notNull()
-    .references(() => financialAccounts.id, { onDelete: 'cascade' }),
-  plaidStreamId: text('plaid_stream_id').unique().notNull(),
-  // 'inflow' | 'outflow'
-  direction: text('direction').notNull(),
-  description: text('description'),
-  merchantName: text('merchant_name'),
-  // WEEKLY | BIWEEKLY | SEMI_MONTHLY | MONTHLY | ANNUALLY | UNKNOWN
-  frequency: text('frequency').notNull(),
-  // Plaid: positive = money OUT (outflow stream's natural sign).
-  averageAmount: numeric('average_amount', { precision: 14, scale: 2 }),
-  lastAmount: numeric('last_amount', { precision: 14, scale: 2 }),
-  firstDate: date('first_date'),
-  lastDate: date('last_date'),
-  predictedNextDate: date('predicted_next_date'),
-  isActive: boolean('is_active').notNull().default(true),
-  // MATURE | EARLY_DETECTION | TOMBSTONED
-  status: text('status').notNull(),
-  primaryCategory: text('primary_category'),
-  detailedCategory: text('detailed_category'),
-  isoCurrencyCode: text('iso_currency_code').default('USD'),
-  createdAt: ts('created_at').defaultNow().notNull(),
-  updatedAt: ts('updated_at').defaultNow().notNull(),
-});
+export const recurringStreams = pgTable(
+  'recurring_stream',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    itemId: text('item_id')
+      .notNull()
+      .references(() => externalItems.id, { onDelete: 'cascade' }),
+    accountId: text('account_id')
+      .notNull()
+      .references(() => financialAccounts.id, { onDelete: 'cascade' }),
+    plaidStreamId: text('plaid_stream_id').unique().notNull(),
+    // 'inflow' | 'outflow'
+    direction: text('direction').notNull(),
+    description: text('description'),
+    merchantName: text('merchant_name'),
+    // WEEKLY | BIWEEKLY | SEMI_MONTHLY | MONTHLY | ANNUALLY | UNKNOWN
+    frequency: text('frequency').notNull(),
+    // Plaid: positive = money OUT (outflow stream's natural sign).
+    averageAmount: numeric('average_amount', { precision: 14, scale: 2 }),
+    lastAmount: numeric('last_amount', { precision: 14, scale: 2 }),
+    firstDate: date('first_date'),
+    lastDate: date('last_date'),
+    predictedNextDate: date('predicted_next_date'),
+    isActive: boolean('is_active').notNull().default(true),
+    // MATURE | EARLY_DETECTION | TOMBSTONED
+    status: text('status').notNull(),
+    primaryCategory: text('primary_category'),
+    detailedCategory: text('detailed_category'),
+    isoCurrencyCode: text('iso_currency_code').default('USD'),
+    createdAt: ts('created_at').defaultNow().notNull(),
+    updatedAt: ts('updated_at').defaultNow().notNull(),
+  },
+  (s) => ({
+    itemIdx: index('recurring_stream_item_idx').on(s.itemId),
+    accountIdx: index('recurring_stream_account_idx').on(s.accountId),
+    itemActiveNextDateIdx: index('recurring_stream_item_active_next_date_idx').on(
+      s.itemId,
+      s.isActive,
+      s.predictedNextDate,
+    ),
+  }),
+);
 
 /**
  * Buys, sells, dividends, fees, transfers — anything that hits an investment
@@ -503,6 +549,12 @@ export const errorLog = pgTable(
     // DESC LIMIT 1 without a separate sort.
     itemOpOccurredIdx: index('error_log_item_op_occurred_idx').on(
       e.externalItemId,
+      e.op,
+      e.occurredAt,
+    ),
+    itemLevelOpOccurredIdx: index('error_log_item_level_op_occurred_idx').on(
+      e.externalItemId,
+      e.level,
       e.op,
       e.occurredAt,
     ),

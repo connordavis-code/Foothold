@@ -1,5 +1,6 @@
-import { and, desc, eq, like, sql } from 'drizzle-orm';
+import { and, eq, inArray, like, or, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { sourceScopeWhere } from '@/lib/db/source-scope';
 import { errorLog, externalItems, financialAccounts } from '@/lib/db/schema';
 import {
   type CapabilityClassification,
@@ -437,158 +438,135 @@ export function aggregateTopLevelTimestamps(
   };
 }
 
-async function loadOpTimestamps(itemId: string): Promise<RawOpTimestamps> {
-  const [
-    balSucc,
-    balFail,
-    nightSucc,
-    nightFail,
-    stActSucc,
-    stActFail,
-    stPosSucc,
-    stPosFail,
-    dispatchFail,
-    stActUnsup,
-  ] = await Promise.all([
-    db
-      .select({ at: errorLog.occurredAt })
-      .from(errorLog)
-      .where(
-        and(
-          eq(errorLog.externalItemId, itemId),
-          eq(errorLog.op, 'cron.balance_refresh.item'),
-          eq(errorLog.level, 'info'),
-        ),
-      )
-      .orderBy(desc(errorLog.occurredAt))
-      .limit(1),
-    db
-      .select({ at: errorLog.occurredAt, message: errorLog.message })
-      .from(errorLog)
-      .where(
-        and(
-          eq(errorLog.externalItemId, itemId),
-          like(errorLog.op, 'cron.balance_refresh%'),
-          eq(errorLog.level, 'error'),
-        ),
-      )
-      .orderBy(desc(errorLog.occurredAt))
-      .limit(1),
-    db
-      .select({ at: errorLog.occurredAt })
-      .from(errorLog)
-      .where(
-        and(
-          eq(errorLog.externalItemId, itemId),
-          eq(errorLog.op, 'cron.nightly_sync.item'),
-          eq(errorLog.level, 'info'),
-        ),
-      )
-      .orderBy(desc(errorLog.occurredAt))
-      .limit(1),
-    db
-      .select({ at: errorLog.occurredAt, message: errorLog.message })
-      .from(errorLog)
-      .where(
-        and(
-          eq(errorLog.externalItemId, itemId),
-          like(errorLog.op, 'cron.nightly_sync%'),
-          eq(errorLog.level, 'error'),
-        ),
-      )
-      .orderBy(desc(errorLog.occurredAt))
-      .limit(1),
-    db
-      .select({ at: errorLog.occurredAt })
-      .from(errorLog)
-      .where(
-        and(
-          eq(errorLog.externalItemId, itemId),
-          eq(errorLog.op, 'snaptrade.sync.activities'),
-          eq(errorLog.level, 'info'),
-        ),
-      )
-      .orderBy(desc(errorLog.occurredAt))
-      .limit(1),
-    db
-      .select({ at: errorLog.occurredAt, message: errorLog.message })
-      .from(errorLog)
-      .where(
-        and(
-          eq(errorLog.externalItemId, itemId),
-          eq(errorLog.op, 'snaptrade.sync.activities'),
-          eq(errorLog.level, 'error'),
-        ),
-      )
-      .orderBy(desc(errorLog.occurredAt))
-      .limit(1),
-    db
-      .select({ at: errorLog.occurredAt })
-      .from(errorLog)
-      .where(
-        and(
-          eq(errorLog.externalItemId, itemId),
-          eq(errorLog.op, 'snaptrade.sync.positions'),
-          eq(errorLog.level, 'info'),
-        ),
-      )
-      .orderBy(desc(errorLog.occurredAt))
-      .limit(1),
-    db
-      .select({ at: errorLog.occurredAt, message: errorLog.message })
-      .from(errorLog)
-      .where(
-        and(
-          eq(errorLog.externalItemId, itemId),
-          eq(errorLog.op, 'snaptrade.sync.positions'),
-          eq(errorLog.level, 'error'),
-        ),
-      )
-      .orderBy(desc(errorLog.occurredAt))
-      .limit(1),
-    db
-      .select({ at: errorLog.occurredAt, message: errorLog.message })
-      .from(errorLog)
-      .where(
-        and(
-          eq(errorLog.externalItemId, itemId),
-          eq(errorLog.op, 'sync.dispatcher'),
-          eq(errorLog.level, 'error'),
-        ),
-      )
-      .orderBy(desc(errorLog.occurredAt))
-      .limit(1),
-    db
-      .select({ at: errorLog.occurredAt })
-      .from(errorLog)
-      .where(
-        and(
-          eq(errorLog.externalItemId, itemId),
-          eq(errorLog.op, 'snaptrade.sync.activities.unsupported'),
-          eq(errorLog.level, 'info'),
-        ),
-      )
-      .orderBy(desc(errorLog.occurredAt))
-      .limit(1),
-  ]);
-
+function emptyOpTimestamps(): RawOpTimestamps {
   return {
-    balanceSuccessAt: balSucc[0]?.at ?? null,
-    balanceFailureAt: balFail[0]?.at ?? null,
-    balanceFailureMessage: balFail[0]?.message ?? null,
-    nightlySuccessAt: nightSucc[0]?.at ?? null,
-    nightlyFailureAt: nightFail[0]?.at ?? null,
-    nightlyFailureMessage: nightFail[0]?.message ?? null,
-    snaptradeActivitiesSuccessAt: stActSucc[0]?.at ?? null,
-    snaptradePositionsSuccessAt: stPosSucc[0]?.at ?? null,
-    snaptradeActivitiesFailureAt: stActFail[0]?.at ?? null,
-    snaptradeActivitiesFailureMessage: stActFail[0]?.message ?? null,
-    snaptradePositionsFailureAt: stPosFail[0]?.at ?? null,
-    snaptradePositionsFailureMessage: stPosFail[0]?.message ?? null,
-    dispatcherFailureAt: dispatchFail[0]?.at ?? null,
-    dispatcherFailureMessage: dispatchFail[0]?.message ?? null,
-    snaptradeActivitiesUnsupportedAt: stActUnsup[0]?.at ?? null,
+    balanceSuccessAt: null,
+    balanceFailureAt: null,
+    balanceFailureMessage: null,
+    nightlySuccessAt: null,
+    nightlyFailureAt: null,
+    nightlyFailureMessage: null,
+    snaptradeActivitiesSuccessAt: null,
+    snaptradePositionsSuccessAt: null,
+    snaptradeActivitiesFailureAt: null,
+    snaptradeActivitiesFailureMessage: null,
+    snaptradePositionsFailureAt: null,
+    snaptradePositionsFailureMessage: null,
+    dispatcherFailureAt: null,
+    dispatcherFailureMessage: null,
+    snaptradeActivitiesUnsupportedAt: null,
   };
+}
+
+function newer(candidate: Date, current: Date | null): boolean {
+  return current === null || candidate.getTime() > current.getTime();
+}
+
+async function loadOpTimestampsByItem(
+  itemIds: string[],
+): Promise<Map<string, RawOpTimestamps>> {
+  const byItem = new Map(itemIds.map((id) => [id, emptyOpTimestamps()]));
+  if (itemIds.length === 0) return byItem;
+
+  const rows = await db
+    .select({
+      itemId: errorLog.externalItemId,
+      op: errorLog.op,
+      level: errorLog.level,
+      at: errorLog.occurredAt,
+      message: errorLog.message,
+    })
+    .from(errorLog)
+    .where(
+      and(
+        inArray(errorLog.externalItemId, itemIds),
+        or(
+          eq(errorLog.op, 'cron.balance_refresh.item'),
+          like(errorLog.op, 'cron.balance_refresh%'),
+          eq(errorLog.op, 'cron.nightly_sync.item'),
+          like(errorLog.op, 'cron.nightly_sync%'),
+          eq(errorLog.op, 'snaptrade.sync.activities'),
+          eq(errorLog.op, 'snaptrade.sync.positions'),
+          eq(errorLog.op, 'snaptrade.sync.activities.unsupported'),
+          eq(errorLog.op, 'sync.dispatcher'),
+        )!,
+      ),
+    );
+
+  for (const row of rows) {
+    if (!row.itemId) continue;
+    const out = byItem.get(row.itemId);
+    if (!out) continue;
+
+    if (
+      row.op === 'cron.balance_refresh.item' &&
+      row.level === 'info' &&
+      newer(row.at, out.balanceSuccessAt)
+    ) {
+      out.balanceSuccessAt = row.at;
+    } else if (
+      row.op.startsWith('cron.balance_refresh') &&
+      row.level === 'error' &&
+      newer(row.at, out.balanceFailureAt)
+    ) {
+      out.balanceFailureAt = row.at;
+      out.balanceFailureMessage = row.message;
+    } else if (
+      row.op === 'cron.nightly_sync.item' &&
+      row.level === 'info' &&
+      newer(row.at, out.nightlySuccessAt)
+    ) {
+      out.nightlySuccessAt = row.at;
+    } else if (
+      row.op.startsWith('cron.nightly_sync') &&
+      row.level === 'error' &&
+      newer(row.at, out.nightlyFailureAt)
+    ) {
+      out.nightlyFailureAt = row.at;
+      out.nightlyFailureMessage = row.message;
+    } else if (
+      row.op === 'snaptrade.sync.activities' &&
+      row.level === 'info' &&
+      newer(row.at, out.snaptradeActivitiesSuccessAt)
+    ) {
+      out.snaptradeActivitiesSuccessAt = row.at;
+    } else if (
+      row.op === 'snaptrade.sync.activities' &&
+      row.level === 'error' &&
+      newer(row.at, out.snaptradeActivitiesFailureAt)
+    ) {
+      out.snaptradeActivitiesFailureAt = row.at;
+      out.snaptradeActivitiesFailureMessage = row.message;
+    } else if (
+      row.op === 'snaptrade.sync.positions' &&
+      row.level === 'info' &&
+      newer(row.at, out.snaptradePositionsSuccessAt)
+    ) {
+      out.snaptradePositionsSuccessAt = row.at;
+    } else if (
+      row.op === 'snaptrade.sync.positions' &&
+      row.level === 'error' &&
+      newer(row.at, out.snaptradePositionsFailureAt)
+    ) {
+      out.snaptradePositionsFailureAt = row.at;
+      out.snaptradePositionsFailureMessage = row.message;
+    } else if (
+      row.op === 'sync.dispatcher' &&
+      row.level === 'error' &&
+      newer(row.at, out.dispatcherFailureAt)
+    ) {
+      out.dispatcherFailureAt = row.at;
+      out.dispatcherFailureMessage = row.message;
+    } else if (
+      row.op === 'snaptrade.sync.activities.unsupported' &&
+      row.level === 'info' &&
+      newer(row.at, out.snaptradeActivitiesUnsupportedAt)
+    ) {
+      out.snaptradeActivitiesUnsupportedAt = row.at;
+    }
+  }
+
+  return byItem;
 }
 
 /**
@@ -597,10 +575,9 @@ async function loadOpTimestamps(itemId: string): Promise<RawOpTimestamps> {
  * stable across reloads.
  *
  * Query shape: 1 typed Drizzle query for items+aggregated account
- * types, then 6 parallel `error_log` lookups per item (success+failure
- * for balance + nightly, plus snaptrade per-capability error ops).
- * Composite index on `error_log(external_item_id, op, occurred_at)`
- * keeps each lookup at O(log N) index seek + LIMIT 1.
+ * types, then 1 batched `error_log` read across those item ids and the
+ * relevant op families. Composite indexes on external item scope and
+ * error-log item/op/level keep both sides bounded.
  *
  * No secret material is exposed — `external_item.secret` is never
  * selected.
@@ -623,7 +600,7 @@ export async function getSourceHealth(userId: string): Promise<SourceHealth[]> {
       financialAccounts,
       eq(financialAccounts.itemId, externalItems.id),
     )
-    .where(eq(externalItems.userId, userId))
+    .where(sourceScopeWhere(userId, 'all'))
     .groupBy(
       externalItems.id,
       externalItems.provider,
@@ -635,50 +612,49 @@ export async function getSourceHealth(userId: string): Promise<SourceHealth[]> {
     .orderBy(externalItems.createdAt);
 
   const now = new Date();
+  const opsByItem = await loadOpTimestampsByItem(items.map((item) => item.id));
 
-  return Promise.all(
-    items.map(async (item): Promise<SourceHealth> => {
-      const provider = item.provider as Provider;
-      const accountTypes = item.accountTypes ?? [];
-      const ops = await loadOpTimestamps(item.id);
-      // SnapTrade activities-unsupported signal is data-driven — must
-      // load ops BEFORE inferring capabilities, so a Fidelity-IRA item
-      // resolves to investments-only and the trust strip stops alarming
-      // on a permanent upstream limitation.
-      const transactionsUnsupported = isSnaptradeTransactionsUnsupported(ops);
-      const applicable = inferCapabilities(provider, accountTypes, {
-        transactionsUnsupported,
-      });
-      const resolved = resolveCapabilityTimestamps(
-        provider,
-        item.lastSyncedAt,
-        ops,
-      );
-      const capabilities = buildCapabilityStates(applicable, resolved);
-      const verdict = classifyItemHealth({
-        provider,
-        itemStatus: item.status,
-        capabilities,
-        now,
-      });
-      const aggregate = aggregateTopLevelTimestamps(resolved);
+  return items.map((item): SourceHealth => {
+    const provider = item.provider as Provider;
+    const accountTypes = item.accountTypes ?? [];
+    const ops = opsByItem.get(item.id) ?? emptyOpTimestamps();
+    // SnapTrade activities-unsupported signal is data-driven — must
+    // load ops BEFORE inferring capabilities, so a Fidelity-IRA item
+    // resolves to investments-only and the trust strip stops alarming
+    // on a permanent upstream limitation.
+    const transactionsUnsupported = isSnaptradeTransactionsUnsupported(ops);
+    const applicable = inferCapabilities(provider, accountTypes, {
+      transactionsUnsupported,
+    });
+    const resolved = resolveCapabilityTimestamps(
+      provider,
+      item.lastSyncedAt,
+      ops,
+    );
+    const capabilities = buildCapabilityStates(applicable, resolved);
+    const verdict = classifyItemHealth({
+      provider,
+      itemStatus: item.status,
+      capabilities,
+      now,
+    });
+    const aggregate = aggregateTopLevelTimestamps(resolved);
 
-      return {
-        itemId: item.id,
-        provider,
-        institutionName: item.institutionName,
-        state: verdict.state,
-        reason: verdict.reason,
-        requiresUserAction: verdict.requiresUserAction,
-        capabilities: applicable,
-        byCapability: verdict.byCapability,
-        lastSuccessfulSyncAt: aggregate.lastSuccessfulSyncAt,
-        lastBalanceRefreshAt: resolved.balances.lastSuccessAt,
-        lastTransactionSyncAt: resolved.transactions.lastSuccessAt,
-        lastInvestmentSyncAt: resolved.investments.lastSuccessAt,
-        lastFailureAt: aggregate.lastFailureAt,
-        lastFailureSummary: aggregate.lastFailureSummary,
-      };
-    }),
-  );
+    return {
+      itemId: item.id,
+      provider,
+      institutionName: item.institutionName,
+      state: verdict.state,
+      reason: verdict.reason,
+      requiresUserAction: verdict.requiresUserAction,
+      capabilities: applicable,
+      byCapability: verdict.byCapability,
+      lastSuccessfulSyncAt: aggregate.lastSuccessfulSyncAt,
+      lastBalanceRefreshAt: resolved.balances.lastSuccessAt,
+      lastTransactionSyncAt: resolved.transactions.lastSuccessAt,
+      lastInvestmentSyncAt: resolved.investments.lastSuccessAt,
+      lastFailureAt: aggregate.lastFailureAt,
+      lastFailureSummary: aggregate.lastFailureSummary,
+    };
+  });
 }
