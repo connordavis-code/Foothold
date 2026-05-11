@@ -221,6 +221,7 @@ export async function syncSnaptradeBrokeragesAction(): Promise<{
   if (newItemIds.length > 0 || decision.toRepair.length > 0) {
     revalidatePath('/settings');
     revalidatePath('/dashboard');
+    revalidatePath('/transactions');
   }
 
   return {

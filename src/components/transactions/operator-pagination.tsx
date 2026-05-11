@@ -23,7 +23,7 @@ export function OperatorPagination({
 }: Props) {
   if (totalPages <= 1) {
     return (
-      <p className="text-xs text-muted-foreground tabular-nums">
+      <p className="text-xs text-[--text-2] tabular-nums">
         {totalCount.toLocaleString()}{' '}
         {totalCount === 1 ? 'transaction' : 'transactions'}
       </p>
@@ -32,7 +32,7 @@ export function OperatorPagination({
 
   return (
     <div className="flex items-center justify-between gap-3">
-      <p className="text-xs text-muted-foreground tabular-nums">
+      <p className="text-xs text-[--text-2] tabular-nums">
         Page {page} of {totalPages} · {totalCount.toLocaleString()} total
       </p>
       <div className="flex items-center gap-2">
@@ -45,7 +45,7 @@ export function OperatorPagination({
           <ChevronLeft className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Previous</span>
         </Button>
-        <span className="hidden font-mono text-[11px] text-muted-foreground sm:inline">
+        <span className="hidden font-mono text-[11px] text-[--text-3] sm:inline">
           ⌘↑ / ⌘↓
         </span>
         <Button

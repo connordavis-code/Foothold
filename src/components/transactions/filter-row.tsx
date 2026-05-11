@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 export const SEARCH_INPUT_ID = 'tx-search';
 
 const CHIP_BASE = cn(
-  'inline-flex h-8 items-center rounded-card border border-border bg-surface-elevated px-3 text-sm',
+  'inline-flex h-9 items-center rounded-pill border border-[--border] bg-[--surface] px-3 text-sm text-[--text]',
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
   'transition-colors duration-fast ease-out-quart',
 );
@@ -82,13 +82,13 @@ export function FilterRow({
           onChange={(e) => setSearch(e.target.value)}
           className={cn(
             CHIP_BASE,
-            'h-9 w-full font-mono placeholder:font-sans placeholder:text-muted-foreground',
+            'h-9 w-full font-mono placeholder:font-sans placeholder:text-[--text-3]',
           )}
         />
       </div>
 
       <select
-        className={cn(CHIP_BASE, 'h-9 cursor-pointer text-muted-foreground')}
+        className={cn(CHIP_BASE, 'h-9 cursor-pointer text-[--text-2]')}
         value={params.get('account') ?? ''}
         onChange={(e) => setParam('account', e.target.value || undefined)}
         aria-label="Account"
@@ -103,7 +103,7 @@ export function FilterRow({
       </select>
 
       <select
-        className={cn(CHIP_BASE, 'h-9 cursor-pointer text-muted-foreground')}
+        className={cn(CHIP_BASE, 'h-9 cursor-pointer text-[--text-2]')}
         value={params.get('category') ?? ''}
         onChange={(e) => setParam('category', e.target.value || undefined)}
         aria-label="Category"
@@ -118,14 +118,14 @@ export function FilterRow({
 
       <input
         type="date"
-        className={cn(CHIP_BASE, 'h-9 cursor-pointer text-muted-foreground')}
+        className={cn(CHIP_BASE, 'h-9 cursor-pointer text-[--text-2]')}
         value={params.get('from') ?? ''}
         onChange={(e) => setParam('from', e.target.value || undefined)}
         aria-label="From date"
       />
       <input
         type="date"
-        className={cn(CHIP_BASE, 'h-9 cursor-pointer text-muted-foreground')}
+        className={cn(CHIP_BASE, 'h-9 cursor-pointer text-[--text-2]')}
         value={params.get('to') ?? ''}
         onChange={(e) => setParam('to', e.target.value || undefined)}
         aria-label="To date"
@@ -140,7 +140,7 @@ export function FilterRow({
           }}
           className={cn(
             CHIP_BASE,
-            'h-9 gap-1 px-2 text-muted-foreground hover:text-foreground',
+            'h-9 gap-1 px-2 text-[--text-2] hover:text-[--text]',
           )}
         >
           <X className="h-3.5 w-3.5" />

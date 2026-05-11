@@ -141,12 +141,12 @@ export function BulkActionBar({
     <div
       role="region"
       aria-label="Bulk actions"
-      className="sticky top-14 z-20 -mx-4 mb-1 flex items-center gap-3 border-b border-border bg-surface-elevated/95 px-4 py-2 backdrop-blur sm:-mx-8 sm:px-8"
+      className="sticky top-14 z-20 -mx-4 mb-1 flex items-center gap-3 border-b border-[--border] bg-[--surface]/95 px-4 py-2 backdrop-blur sm:-mx-8 sm:px-8"
     >
-      <span className="font-mono text-xs tabular-nums text-foreground">
+      <span className="font-mono text-xs tabular-nums text-[--text]">
         {selectedCount.toLocaleString()} selected
       </span>
-      <span className="h-4 w-px bg-border" />
+      <span className="h-4 w-px bg-[--border]" />
       <CategoryPicker
         options={categoryOptions}
         onApply={applyCategory}
@@ -158,7 +158,7 @@ export function BulkActionBar({
         type="button"
         onClick={onClear}
         disabled={isPending}
-        className="ml-auto inline-flex items-center gap-1 rounded-card px-2 py-1 text-xs text-muted-foreground transition-colors duration-fast ease-out-quart hover:text-foreground disabled:opacity-60"
+        className="ml-auto inline-flex items-center gap-1 rounded-card px-2 py-1 text-xs text-[--text-2] transition-colors duration-fast ease-out-quart hover:text-[--text] disabled:opacity-60"
       >
         <X className="h-3.5 w-3.5" />
         Clear

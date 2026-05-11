@@ -12,6 +12,7 @@ import {
   type AccountOption,
   type TransactionListRow,
 } from '@/lib/db/queries/transactions';
+import type { DayGroup } from '@/lib/transactions/group-by-date';
 import { BulkActionBar } from './bulk-action-bar';
 import { FilterRow, SEARCH_INPUT_ID } from './filter-row';
 import { OperatorPagination } from './operator-pagination';
@@ -19,6 +20,7 @@ import { OperatorTable } from './operator-table';
 
 type Props = {
   rows: TransactionListRow[];
+  groups: DayGroup[];
   accounts: AccountOption[];
   categories: string[];
   categoryOptions: CategoryOption[];
@@ -38,9 +40,14 @@ type Props = {
  * Selection state is intentionally NOT persisted to URL — it's
  * ephemeral and shouldn't be shareable. Filters belong in URL,
  * selection doesn't.
+ *
+ * `groups` is the date-grouped presentational view of `rows` (T1's
+ * groupTransactionsByDate) — passed straight through to OperatorTable.
+ * Selection math operates on flat `rows`, NOT on groups.
  */
 export function OperatorShell({
   rows,
+  groups,
   accounts,
   categories,
   categoryOptions,
@@ -190,6 +197,7 @@ export function OperatorShell({
       />
       <OperatorTable
         rows={rows}
+        groups={groups}
         selectedIndex={selectedIndex}
         selectedIds={selectedIds}
         onToggle={onToggle}

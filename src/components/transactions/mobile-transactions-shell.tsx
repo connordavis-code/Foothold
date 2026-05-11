@@ -2,17 +2,24 @@
 
 import { Search } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from 'react';
 import type { CategoryOption } from '@/lib/db/queries/categories';
 import {
   type AccountOption,
   type TransactionListRow,
 } from '@/lib/db/queries/transactions';
-import { humanizeCategory } from '@/lib/format/category';
+import { groupTransactionsByDate } from '@/lib/transactions/group-by-date';
 import { loadMoreTransactionsAction } from '@/lib/transactions/actions';
 import { cn, formatCurrency } from '@/lib/utils';
 import { MobileFilterSheet } from '@/components/operator/mobile-filter-sheet';
-import { MobileList } from '@/components/operator/mobile-list';
+import { CategoryChip } from './category-chip';
 import { TransactionDetailSheet } from './transaction-detail-sheet';
 
 /**
@@ -20,16 +27,19 @@ import { TransactionDetailSheet } from './transaction-detail-sheet';
  * (desktop) under a CSS swap on the page. Owns:
  *
  *  - Search input (debounced URL push), Filters button (active count)
- *  - <MobileList> render with date sections
+ *  - Date-grouped row rendering via groupTransactionsByDate (T1) —
+ *    same source of truth as desktop. Group re-computation runs on
+ *    every render of allRows so appended pages merge cleanly into
+ *    the existing groups (rather than re-grouping just the appended
+ *    chunk, which would visually duplicate group headers at page
+ *    boundaries).
  *  - <TransactionDetailSheet> half-sheet edit on row tap
  *  - Infinite scroll: IntersectionObserver sentinel triggers
- *    loadMoreTransactionsAction; appended rows live in local state
- *    and merge with the initial server render
+ *    loadMoreTransactionsAction; appended rows live in local state.
  *
- * Reset of appended rows happens whenever the underlying initialRows
- * changes (route navigation refreshes the SSR render under the same
- * filter), so re-categorize → router.refresh() doesn't leave stale
- * appended rows from the prior fetch.
+ * Reset of appended rows happens whenever initialRows changes (route
+ * navigation refreshes the SSR render under the same filter), so
+ * re-categorize → router.refresh() doesn't leave stale appended rows.
  */
 export function MobileTransactionsShell({
   initialRows,
@@ -69,15 +79,12 @@ export function MobileTransactionsShell({
   const [active, setActive] = useState<TransactionListRow | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  // SSR render (initialRows) changes whenever filters / refresh happen.
-  // Drop appended rows so we don't show stale or duplicated entries.
   useEffect(() => {
     setAppended([]);
     setNextPage(initialPage + 1);
     setHasMore(initialPage < totalPages);
   }, [initialRows, initialPage, totalPages]);
 
-  // Debounced search input → URL.
   useEffect(() => {
     const current = params.get('q') ?? '';
     if (search === current) return;
@@ -103,8 +110,7 @@ export function MobileTransactionsShell({
       setNextPage((p) => p + 1);
       setHasMore(result.hasMore);
     } catch {
-      // Surface silently — sentinel will retry on next intersection.
-      // Toasting on every chunk failure spams the user.
+      // Silent: sentinel will retry on next intersection.
     } finally {
       setLoading(false);
     }
@@ -127,78 +133,113 @@ export function MobileTransactionsShell({
     return () => obs.disconnect();
   }, [hasMore, loadMore]);
 
-  const allRows = appended.length === 0
-    ? initialRows
-    : [...initialRows, ...appended];
+  const allRows = useMemo(
+    () => (appended.length === 0 ? initialRows : [...initialRows, ...appended]),
+    [initialRows, appended],
+  );
+  const groups = useMemo(() => groupTransactionsByDate(allRows), [allRows]);
 
   return (
     <div className="space-y-3 md:hidden">
-      <div className="sticky top-14 z-10 -mx-4 flex items-center gap-2 border-b border-border bg-surface-paper/95 px-4 py-2 backdrop-blur sm:-mx-8 sm:px-8">
+      <div className="sticky top-14 z-10 -mx-4 flex items-center gap-2 border-b border-[--border] bg-[--surface]/95 px-4 py-2 backdrop-blur sm:-mx-8 sm:px-8">
         <div className="relative flex-1">
           <Search
             aria-hidden
-            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[--text-3]"
           />
           <input
             type="search"
             placeholder="Search transactions"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-11 w-full rounded-pill border border-border bg-surface-elevated pl-9 pr-3 font-mono text-sm placeholder:font-sans placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="h-11 w-full rounded-pill border border-[--border] bg-[--surface] pl-9 pr-3 font-mono text-sm text-[--text] placeholder:font-sans placeholder:text-[--text-3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
         </div>
         <MobileFilterSheet accounts={accounts} categories={categories} />
       </div>
 
-      <p className="px-1 text-xs text-muted-foreground">
+      <p className="px-1 text-xs text-[--text-3]">
         {totalCount.toLocaleString()}{' '}
         {totalCount === 1 ? 'transaction' : 'transactions'}
       </p>
 
-      <MobileList<TransactionListRow>
-        rows={allRows}
-        config={{
-          rowKey: (r) => r.id,
-          dateField: (r) => r.date,
-          topLine: (r) => (
-            <span className="flex items-center gap-2">
-              <span className="truncate font-medium">
-                {r.merchantName ?? r.name}
-              </span>
-              {r.pending && (
-                <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-                  pending
+      {groups.length === 0 ? (
+        <div className="rounded-card border border-[--border] bg-[--surface] px-4 py-12 text-center text-sm text-[--text-2]">
+          {params.size > 0
+            ? 'No transactions match these filters.'
+            : 'No transactions synced yet.'}
+        </div>
+      ) : (
+        <div className="space-y-5">
+          {groups.map((group) => (
+            <section key={group.dateIso} className="space-y-1.5">
+              <header className="flex items-baseline justify-between px-1">
+                <div>
+                  <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[--text-2]">
+                    {formatMobileGroupDate(group.dateIso)}
+                  </span>
+                  <span className="ml-1.5 text-[11px] text-[--text-3]">
+                    · {group.dayName}
+                  </span>
+                </div>
+                <span
+                  className={cn(
+                    'font-mono text-[11px] tabular-nums',
+                    group.dayNet > 0
+                      ? 'text-[--text-2]'
+                      : group.dayNet < 0
+                        ? 'text-positive'
+                        : 'text-[--text-3]',
+                  )}
+                >
+                  {formatCurrency(-group.dayNet, { signed: true })}
                 </span>
-              )}
-            </span>
-          ),
-          secondLine: (r) => {
-            const cat = r.overrideCategoryName
-              ? r.overrideCategoryName
-              : r.primaryCategory
-                ? humanizeCategory(r.primaryCategory)
-                : '—';
-            return `${cat} · ${r.accountName}`;
-          },
-          rightCell: (r) => {
-            const display = -r.amount;
-            const isIncome = display > 0;
-            return (
-              <span className={cn(isIncome && 'text-positive')}>
-                {formatCurrency(display, { signed: true })}
-              </span>
-            );
-          },
-          onRowTap: (r) => setActive(r),
-        }}
-        empty={
-          <div className="rounded-card border border-border bg-surface-elevated px-4 py-12 text-center text-sm text-muted-foreground">
-            {params.size > 0
-              ? 'No transactions match these filters.'
-              : 'No transactions synced yet.'}
-          </div>
-        }
-      />
+              </header>
+              <ul className="overflow-hidden rounded-card border border-[--border] bg-[--surface]">
+                {group.rows.map((r) => (
+                  <li key={r.id}>
+                    <button
+                      type="button"
+                      onClick={() => setActive(r)}
+                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors active:bg-[--surface-sunken]/60"
+                    >
+                      <div className="min-w-0 flex-1 space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate text-sm font-medium text-[--text]">
+                            {r.merchantName ?? r.name}
+                          </span>
+                          {r.pending && (
+                            <span className="shrink-0 rounded-md bg-[--surface-sunken] px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-[--text-3]">
+                              pending
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-xs text-[--text-3]">
+                          <CategoryChip
+                            primaryCategory={r.primaryCategory}
+                            overrideCategoryName={r.overrideCategoryName}
+                            size="xs"
+                          />
+                          <span>·</span>
+                          <span className="truncate">{r.accountName}</span>
+                        </div>
+                      </div>
+                      <span
+                        className={cn(
+                          'shrink-0 font-mono text-sm tabular-nums',
+                          -r.amount > 0 ? 'text-positive' : 'text-[--text]',
+                        )}
+                      >
+                        {formatCurrency(-r.amount, { signed: true })}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      )}
 
       {hasMore && (
         <div
@@ -208,12 +249,12 @@ export function MobileTransactionsShell({
         />
       )}
       {loading && (
-        <p className="py-2 text-center text-xs text-muted-foreground">
+        <p className="py-2 text-center text-xs text-[--text-3]">
           Loading more…
         </p>
       )}
-      {!hasMore && allRows.length > 0 && (
-        <p className="py-3 text-center text-[11px] uppercase tracking-[0.08em] text-muted-foreground/60">
+      {!hasMore && groups.length > 0 && (
+        <p className="py-3 text-center text-[11px] uppercase tracking-[0.12em] text-[--text-3]/80">
           End of list
         </p>
       )}
@@ -225,4 +266,13 @@ export function MobileTransactionsShell({
       />
     </div>
   );
+}
+
+function formatMobileGroupDate(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
 }
