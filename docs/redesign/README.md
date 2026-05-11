@@ -18,10 +18,10 @@ This milestone replaces the visual + IA layer wholesale while preserving the dat
 | R.0 | ✓ specced ([SPEC.md](SPEC.md)) |
 | R.1 Foundation | ✓ shipped — merged to `feat/redesign` (tokens, fonts, FootholdMark, SignatureFooter, sidebar/top-bar restyle, page-bg textures) |
 | R.2 Dashboard | ✓ shipped — merged to `feat/redesign` (NetWorthHero w/ trajectory + uncertainty band, KPIs w/ Runway, drift module fold, weekly brief editorial card fold, formatFreshness helper). [r2-dashboard/SPEC.md](r2-dashboard/SPEC.md) + [PLAN.md](r2-dashboard/PLAN.md) |
-| R.3.1 Goals | 🟡 in flight on `feat/r3-1-goals` — T1–T5 done + 3 UAT polish commits; T6 (form restyle) + T7 (UAT polish reservation) remaining. [r3-1-goals/SPEC.md](r3-1-goals/SPEC.md) + [PLAN.md](r3-1-goals/PLAN.md) (resume point at top of plan) |
-| R.3.2 Recurring | not started |
-| R.3.3 Transactions | not started |
-| R.3.4 Investments | not started |
+| R.3.1 Goals | ✓ shipped — merged to `feat/redesign` (sectioned pace leaderboard, archived toggle, restyled forms; T6 form restyle + T7 UAT polish landed). [r3-1-goals/SPEC.md](r3-1-goals/SPEC.md) + [PLAN.md](r3-1-goals/PLAN.md) |
+| R.3.2 Recurring | ✓ shipped — merged to `feat/redesign` (layered IA: Hike alerts → PFC-clustered category sections → Inflows → Recently cancelled; merchant drilldown). [r3-2-recurring/SPEC.md](r3-2-recurring/SPEC.md) + [PLAN.md](r3-2-recurring/PLAN.md) |
+| R.3.3 Transactions | ✓ shipped — merged to `feat/redesign` (operator-table date grouping, mobile shell, chips, page rewrite, revalidatePath). [r3-3-transactions/SPEC.md](r3-3-transactions/SPEC.md) + [PLAN.md](r3-3-transactions/PLAN.md) |
+| R.3.4 Investments | ✓ shipped — on `feat/redesign` (portfolio_snapshot table + walkback chart, wholesale-IA restyle with Allocation/Holdings/Recent-activity sections, capability-aware freshness). [r3-4-investments/SPEC.md](r3-4-investments/SPEC.md) + [PLAN.md](r3-4-investments/PLAN.md) |
 | R.3.5 Simulator | not started |
 | R.3.6 Settings | not started |
 | R.4 Goals Moves + scenario unification | not started |
