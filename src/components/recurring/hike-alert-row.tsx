@@ -13,22 +13,27 @@ type Props = {
 
 export function HikeAlertRow({ stream }: Props) {
   const ratio = hikeRatio(stream);
-  if (ratio == null || stream.lastAmount == null || stream.averageAmount == null) {
+  if (
+    ratio == null ||
+    stream.lastAmount == null ||
+    stream.averageAmount == null
+  ) {
     return null;
   }
 
   const label = pickLabel(stream);
   const drillHref = drilldownHref(stream);
+  const lastNum = stream.lastAmount;
+  const avgNum = stream.averageAmount;
   const deltaMonthly =
-    (stream.lastAmount - stream.averageAmount) *
-    frequencyToMonthlyMultiplier(stream.frequency);
+    (lastNum - avgNum) * frequencyToMonthlyMultiplier(stream.frequency);
 
   return (
     <li
       className={cn(
         'relative px-5 py-3 sm:px-6',
         drillHref &&
-          'transition-colors duration-fast ease-out-quart hover:bg-surface-sunken/60',
+          'transition-colors duration-fast ease-out-quart hover:bg-[--surface-sunken]/60',
       )}
     >
       {drillHref && (
@@ -40,15 +45,15 @@ export function HikeAlertRow({ stream }: Props) {
       )}
       <div className="space-y-1">
         <div className="flex items-baseline justify-between gap-3">
-          <p className="truncate text-sm font-medium">{label}</p>
-          <p className="whitespace-nowrap font-mono text-sm font-medium tabular-nums">
-            {formatCurrency(stream.lastAmount)}/mo
-            <span className="ml-2 text-xs font-normal text-muted-foreground">
-              was {formatCurrency(stream.averageAmount)}
+          <p className="truncate text-sm font-medium text-[--text]">{label}</p>
+          <p className="whitespace-nowrap font-mono text-sm font-medium tabular-nums text-[--text]">
+            {formatCurrency(lastNum)}/mo
+            <span className="ml-2 text-xs font-normal text-[--text-3]">
+              was {formatCurrency(avgNum)}
             </span>
           </p>
         </div>
-        <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+        <p className="text-xs font-medium text-[--semantic-caution]">
           +{formatPercent(ratio)} vs avg · +{formatCurrency(deltaMonthly)}/mo
         </p>
       </div>
@@ -57,7 +62,6 @@ export function HikeAlertRow({ stream }: Props) {
 }
 
 function drilldownHref(stream: RecurringStreamRow): string | null {
-  // See stream-row.tsx for the fallback rationale.
   const term = stream.merchantName?.trim() || stream.description?.trim();
   if (!term) return null;
   const params = new URLSearchParams();
