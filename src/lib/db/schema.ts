@@ -706,6 +706,51 @@ export const snaptradeUsers = pgTable('snaptrade_user', {
   createdAt: ts('created_at').defaultNow().notNull(),
 });
 
+/**
+ * Daily snapshot of each user's portfolio totals. R.3.4 redesign
+ * support — drives the /investments page's range-tab performance
+ * chart. Two consumers planned:
+ *
+ *   - **Performance chart** — chart's solid (real) line reads from
+ *     this table; the dashed (estimated) line is walked back through
+ *     `investment_transactions` for dates earlier than the user's
+ *     first snapshot.
+ *   - **Future cost-basis trajectory** — `totalCostBasis` captured
+ *     here too so future analyses don't require a migration.
+ *
+ * Snapshot writes piggyback on `syncExternalItem` (sync dispatcher)
+ * — no separate cron route. Multiple syncs per day collapse to one
+ * row via ON CONFLICT (user_id, snapshot_date) DO UPDATE.
+ *
+ * `snapshotDate` is a calendar `date` derived in UTC at sync time.
+ * Mirrors the `forecast_snapshot` pattern from Phase 1 simulator
+ * reorientation.
+ */
+export const portfolioSnapshots = pgTable(
+  'portfolio_snapshot',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    snapshotDate: date('snapshot_date').notNull(),
+    totalValue: numeric('total_value', { precision: 14, scale: 2 }).notNull(),
+    totalCostBasis: numeric('total_cost_basis', {
+      precision: 14,
+      scale: 2,
+    }).notNull(),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => ({
+    userDateUnique: uniqueIndex('portfolio_snapshot_user_date_idx').on(
+      t.userId,
+      t.snapshotDate,
+    ),
+  }),
+);
+
 // =============================================================================
 // Type exports — convenient for queries
 // =============================================================================
@@ -723,3 +768,5 @@ export type RecurringStream = typeof recurringStreams.$inferSelect;
 export type Goal = typeof goals.$inferSelect;
 export type Insight = typeof insights.$inferSelect;
 export type ErrorLog = typeof errorLog.$inferSelect;
+export type PortfolioSnapshot = typeof portfolioSnapshots.$inferSelect;
+export type PortfolioSnapshotInsert = typeof portfolioSnapshots.$inferInsert;
