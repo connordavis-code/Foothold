@@ -222,6 +222,7 @@ export async function syncSnaptradeBrokeragesAction(): Promise<{
     revalidatePath('/settings');
     revalidatePath('/dashboard');
     revalidatePath('/transactions');
+    revalidatePath('/investments');
   }
 
   return {
@@ -280,6 +281,7 @@ export async function disconnectSnaptradeItemAction(
 
   revalidatePath('/settings');
   revalidatePath('/dashboard');
+  revalidatePath('/investments');
   return { ok: true };
 }
 

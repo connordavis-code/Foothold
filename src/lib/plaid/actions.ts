@@ -143,6 +143,7 @@ export async function syncItemAction(
   revalidatePath('/dashboard');
   revalidatePath('/recurring');
   revalidatePath('/transactions');
+  revalidatePath('/investments');
   return result;
 }
 
@@ -186,6 +187,7 @@ export async function syncAllItemsAction(): Promise<{
   revalidatePath('/dashboard');
   revalidatePath('/recurring');
   revalidatePath('/transactions');
+  revalidatePath('/investments');
 
   return {
     synced: results.filter((r) => r.status === 'fulfilled').length,
@@ -355,5 +357,6 @@ export async function disconnectItemAction(
 
   revalidatePath('/settings');
   revalidatePath('/dashboard');
+  revalidatePath('/investments');
   return { ok: true };
 }
