@@ -10,6 +10,7 @@ import { externalItems } from '@/lib/db/schema';
 import { env, plaidCountryCodes, plaidProducts } from '@/lib/env';
 import { syncExternalItem, type SyncDispatchResult } from '@/lib/sync/dispatcher';
 import { plaid } from './client';
+import { linkConsentedProducts } from './products';
 import { syncItem, type SyncSummary } from './sync';
 
 /**
@@ -33,9 +34,7 @@ export async function createLinkToken(): Promise<string> {
   // skips where not. User consent to the full set is captured up-front
   // via the Link disclosure.
   const requiredProducts = ['transactions'] as Products[];
-  const optionalProducts = (plaidProducts as Products[]).filter(
-    (p) => !requiredProducts.includes(p),
-  );
+  const optionalProducts = linkConsentedProducts(plaidProducts);
 
   const response = await plaid.linkTokenCreate({
     user: { client_user_id: session.user.id },
@@ -224,12 +223,11 @@ export async function createLinkTokenForUpdate(itemId: string): Promise<string> 
 
   // Mirrors createLinkToken's split: `transactions` is the implicit
   // required minimum (already on the existing item in update mode);
-  // everything else in PLAID_PRODUCTS becomes optional consent. When a
-  // new product is added to the env (e.g. `balance`), reconnecting an
-  // existing item via this flow is what attaches the consent.
-  const optionalProducts = (plaidProducts as Products[]).filter(
-    (p) => p !== 'transactions',
-  );
+  // everything else in PLAID_PRODUCTS becomes optional consent — except
+  // products that Plaid's link API rejects (e.g. `balance`, which is
+  // app-level enabled and called directly via accountsBalanceGet).
+  // See linkConsentedProducts in ./products for the filter.
+  const optionalProducts = linkConsentedProducts(plaidProducts);
 
   // Plaintext access_token passed inline so we don't hold an extra
   // userland reference. Plaid's SDK retains its own ref through the call;
