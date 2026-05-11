@@ -623,6 +623,17 @@ plumbing with no testable predicates).
 **Phase 3-pt3 — Per-goal coaching detail page** (2026-05-07 evening; spec
 at `docs/superpowers/specs/2026-05-07-phase-3-pt3-goal-detail-design.md`,
 plan at `docs/superpowers/plans/2026-05-07-phase-3-pt3-goal-detail.md`)
+> **R.3.1 update (2026-05-10):** `/goals/[id]` route deleted as part of
+> the goals IA shift to card-per-goal on `/goals`. Trajectory chart,
+> contributing-data feed, `<CoachingCard>`, `<ProjectionCard>`, and
+> `walkBackTrajectory` all removed. `composeCoaching`, `paceVerdict`,
+> `severityKey`, `pickTopDiscretionaryCategory`,
+> `getBehindSavingsCoachingCategory`, and `getTopDiscretionaryCategory`
+> all survive — relocated into the goal-card consumer path. New pure
+> helper `buildCoachingInput` in `src/lib/goals/coaching-input.ts`
+> shapes the discriminated-union input for `composeCoaching` from a
+> goal + verdict + top-discretionary category. See
+> [docs/redesign/r3-1-goals/SPEC.md](docs/redesign/r3-1-goals/SPEC.md).
 - New route `/goals/[id]` with 5 sections: header (name, status pill,
   edit/delete), projection card (type+verdict-branched headline copy),
   trajectory chart (Recharts: cumulative actual + ideal pace + reference

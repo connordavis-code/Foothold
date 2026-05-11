@@ -200,5 +200,6 @@ export async function setGoalArchived(goalId: string, archived: boolean) {
     .where(and(eq(goals.id, goalId), eq(goals.userId, session.user.id)));
 
   revalidatePath('/goals');
-  revalidatePath(`/goals/${goalId}`);
+  // R.3.1 deleted /goals/[id]; archive/restore only invalidates the list.
+  // /goals/[id]/edit reads goals fresh on each load, no invalidation needed.
 }
