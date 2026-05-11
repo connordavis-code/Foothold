@@ -2,7 +2,6 @@ import {
   frequencyToMonthlyMultiplier,
   type RecurringStreamRow,
 } from '@/lib/db/queries/recurring';
-import { humanizeCategory } from '@/lib/format/category';
 
 const HIKE_RATIO_THRESHOLD = 0.15;
 const HIKE_FLOOR_PER_MONTH = 2;
@@ -41,52 +40,4 @@ export function isHikeAlert(s: RecurringStreamRow): boolean {
 export function monthlyCost(s: RecurringStreamRow): number {
   if (s.averageAmount == null) return 0;
   return Math.abs(s.averageAmount) * frequencyToMonthlyMultiplier(s.frequency);
-}
-
-export type CategoryGroup = {
-  category: string | null;
-  humanLabel: string;
-  total: number;
-  streams: RecurringStreamRow[];
-};
-
-/**
- * Active outflows only, bucketed by primaryCategory. Inflows and
- * cancelled streams are handled in their own page sections — callers
- * pass the full stream list and this function filters.
- *
- * Within a bucket: streams sorted by monthlyCost desc.
- * Across buckets: total monthlyCost desc, except null ("Other") is
- * pinned to the bottom regardless of total.
- */
-export function groupByCategory(
-  streams: RecurringStreamRow[],
-): CategoryGroup[] {
-  const active = streams.filter(
-    (s) => s.direction === 'outflow' && s.isActive,
-  );
-  const buckets = new Map<string | null, RecurringStreamRow[]>();
-  for (const s of active) {
-    const key = s.primaryCategory ?? null;
-    const arr = buckets.get(key);
-    if (arr) arr.push(s);
-    else buckets.set(key, [s]);
-  }
-  const groups: CategoryGroup[] = [];
-  for (const [key, list] of buckets.entries()) {
-    list.sort((a, b) => monthlyCost(b) - monthlyCost(a));
-    const total = list.reduce((sum, s) => sum + monthlyCost(s), 0);
-    groups.push({
-      category: key,
-      humanLabel: key ? humanizeCategory(key) : 'Other',
-      total,
-      streams: list,
-    });
-  }
-  groups.sort((a, b) => {
-    if (a.category === null && b.category !== null) return 1;
-    if (b.category === null && a.category !== null) return -1;
-    return b.total - a.total;
-  });
-  return groups;
 }

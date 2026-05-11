@@ -1,27 +1,46 @@
 import Link from 'next/link';
 import { ArrowRight, Repeat } from 'lucide-react';
 import { auth } from '@/auth';
-import { RecurringOverview } from '@/components/recurring/recurring-overview';
+import { CalendarWindows } from '@/components/recurring/calendar-windows';
+import { CancelledArchiveList } from '@/components/recurring/cancelled-archive-list';
+import { HikeAlertBanner } from '@/components/recurring/hike-alert-banner';
+import { InflowsSection } from '@/components/recurring/inflows-section';
+import { RecentlyCancelledSection } from '@/components/recurring/recently-cancelled-section';
+import { RecurringPageHeader } from '@/components/recurring/recurring-page-header';
+import { RecurringSummaryStrip } from '@/components/recurring/recurring-summary-strip';
+import { RecurringTabs } from '@/components/recurring/recurring-tabs';
 import { Button } from '@/components/ui/button';
+import { getSourceHealth } from '@/lib/db/queries/health';
 import {
   frequencyToMonthlyMultiplier,
   getMonthlyRecurringOutflow,
   getRecurringStreams,
+  type RecurringStreamRow,
 } from '@/lib/db/queries/recurring';
-import { cn, formatCurrency } from '@/lib/utils';
+import { formatFreshness } from '@/lib/format/freshness';
+import {
+  groupByDateWindow,
+  pickNextCharge,
+} from '@/lib/recurring/calendar-windows';
+import { isHikeAlert } from '@/lib/recurring/analysis';
+
+const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 
 export default async function RecurringPage() {
   const session = await auth();
   if (!session?.user) return null;
 
-  const [streams, monthlyOutflow] = await Promise.all([
+  const [streams, monthlyOutflow, sourceHealth] = await Promise.all([
     getRecurringStreams(session.user.id),
     getMonthlyRecurringOutflow(session.user.id),
+    getSourceHealth(session.user.id),
   ]);
 
   if (streams.length === 0) {
     return <EmptyState />;
   }
+
+  const today = new Date();
 
   const activeOutflows = streams.filter(
     (s) => s.direction === 'outflow' && s.isActive,
@@ -29,74 +48,81 @@ export default async function RecurringPage() {
   const activeInflows = streams.filter(
     (s) => s.direction === 'inflow' && s.isActive,
   );
+  const hikes = activeOutflows.filter(isHikeAlert);
+  const recentCancelled = streams
+    .filter(isRecentlyCancelled)
+    .sort(byLastDateDesc);
+  const allCancelled = streams
+    .filter((s) => s.status === 'TOMBSTONED')
+    .sort(byLastDateDesc);
+
+  const windows = groupByDateWindow(activeOutflows, today);
+  const nextCharge = pickNextCharge(activeOutflows, today);
+
   const monthlyInflow = activeInflows.reduce((sum, s) => {
     if (s.averageAmount == null) return sum;
     return (
       sum +
-      Math.abs(s.averageAmount) * frequencyToMonthlyMultiplier(s.frequency)
+      Math.abs(s.averageAmount) *
+        frequencyToMonthlyMultiplier(s.frequency)
     );
   }, 0);
-  const net = monthlyInflow - monthlyOutflow;
+  const netMonthly = monthlyInflow - monthlyOutflow;
+
+  const freshness = formatFreshness({
+    sources: sourceHealth.map((s) => ({
+      name: s.institutionName ?? 'Source',
+      lastSyncAt: s.lastSuccessfulSyncAt,
+    })),
+    now: today,
+  });
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-8 sm:py-8">
-      <div className="space-y-1.5">
-        <p className="text-eyebrow">Plan</p>
-        <h1 className="text-xl font-semibold tracking-tight">Recurring</h1>
-      </div>
-
-      <section className="grid grid-cols-1 divide-y divide-border rounded-card border border-border bg-surface-elevated md:grid-cols-3 md:divide-x md:divide-y-0">
-        <SummaryCell
-          label="Monthly outflow"
-          value={formatCurrency(monthlyOutflow)}
-          sub={`${activeOutflows.length} active ${activeOutflows.length === 1 ? 'subscription' : 'subscriptions'}`}
-        />
-        <SummaryCell
-          label="Monthly inflow"
-          value={formatCurrency(monthlyInflow)}
-          sub={
-            activeInflows.length === 0
-              ? 'None detected yet'
-              : `${activeInflows.length} active ${activeInflows.length === 1 ? 'source' : 'sources'}`
-          }
-        />
-        <SummaryCell
-          label="Net monthly"
-          value={formatCurrency(net, { signed: true })}
-          sub="Inflows minus outflows"
-          valueClass={net >= 0 ? 'text-positive' : 'text-destructive'}
-        />
-      </section>
-
-      <RecurringOverview streams={streams} />
+    <div className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-8 sm:py-8">
+      <RecurringPageHeader
+        freshnessHeadline={freshness.headline}
+        freshnessCaveat={freshness.caveat}
+      />
+      <p className="text-sm text-[--text-2]">
+        The monthly charges that move on autopilot.
+      </p>
+      <RecurringSummaryStrip
+        monthlyOutflow={monthlyOutflow}
+        netMonthly={netMonthly}
+        activeOutflowCount={activeOutflows.length}
+        nextCharge={nextCharge}
+      />
+      <RecurringTabs
+        active={
+          <div className="space-y-6">
+            {hikes.length > 0 && <HikeAlertBanner streams={hikes} />}
+            <CalendarWindows windows={windows} />
+            {activeInflows.length > 0 && (
+              <InflowsSection streams={activeInflows} />
+            )}
+            {recentCancelled.length > 0 && (
+              <RecentlyCancelledSection streams={recentCancelled} />
+            )}
+          </div>
+        }
+        cancelled={<CancelledArchiveList streams={allCancelled} />}
+      />
     </div>
   );
 }
 
-function SummaryCell({
-  label,
-  value,
-  sub,
-  valueClass,
-}: {
-  label: string;
-  value: string;
-  sub: string;
-  valueClass?: string;
-}) {
+function isRecentlyCancelled(stream: RecurringStreamRow): boolean {
+  if (stream.status !== 'TOMBSTONED') return false;
+  if (!stream.lastDate) return false;
+  const last = Date.parse(stream.lastDate);
+  if (!Number.isFinite(last)) return false;
+  return Date.now() - last <= NINETY_DAYS_MS;
+}
+
+function byLastDateDesc(a: RecurringStreamRow, b: RecurringStreamRow): number {
   return (
-    <div className="flex flex-col gap-1.5 p-5 sm:p-6">
-      <p className="text-eyebrow">{label}</p>
-      <p
-        className={cn(
-          'font-mono text-2xl font-semibold tracking-[-0.015em] tabular-nums sm:text-3xl',
-          valueClass,
-        )}
-      >
-        {value}
-      </p>
-      <p className="text-xs text-muted-foreground">{sub}</p>
-    </div>
+    Date.parse(b.lastDate ?? '1970-01-01') -
+    Date.parse(a.lastDate ?? '1970-01-01')
   );
 }
 
@@ -104,14 +130,14 @@ function EmptyState() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-16 sm:px-8 sm:py-24">
       <div className="space-y-6 text-center">
-        <span className="mx-auto grid h-14 w-14 place-items-center rounded-pill bg-accent text-foreground/80">
+        <span className="mx-auto grid h-14 w-14 place-items-center rounded-pill bg-[--surface] text-[--text-2]">
           <Repeat className="h-6 w-6" />
         </span>
         <div className="space-y-2">
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 className="text-2xl font-semibold tracking-tight text-[--text]">
             Not enough history yet
           </h1>
-          <p className="mx-auto max-w-md text-sm text-muted-foreground">
+          <p className="mx-auto max-w-md text-sm text-[--text-2]">
             Plaid needs 60–90 days of transaction data to detect
             subscriptions, payroll, and bills. Connecting more accounts
             shortens the wait.
