@@ -1,4 +1,6 @@
+import { groupTransactionsByDate } from '@/lib/transactions/group-by-date';
 import type { RecentInvestmentTxn } from '@/lib/db/queries/investments';
+import { humanizeDate } from '@/lib/format/date';
 import { cn, formatCurrency } from '@/lib/utils';
 
 type Props = {
@@ -6,100 +8,104 @@ type Props = {
 };
 
 /**
- * Secondary mono table on /investments. Same operator pattern as the
- * /transactions table — sticky head, py-1.5 rows, JetBrains Mono on
- * date + amount, sans on label columns. No keyboard nav here; this is
- * a viewing surface, not an edit surface, and adding j/k would conflict
- * with the holdings table above.
+ * Date-grouped recent activity. Eyebrow renamed "Recent activity"
+ * (parent section is /investments — "investment" qualifier is
+ * redundant). Per DESIGN.md restraint: single muted pill for type,
+ * no categorical hue palette.
  */
 export function InvestmentTxnsTable({ transactions }: Props) {
   if (transactions.length === 0) return null;
 
+  // Plaid sign convention on investment txns: positive amount = cash
+  // OUT (a buy), negative = cash IN (sell, dividend). The grouper's
+  // dayNet preserves sign, so flip up front for display: dayNet > 0
+  // here will mean "net cash INTO portfolio" once flipped.
+  const flippedForDisplay = transactions.map((t) => ({
+    ...t,
+    amount: -t.amount,
+  }));
+  const groups = groupTransactionsByDate(flippedForDisplay);
+
   return (
-    <section className="space-y-3">
-      <p className="text-eyebrow">
-        Recent investment activity · {transactions.length}
-      </p>
-      <div className="overflow-hidden rounded-card border border-border bg-surface-elevated">
-        <div className="max-h-[400px] overflow-auto">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10 bg-surface-elevated/95 backdrop-blur">
-              <tr className="border-b border-border text-[10px] uppercase tracking-[0.08em] text-muted-foreground/80">
-                <th className="px-3 py-2 text-left font-medium w-[110px]">
-                  Date
-                </th>
-                <th className="px-3 py-2 text-left font-medium w-[90px]">
-                  Type
-                </th>
-                <th className="px-3 py-2 text-left font-medium">Security</th>
-                <th className="px-3 py-2 text-right font-medium w-[110px]">
-                  Qty
-                </th>
-                <th className="px-3 py-2 text-right font-medium w-[120px]">
-                  Amount
-                </th>
-                <th className="px-3 py-2 text-left font-medium w-[180px]">
-                  Account
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {transactions.map((t) => (
-                <Row key={t.id} t={t} />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+    <section className="hidden space-y-4 rounded-2xl border border-[--hairline] bg-[--surface] p-6 md:block md:p-8">
+      <header>
+        <p className="text-xs uppercase tracking-[0.16em] text-[--text-3]">
+          Recent activity · {transactions.length}
+        </p>
+      </header>
+
+      <ul className="divide-y divide-[--hairline]">
+        {groups.map((group) => {
+          const dayNetUp = group.dayNet >= 0;
+          return (
+            <li key={group.dateIso}>
+              <div className="flex items-baseline justify-between gap-3 py-2.5 text-xs text-[--text-3]">
+                <span className="font-mono uppercase tracking-[0.08em]">
+                  {humanizeDate(group.dateIso)}
+                </span>
+                <span
+                  className={cn(
+                    'font-mono tabular-nums',
+                    dayNetUp ? 'text-positive' : 'text-destructive',
+                  )}
+                >
+                  {dayNetUp ? '↑' : '↓'}{' '}
+                  {formatCurrency(Math.abs(group.dayNet))}
+                </span>
+              </div>
+              <ul className="space-y-1.5 pb-3">
+                {group.rows.map((t) => (
+                  <Row key={t.id} t={t} />
+                ))}
+              </ul>
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }
 
 function Row({ t }: { t: RecentInvestmentTxn }) {
-  // Plaid sign convention on investment txns: positive amount = cash OUT
-  // of the account (a buy), negative = cash IN (sell, dividend). Flip
-  // for display so a buy reads as a debit and a dividend as a credit.
-  const display = -t.amount;
-  const isPositive = display > 0;
+  // Caller pre-flipped amount; positive = credit (sell/dividend).
+  const isPositive = t.amount > 0;
 
   return (
-    <tr className="border-b border-border/60 transition-colors duration-fast ease-out-quart hover:bg-surface-sunken/60 last:border-b-0">
-      <td className="px-3 py-1.5 font-mono text-xs tabular-nums text-muted-foreground whitespace-nowrap">
-        {formatDate(t.date)}
-      </td>
-      <td className="px-3 py-1.5 text-xs whitespace-nowrap">
-        <TypePill type={t.type} subtype={t.subtype} />
-      </td>
-      <td className="max-w-0 px-3 py-1.5">
-        <div className="flex items-center gap-2">
+    <li className="flex items-baseline justify-between gap-3 text-sm">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-2">
+          <TypePill type={t.type} subtype={t.subtype} />
           {t.ticker && (
-            <span className="font-mono text-xs font-medium">{t.ticker}</span>
+            <span className="font-mono text-xs font-medium text-[--text]">
+              {t.ticker}
+            </span>
           )}
-          <span className="truncate text-sm">
+          <span className="truncate text-[--text-2]">
             {t.securityName ?? t.name ?? '—'}
           </span>
         </div>
-      </td>
-      <td className="px-3 py-1.5 text-right font-mono text-xs tabular-nums text-muted-foreground whitespace-nowrap">
-        {t.quantity != null
-          ? t.quantity.toLocaleString(undefined, { maximumFractionDigits: 4 })
-          : '—'}
-      </td>
-      <td
+        <p className="text-xs text-[--text-3]">
+          {t.accountName}
+          {t.accountMask && <span> ····{t.accountMask}</span>}
+          {t.quantity != null && (
+            <span className="ml-2 font-mono tabular-nums">
+              {t.quantity.toLocaleString(undefined, {
+                maximumFractionDigits: 4,
+              })}{' '}
+              sh
+            </span>
+          )}
+        </p>
+      </div>
+      <div
         className={cn(
-          'px-3 py-1.5 text-right font-mono tabular-nums whitespace-nowrap',
-          isPositive ? 'text-positive' : 'text-foreground',
+          'shrink-0 font-mono tabular-nums',
+          isPositive ? 'text-positive' : 'text-[--text]',
         )}
       >
-        {formatCurrency(display, { signed: true })}
-      </td>
-      <td className="px-3 py-1.5 text-xs text-muted-foreground whitespace-nowrap">
-        {t.accountName}
-        {t.accountMask && (
-          <span className="text-muted-foreground/70"> ····{t.accountMask}</span>
-        )}
-      </td>
-    </tr>
+        {formatCurrency(t.amount, { signed: true })}
+      </div>
+    </li>
   );
 }
 
@@ -113,23 +119,10 @@ function TypePill({
   const label = type ?? '—';
   return (
     <span
-      // Single muted tone for every type — the label IS the affordance.
-      // The previous five-hue palette (blue/orange/emerald/rose/muted)
-      // was decoration disguised as semantics; per DESIGN.md's
-      // Restrained Floor Rule, semantic color is reserved for state
-      // (positive / negative / elevated), not for categorical labels.
-      className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
+      className="inline-flex items-center rounded-md bg-[--hairline] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[--text-2]"
       title={subtype ?? undefined}
     >
       {label}
     </span>
   );
-}
-
-function formatDate(d: string | Date): string {
-  const date = typeof d === 'string' ? new Date(d) : d;
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: '2-digit',
-  });
 }
