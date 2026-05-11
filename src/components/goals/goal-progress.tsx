@@ -32,9 +32,37 @@ export function GoalProgress({ goal, verdict }: Props) {
 
   const currentValue = p.type === 'savings' ? p.current : p.spent;
   const targetValue = p.type === 'savings' ? p.target : p.cap;
+  const pctLeftPct = Math.max(0, Math.min(100, fraction * 100));
+  // Edge anchoring: when pct sits near 0% or 100%, shift the translate so
+  // the label doesn't get clipped half-off-screen at the extremes.
+  const pctTransform =
+    fraction < 0.05
+      ? 'translateX(0%)'
+      : fraction > 0.95
+        ? 'translateX(-100%)'
+        : 'translateX(-50%)';
+  const pctColor =
+    verdict === 'over' || verdict === 'behind'
+      ? 'var(--semantic-caution)'
+      : 'var(--text-2)';
 
   return (
     <div>
+      {/* Above-bar pct label tracks the dot position; placed above so it
+          never collides with the current/target endpoint labels below. */}
+      <div className="relative mb-1 h-4 font-mono text-[11px] tabular-nums">
+        <span
+          className="absolute"
+          style={{
+            left: `${pctLeftPct}%`,
+            transform: pctTransform,
+            color: pctColor,
+          }}
+        >
+          {pct}%
+        </span>
+      </div>
+
       <div className="relative h-2 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
         <div
           className="absolute left-0 top-0 h-full rounded-full"
@@ -68,30 +96,12 @@ export function GoalProgress({ goal, verdict }: Props) {
         )}
       </div>
 
-      {/* Below-bar labels: current (left) + pct (tracks the dot position) +
-          target (right). Pct uses absolute positioning so it follows the
-          fill-edge instead of sitting at the geometric center — reads as
-          "you are HERE, at N%" instead of "the middle of the bar is N%". */}
-      <div className="relative mt-2 h-4 font-mono text-[11px] tabular-nums text-[--text-2]">
-        <span className="absolute left-0">
-          {formatCurrencyCompact(currentValue)}
-        </span>
-        <span
-          className="absolute"
-          style={{
-            left: `${Math.max(0, Math.min(100, fraction * 100))}%`,
-            transform: 'translateX(-50%)',
-            color:
-              verdict === 'over' || verdict === 'behind'
-                ? 'var(--semantic-caution)'
-                : 'var(--text-2)',
-          }}
-        >
-          {pct}%
-        </span>
-        <span className="absolute right-0">
-          {formatCurrencyCompact(targetValue)}
-        </span>
+      {/* Below-bar endpoint labels only — pct moved above to prevent
+          collision at fraction extremes (was crashing into target label
+          on hit goals). */}
+      <div className="mt-2 flex justify-between font-mono text-[11px] tabular-nums text-[--text-2]">
+        <span>{formatCurrencyCompact(currentValue)}</span>
+        <span>{formatCurrencyCompact(targetValue)}</span>
       </div>
     </div>
   );
