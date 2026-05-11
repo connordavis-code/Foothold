@@ -768,7 +768,21 @@ plan at `docs/superpowers/plans/2026-05-07-phase-3-pt3-goal-detail.md`)
     tokens replacing rogue `text-muted-foreground` defaults; T7 UAT pass
     clean — zero polish commits needed beyond the three shipped pre-T6).
     549 vitest passing; clean prod build (27/27 pages).
-  - **R.3.2–R.3.6** not started (Recurring, Transactions, Investments,
+  - **R.3.2 Recurring** ✓ shipped to `feat/redesign` (calendar-window IA
+    grouping active outflows by `predictedNextDate` into THIS WEEK /
+    LATER THIS MONTH / NEXT MONTH / LATER buckets, replacing the
+    post-2026-05-06 PFC-category IA; Active/Cancelled tabs lite —
+    Active tab carries hike banner + calendar windows + inflows + 90d
+    recently-cancelled mini, Cancelled tab carries the full TOMBSTONED
+    archive; new pure helpers `groupByDateWindow` + `pickNextCharge` +
+    `trendIndicator` in `src/lib/recurring/calendar-windows.ts`;
+    `<RecurringTabs>` is the only `'use client'` island, children-prop
+    pattern for both tab bodies — strike-3 RSC boundary watch PASSED;
+    bonus fix: `syncAllItemsAction` revalidatePath was empty pre-R.3.2,
+    now symmetrically revalidates `/settings`/`/dashboard`/`/recurring`).
+    562 vitest passing (+13 net); clean prod build (27/27, /recurring
+    890 B / 102 kB First Load).
+  - **R.3.3–R.3.6** not started (Transactions, Investments,
     Simulator, Settings — per-page sweep, one PR each)
   - **R.4 Moves + scenario unification** not started; **R.5 mobile
     rebuild** not started; **R.6 polish** not started

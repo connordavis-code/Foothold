@@ -16,6 +16,31 @@
 
 ---
 
+## ▶ Resume point (as of 2026-05-11)
+
+**R.3.2 COMPLETE.** All 6 tasks shipped on `feat/r3-2-recurring`; UAT pass clean; merged into `feat/redesign`.
+
+| Task | Status | Commit |
+|---|---|---|
+| SPEC | ✅ | `8f1ec27` |
+| PLAN | ✅ | `0dfdc46` |
+| **T1** calendar-windows pure helpers + 21 vitest cases | ✅ | `70a7ef2` |
+| **T2** RecurringPageHeader + RecurringSummaryStrip | ✅ | `0db41e3` |
+| **T3** Active tab content (4 new + 2 restyles) | ✅ | `9a52c79` |
+| **T4** Cancelled archive list | ✅ | `ee8e7d5` |
+| **T5** Tabs island + page rewrite + cleanup + revalidatePath fixes | ✅ | `89a4c69` |
+| **T6** UAT polish reservation | ✅ (zero polish commits — UAT pass clean) | — |
+
+**Test count:** 549 → 562 (+13 net; 21 new from `calendar-windows.test.ts` minus 8 deleted from `groupByCategory`). Inside SPEC's +11/+13 budget.
+
+**Acceptance gates:** all 15 met (typecheck clean, 562/562 tests, clean prod build 27/27 pages, RSC grep clean — only `recurring-tabs.tsx` carries `'use client'`, browser UAT pass).
+
+**Bonus correctness fix shipped in T5:** `syncAllItemsAction` revalidatePath was empty pre-R.3.2 — the top-bar "Sync now" click propagated state nowhere. Now revalidates `/settings`, `/dashboard`, `/recurring` symmetrically with `syncItemAction`.
+
+**Outcome:** `feat/r3-2-recurring` merged to `feat/redesign` + pushed. Next sub-phase: R.3.3 (Transactions) — see [docs/redesign/README.md](../README.md) for sub-phase queue.
+
+---
+
 ## Branching + commit rhythm
 
 All work lands on `feat/r3-2-recurring`. One atomic commit per task. Commit subject format: `feat(r3.2): <task summary>`. T6 polish may produce 0–N fixup commits — `fix(r3.2): <issue>`.
