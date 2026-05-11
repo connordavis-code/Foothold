@@ -53,17 +53,17 @@ export function AllocationSection({
         {allocation.map((seg) => (
           <li
             key={seg.name}
-            className="flex items-center gap-3"
+            className="flex items-center gap-2"
           >
             <span
               className="h-2 w-2 shrink-0 rounded-full"
               style={{ background: CLASS_PALETTE[seg.name] }}
             />
-            <span className="flex-1 text-[--text-2]">{seg.name}</span>
+            <span className="text-[--text-2]">{seg.name}</span>
             <span className="font-mono tabular-nums text-[--text-3]">
               {seg.pct.toFixed(1)}%
             </span>
-            <span className="w-24 text-right font-mono tabular-nums text-[--text]">
+            <span className="ml-auto font-mono tabular-nums text-[--text]">
               {formatCurrency(seg.value)}
             </span>
           </li>
