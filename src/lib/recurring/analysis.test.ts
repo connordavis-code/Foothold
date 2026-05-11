@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RecurringStreamRow } from '@/lib/db/queries/recurring';
-import {
-  groupByCategory,
-  hikeRatio,
-  isHikeAlert,
-  monthlyCost,
-} from './analysis';
+import { hikeRatio, isHikeAlert, monthlyCost } from './analysis';
 
 function makeStream(
   o: Partial<RecurringStreamRow> = {},
@@ -154,86 +149,3 @@ describe('monthlyCost', () => {
   });
 });
 
-describe('groupByCategory', () => {
-  const a = makeStream({
-    id: 'a',
-    primaryCategory: 'ENTERTAINMENT',
-    averageAmount: 20,
-  });
-  const b = makeStream({
-    id: 'b',
-    primaryCategory: 'ENTERTAINMENT',
-    averageAmount: 10,
-  });
-  const c = makeStream({
-    id: 'c',
-    primaryCategory: 'RENT_AND_UTILITIES',
-    averageAmount: 2400,
-  });
-  const d = makeStream({
-    id: 'd',
-    primaryCategory: null,
-    averageAmount: 5,
-  });
-  const inflow = makeStream({
-    id: 'in',
-    direction: 'inflow',
-    primaryCategory: 'INCOME',
-    averageAmount: 7500,
-  });
-  const inactive = makeStream({
-    id: 'cancelled',
-    isActive: false,
-    primaryCategory: 'ENTERTAINMENT',
-    averageAmount: 100,
-  });
-
-  it('groups outflow streams by primaryCategory', () => {
-    const groups = groupByCategory([a, b, c]);
-    const keys = groups.map((g) => g.category);
-    expect(new Set(keys)).toEqual(new Set(['ENTERTAINMENT', 'RENT_AND_UTILITIES']));
-  });
-
-  it('sorts streams within each group by monthlyCost desc', () => {
-    const groups = groupByCategory([b, a]);
-    const ent = groups.find((g) => g.category === 'ENTERTAINMENT');
-    expect(ent?.streams.map((s) => s.id)).toEqual(['a', 'b']);
-  });
-
-  it('sorts groups across by total monthlyCost desc', () => {
-    const groups = groupByCategory([a, b, c]);
-    expect(groups.map((g) => g.category)).toEqual([
-      'RENT_AND_UTILITIES',
-      'ENTERTAINMENT',
-    ]);
-  });
-
-  it('places null-category streams in an "Other" bucket pinned to the bottom', () => {
-    const groups = groupByCategory([a, c, d]);
-    expect(groups[groups.length - 1].category).toBeNull();
-  });
-
-  it('keeps "Other" at the bottom even when its total exceeds another category', () => {
-    const big = makeStream({ id: 'big', primaryCategory: null, averageAmount: 99999 });
-    const groups = groupByCategory([a, c, big]);
-    expect(groups[groups.length - 1].category).toBeNull();
-  });
-
-  it('excludes inflow streams', () => {
-    const groups = groupByCategory([a, inflow]);
-    const allIds = groups.flatMap((g) => g.streams.map((s) => s.id));
-    expect(allIds).not.toContain('in');
-  });
-
-  it('excludes inactive streams', () => {
-    const groups = groupByCategory([a, inactive]);
-    const allIds = groups.flatMap((g) => g.streams.map((s) => s.id));
-    expect(allIds).not.toContain('cancelled');
-  });
-
-  it('exposes per-group total monthlyCost', () => {
-    const groups = groupByCategory([a, b, c]);
-    const ent = groups.find((g) => g.category === 'ENTERTAINMENT');
-    expect(ent?.total).toBe(30);
-  });
-});

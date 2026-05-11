@@ -141,6 +141,7 @@ export async function syncItemAction(
   // surfaces immediately.
   revalidatePath('/settings');
   revalidatePath('/dashboard');
+  revalidatePath('/recurring');
   return result;
 }
 
@@ -176,6 +177,13 @@ export async function syncAllItemsAction(): Promise<{
   const results = await Promise.allSettled(
     items.map((i) => syncExternalItem(i.id)),
   );
+
+  // Top-bar "Sync now" hits this path; mirror syncItemAction's
+  // revalidation set so post-sync state propagates regardless of
+  // which page the user was on when they clicked.
+  revalidatePath('/settings');
+  revalidatePath('/dashboard');
+  revalidatePath('/recurring');
 
   return {
     synced: results.filter((r) => r.status === 'fulfilled').length,
