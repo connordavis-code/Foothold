@@ -115,33 +115,33 @@ export function TransactionDetailSheet({
       }}
     >
       <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 z-40 bg-foreground/40 backdrop-blur-[2px]" />
+        <Drawer.Overlay className="fixed inset-0 z-40 bg-[--text]/40 backdrop-blur-[2px]" />
         <Drawer.Content
           aria-describedby={undefined}
           className={cn(
             'fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] flex-col',
-            'rounded-t-card border-t border-border bg-surface-elevated',
+            'rounded-t-card border-t border-[--border] bg-[--surface]',
             'pb-[env(safe-area-inset-bottom)]',
             'outline-none',
           )}
         >
           <div
             aria-hidden
-            className="mx-auto mt-2 h-1 w-10 rounded-full bg-muted"
+            className="mx-auto mt-2 h-1 w-10 rounded-full bg-[--text-3]/40"
           />
           {row && (
             <>
               <header className="flex items-start justify-between gap-3 px-5 py-4">
                 <div className="min-w-0">
-                  <Drawer.Title className="truncate text-base font-semibold">
+                  <Drawer.Title className="truncate text-base font-semibold text-[--text]">
                     {row.merchantName ?? row.name}
                   </Drawer.Title>
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  <p className="mt-0.5 truncate text-xs text-[--text-2]">
                     {formatLong(row.date)}
                     <span aria-hidden> · </span>
                     {row.accountName}
                     {row.accountMask && (
-                      <span className="text-muted-foreground/70">
+                      <span className="text-[--text-3]">
                         {' ····'}
                         {row.accountMask}
                       </span>
@@ -163,13 +163,13 @@ export function TransactionDetailSheet({
                 <p
                   className={cn(
                     'font-mono text-3xl font-semibold tabular-nums',
-                    isIncome ? 'text-positive' : 'text-foreground',
+                    isIncome ? 'text-positive' : 'text-[--text]',
                   )}
                 >
                   {formatCurrency(display, { signed: true })}
                 </p>
                 {row.pending && (
-                  <span className="mt-1 inline-flex rounded-md bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <span className="mt-1 inline-flex rounded-md bg-[--surface-sunken] px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-[--text-3]">
                     pending
                   </span>
                 )}
@@ -182,14 +182,14 @@ export function TransactionDetailSheet({
                     <span
                       className={cn(
                         row.overrideCategoryName
-                          ? 'italic text-foreground'
-                          : 'text-foreground',
+                          ? 'italic text-[--text]'
+                          : 'text-[--text]',
                       )}
                     >
                       {currentLabel}
                     </span>
                     {row.overrideCategoryName && row.primaryCategory && (
-                      <span className="ml-1.5 text-xs text-muted-foreground">
+                      <span className="ml-1.5 text-xs text-[--text-2]">
                         Plaid: {humanizeCategory(row.primaryCategory)}
                       </span>
                     )}
@@ -271,13 +271,13 @@ function CategoryOptionRow({
       className={cn(
         'flex min-h-[44px] items-center justify-between gap-2 rounded-card px-3 py-2 text-left text-sm transition-colors duration-fast ease-out-quart',
         muted
-          ? 'text-muted-foreground hover:bg-surface-sunken'
-          : 'hover:bg-surface-sunken',
+          ? 'text-[--text-2] hover:bg-[--surface-sunken]'
+          : 'text-[--text] hover:bg-[--surface-sunken]',
         'disabled:cursor-not-allowed disabled:opacity-60',
       )}
     >
       <span className="truncate">{label}</span>
-      {isCurrent && <Check className="h-4 w-4 text-foreground" />}
+      {isCurrent && <Check className="h-4 w-4 text-[--text]" />}
     </button>
   );
 }
