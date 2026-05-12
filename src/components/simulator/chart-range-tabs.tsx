@@ -21,7 +21,7 @@ export function ChartRangeTabs({ range, onChange }: Props) {
           className={cn(
             'rounded-pill px-3 py-1 text-xs',
             r === range
-              ? 'bg-foreground text-bg'
+              ? 'bg-foreground text-background'
               : 'text-text-2 hover:text-foreground',
           )}
         >

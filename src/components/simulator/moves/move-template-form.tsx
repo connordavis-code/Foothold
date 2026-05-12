@@ -77,7 +77,7 @@ export function MoveTemplateForm({
         <button
           type="submit"
           disabled={hasErrors || submitting}
-          className="rounded-btn border border-hairline bg-foreground px-3 py-1.5 text-sm text-bg disabled:opacity-50"
+          className="rounded-btn border border-hairline bg-foreground px-3 py-1.5 text-sm text-background disabled:opacity-50"
         >
           Apply
         </button>
@@ -174,7 +174,7 @@ function Field({ name, field, value, error, availableMonths, recurringStreams, o
               key={d}
               type="button"
               onClick={() => onChange(d)}
-              className={`px-3 py-1.5 text-sm ${value === d ? 'bg-foreground text-bg' : 'text-text-2'}`}
+              className={`px-3 py-1.5 text-sm ${value === d ? 'bg-foreground text-background' : 'text-text-2'}`}
             >
               {d === 'outflow' ? 'Outflow' : 'Inflow'}
             </button>
