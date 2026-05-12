@@ -21,16 +21,16 @@ export function MovesGrid({ onPick, disabledTemplates }: Props) {
             disabled={disabled}
             onClick={() => onPick(t.id)}
             className={cn(
-              'group flex items-center gap-3 rounded-card border border-hairline bg-surface p-4 text-left transition-all',
+              'group flex items-center gap-3 rounded-card border border-hairline-strong bg-surface-elevated p-4 text-left shadow-sm transition-all',
               disabled
                 ? 'cursor-not-allowed opacity-50'
-                : 'hover:-translate-y-0.5 hover:border-text-3',
+                : 'hover:-translate-y-0.5 hover:border-text-3 hover:shadow-md',
             )}
             title={disabled ? 'Connect accounts first — needs at least one recurring charge.' : undefined}
           >
             <span
               aria-hidden
-              className="flex h-10 w-10 items-center justify-center rounded-card border border-hairline bg-bg-2 text-text-2"
+              className="flex h-10 w-10 items-center justify-center rounded-card border border-hairline bg-surface-sunken text-text-2"
             >
               <Icon size={18} />
             </span>
