@@ -1,10 +1,18 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Scenario } from '@/lib/db/schema';
 import { projectCash } from '@/lib/forecast/engine';
+import type { FreshnessText } from '@/lib/format/freshness';
 import type { ForecastHistory, ScenarioOverrides } from '@/lib/forecast/types';
+import { buildSimulatorUrl, type RangeParam, type ViewParam } from '@/lib/simulator/url-state';
+import { deriveChartMarkers } from '@/lib/simulator/markers';
+import type { MoveTemplateId } from '@/lib/simulator/moves/templates';
+import { findTemplate } from '@/lib/simulator/moves/templates';
+
 import { ScenarioHeader } from '@/components/simulator/scenario-header';
+import { SimulatorTabs } from '@/components/simulator/simulator-tabs';
 import { OverrideSection } from '@/components/simulator/override-section';
 import { CategoryOverrides } from '@/components/simulator/category-overrides';
 import { LumpSumOverrides } from '@/components/simulator/lump-sum-overrides';
@@ -14,39 +22,46 @@ import { HypotheticalGoalOverrides } from '@/components/simulator/hypothetical-g
 import { GoalTargetOverrides } from '@/components/simulator/goal-target-overrides';
 import { SkipRecurringOverrides } from '@/components/simulator/skip-recurring-overrides';
 import { ForecastChart } from '@/components/simulator/forecast-chart';
-import { GoalDiffCards } from '@/components/simulator/goal-diff-cards';
+import { ChartRangeTabs } from '@/components/simulator/chart-range-tabs';
+import { ScenarioCards } from '@/components/simulator/scenario-cards';
+import { GoalImpacts } from '@/components/simulator/goal-impacts';
+import { EmptyStateCard } from '@/components/simulator/empty-state-card';
+import { MovesGrid } from '@/components/simulator/moves/moves-grid';
+import { MoveTemplateDrawer } from '@/components/simulator/moves/move-template-drawer';
 import { MobileScenarioSaveBar } from '@/components/simulator/mobile-scenario-save-bar';
-import { NarrativePanel } from '@/components/simulator/narrative-panel';
 
 type Props = {
   history: ForecastHistory;
   scenarios: Scenario[];
   currentMonth: string;
   initialScenario: Scenario | null;
+  initialView: ViewParam;
+  initialRange: RangeParam;
+  freshness: FreshnessText;
 };
 
-/**
- * Top-level simulator client. Owns:
- *   - selectedScenarioId (which saved scenario is loaded; null = baseline)
- *   - liveOverrides (the in-progress edit; equals selected scenario's overrides until edited)
- *   - engineResult (memoized projectCash output, recomputes when liveOverrides changes)
- *
- * isDirty is computed: liveOverrides differs from the loaded scenario's overrides.
- * Save / Delete actions live in ScenarioHeader; they call the server actions
- * and trigger a router refresh to re-fetch the scenarios list.
- */
 export function SimulatorClient({
   history,
   scenarios,
   currentMonth,
   initialScenario,
+  initialView,
+  initialRange,
+  freshness,
 }: Props) {
+  const router = useRouter();
+
+  // State -----------------------------------------------------------------
+  const [view, setViewState] = useState<ViewParam>(initialView);
+  const [range, setRangeState] = useState<RangeParam>(initialRange);
   const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(
     initialScenario?.id ?? null,
   );
   const [liveOverrides, setLiveOverrides] = useState<ScenarioOverrides>(
     (initialScenario?.overrides as ScenarioOverrides | undefined) ?? {},
   );
+  const [openSections, setOpenSections] = useState<ReadonlySet<string>>(() => new Set());
+  const [activeMoveTemplate, setActiveMoveTemplate] = useState<MoveTemplateId | null>(null);
 
   const selectedScenario = scenarios.find((s) => s.id === selectedScenarioId) ?? null;
 
@@ -70,38 +85,66 @@ export function SimulatorClient({
     [engineResult],
   );
 
-  const hasOverrides = useMemo(() => {
-    return Boolean(
-      liveOverrides.categoryDeltas?.length ||
-        liveOverrides.lumpSums?.length ||
-        liveOverrides.recurringChanges?.length ||
-        liveOverrides.skipRecurringInstances?.length ||
-        liveOverrides.incomeDelta ||
-        liveOverrides.hypotheticalGoals?.length ||
-        liveOverrides.goalTargetEdits?.length,
-    );
-  }, [liveOverrides]);
-
-  const handleSelectScenario = (id: string | null) => {
-    const scn = id ? scenarios.find((s) => s.id === id) : null;
-    setSelectedScenarioId(id);
-    setLiveOverrides((scn?.overrides as ScenarioOverrides | undefined) ?? {});
-  };
-
-  const handleReset = () => {
-    setLiveOverrides(
-      (selectedScenario?.overrides as ScenarioOverrides | undefined) ?? {},
-    );
-  };
-
-  // Override-section accordion state. Single Set keyed by section id;
-  // toggleSection collapses siblings on mobile (single-open accordion
-  // per spec §5) and toggles independently on desktop. Breakpoint
-  // detection via window.matchMedia inside the handler — read at click
-  // time, not at render, so SSR markup is identical at every viewport.
-  const [openSections, setOpenSections] = useState<ReadonlySet<string>>(
-    () => new Set(),
+  const chartMarkers = useMemo(
+    () =>
+      deriveChartMarkers(
+        baselineResult.projection,
+        engineResult.projection,
+        engineResult.goalImpacts,
+        currentMonth,
+        range,
+      ),
+    [baselineResult, engineResult, currentMonth, range],
   );
+
+  const currentMonthlyIncome = useMemo(() => {
+    const incomeHistory = history.incomeHistory ?? [];
+    if (incomeHistory.length === 0) return 0;
+    return incomeHistory.reduce((a, b) => a + b, 0) / incomeHistory.length;
+  }, [history.incomeHistory]);
+
+  // URL mirroring --------------------------------------------------------
+  const pushUrl = useCallback(
+    (next: { view?: ViewParam; range?: RangeParam; scenarioId?: string | null }) => {
+      const url = buildSimulatorUrl({
+        view: next.view ?? view,
+        range: next.range ?? range,
+        scenarioId: next.scenarioId === undefined ? selectedScenarioId : next.scenarioId,
+      });
+      router.push(url, { scroll: false });
+    },
+    [router, view, range, selectedScenarioId],
+  );
+
+  const setView = useCallback(
+    (next: ViewParam) => {
+      setViewState(next);
+      pushUrl({ view: next });
+      // Drawer closes when leaving Moves
+      if (next !== 'moves') setActiveMoveTemplate(null);
+    },
+    [pushUrl],
+  );
+
+  const setRange = useCallback(
+    (next: RangeParam) => {
+      setRangeState(next);
+      pushUrl({ range: next });
+    },
+    [pushUrl],
+  );
+
+  const handleSelectScenario = useCallback(
+    (id: string | null) => {
+      const scn = id ? scenarios.find((s) => s.id === id) : null;
+      setSelectedScenarioId(id);
+      setLiveOverrides((scn?.overrides as ScenarioOverrides | undefined) ?? {});
+      pushUrl({ scenarioId: id });
+    },
+    [scenarios, pushUrl],
+  );
+
+  // Override accordion ---------------------------------------------------
   const toggleSection = useCallback((key: string) => {
     setOpenSections((prev) => {
       const isMobile =
@@ -118,6 +161,31 @@ export function SimulatorClient({
     });
   }, []);
 
+  // Move submit ----------------------------------------------------------
+  const handleMoveSubmit = useCallback(
+    (templateId: MoveTemplateId, values: Record<string, unknown>) => {
+      const template = findTemplate(templateId);
+      if (!template) return;
+      // Inject derived current monthly income for job-loss applier
+      const derived = templateId === 'jobLoss'
+        ? { ...values, currentMonthlyIncome }
+        : values;
+      const next = template.applier(derived, liveOverrides);
+      setLiveOverrides(next);
+      setActiveMoveTemplate(null);
+      setView('comparison');
+      setOpenSections((prev) => new Set([...prev, template.targetSection]));
+    },
+    [liveOverrides, currentMonthlyIncome, setView],
+  );
+
+  // Reset ----------------------------------------------------------------
+  const handleReset = useCallback(() => {
+    const saved = (selectedScenario?.overrides as ScenarioOverrides | undefined) ?? {};
+    setLiveOverrides(saved);
+  }, [selectedScenario]);
+
+  // Empty-data guard -----------------------------------------------------
   const hasNoData =
     history.currentCash === 0 &&
     history.recurringStreams.length === 0 &&
@@ -134,19 +202,31 @@ export function SimulatorClient({
           onSelect={handleSelectScenario}
           onReset={handleReset}
         />
-        <div className="rounded-card border border-border bg-surface-elevated p-8 text-center">
-          <h2 className="mb-2 text-lg font-semibold text-foreground">
-            No data yet
-          </h2>
-          <p className="mx-auto max-w-md text-sm text-muted-foreground">
-            The simulator forecasts forward from your synced transactions and
-            recurring streams. Once Plaid finishes its first sync (typically
-            within a few minutes of connecting), the forecast will fill in here.
+        <div className="rounded-card border border-hairline bg-surface p-8 text-center">
+          <h2 className="mb-2 text-lg font-medium text-foreground">No data yet</h2>
+          <p className="mx-auto max-w-md text-sm text-text-2">
+            The simulator forecasts forward from your synced transactions and recurring streams.
+            Once Plaid finishes its first sync, the forecast will fill in here.
           </p>
         </div>
       </div>
     );
   }
+
+  // Disable Pause/Cancel Moves when no recurring streams exist
+  const disabledMoves = new Set<MoveTemplateId>();
+  if (history.recurringStreams.length === 0) {
+    disabledMoves.add('pauseRecurring');
+    disabledMoves.add('cancelSub');
+  }
+
+  // Chart subtitle (12mo · 2027-05 projected -$X)
+  const lastVisible = (range === '1Y' ? 11 : 23);
+  const horizonProjected =
+    engineResult.projection[lastVisible]?.endCash ?? engineResult.projection.at(-1)?.endCash ?? 0;
+  const horizonMonth =
+    engineResult.projection[lastVisible]?.month ?? engineResult.projection.at(-1)?.month ?? '';
+  const subtitle = `${range === '1Y' ? '12' : '24'} months · ${horizonMonth} projected`;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 pb-24 sm:px-8 sm:py-8 md:pb-8">
@@ -159,154 +239,185 @@ export function SimulatorClient({
         onReset={handleReset}
       />
 
-      {scenarios.length === 0 && (
-        <p className="-mt-4 mb-6 text-xs text-muted-foreground">
-          You&apos;re viewing the baseline forecast. Add overrides on the left
-          and click &ldquo;Save as…&rdquo; to keep a scenario for later.
-        </p>
+      <SimulatorTabs view={view} onChange={setView} />
+
+      {view === 'empty' && (
+        <div className="space-y-6">
+          <ForecastChart
+            baseline={baselineResult.projection}
+            scenario={[]}
+            markers={chartMarkers}
+            range={range}
+            showScenario={false}
+            subtitle={subtitle}
+            freshnessHeadline={freshness.headline}
+            freshnessCaveat={freshness.caveat}
+          />
+          <EmptyStateCard onPickMove={() => setView('moves')} />
+        </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-[260px_1fr] md:gap-10">
-        {/* Left: override editor */}
-        <div>
-          <p className="text-eyebrow mb-3">Overrides</p>
-          <OverrideSection
-            label="Categories"
-            count={liveOverrides.categoryDeltas?.length ?? 0}
-            open={openSections.has('categories')}
-            onToggle={() => toggleSection('categories')}
-          >
-            <CategoryOverrides
-              value={liveOverrides.categoryDeltas}
-              onChange={(next) =>
-                setLiveOverrides((o) => ({ ...o, categoryDeltas: next }))
-              }
-              knownCategories={history.categories}
-            />
-          </OverrideSection>
-          <OverrideSection
-            label="Lump sums"
-            count={liveOverrides.lumpSums?.length ?? 0}
-            open={openSections.has('lumpSums')}
-            onToggle={() => toggleSection('lumpSums')}
-          >
-            <LumpSumOverrides
-              value={liveOverrides.lumpSums}
-              onChange={(next) =>
-                setLiveOverrides((o) => ({ ...o, lumpSums: next }))
-              }
-              availableMonths={availableMonths}
-            />
-          </OverrideSection>
-          <OverrideSection
-            label="Recurring"
-            count={liveOverrides.recurringChanges?.length ?? 0}
-            open={openSections.has('recurring')}
-            onToggle={() => toggleSection('recurring')}
-          >
-            <RecurringOverrides
-              value={liveOverrides.recurringChanges}
-              onChange={(next) =>
-                setLiveOverrides((o) => ({ ...o, recurringChanges: next }))
-              }
-              baseStreams={history.recurringStreams}
-            />
-          </OverrideSection>
-          <OverrideSection
-            label="Income"
-            count={liveOverrides.incomeDelta ? 1 : 0}
-            open={openSections.has('income')}
-            onToggle={() => toggleSection('income')}
-          >
-            <IncomeOverrides
-              value={liveOverrides.incomeDelta}
-              onChange={(next) =>
-                setLiveOverrides((o) => ({ ...o, incomeDelta: next }))
-              }
-              availableMonths={availableMonths}
-            />
-          </OverrideSection>
-          <OverrideSection
-            label="Hypothetical goals"
-            count={liveOverrides.hypotheticalGoals?.length ?? 0}
-            open={openSections.has('hypotheticalGoals')}
-            onToggle={() => toggleSection('hypotheticalGoals')}
-          >
-            <HypotheticalGoalOverrides
-              value={liveOverrides.hypotheticalGoals}
-              onChange={(next) =>
-                setLiveOverrides((o) => ({ ...o, hypotheticalGoals: next }))
-              }
-            />
-          </OverrideSection>
-          <OverrideSection
-            label="Existing goal edits"
-            count={liveOverrides.goalTargetEdits?.length ?? 0}
-            open={openSections.has('goalTargetEdits')}
-            onToggle={() => toggleSection('goalTargetEdits')}
-          >
-            <GoalTargetOverrides
-              value={liveOverrides.goalTargetEdits}
-              onChange={(next) =>
-                setLiveOverrides((o) => ({ ...o, goalTargetEdits: next }))
-              }
-              realGoals={history.goals}
-            />
-          </OverrideSection>
-          <OverrideSection
-            label="Skip recurring"
-            count={liveOverrides.skipRecurringInstances?.length ?? 0}
-            open={openSections.has('skipRecurring')}
-            onToggle={() => toggleSection('skipRecurring')}
-          >
-            <SkipRecurringOverrides
-              value={liveOverrides.skipRecurringInstances}
-              onChange={(next) =>
-                setLiveOverrides((o) => ({ ...o, skipRecurringInstances: next }))
-              }
-              baseStreams={history.recurringStreams}
-              availableMonths={availableMonths}
-            />
-          </OverrideSection>
+      {view === 'moves' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-medium text-foreground">Pick a Move</h2>
+              <p className="text-xs text-text-3">Each Move adds an override and re-runs the projection</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setView('empty')}
+              className="text-xs text-text-2 hover:text-foreground"
+            >
+              Cancel ×
+            </button>
+          </div>
+          <MovesGrid
+            onPick={(id) => setActiveMoveTemplate(id)}
+            disabledTemplates={disabledMoves}
+          />
+          <MoveTemplateDrawer
+            activeTemplateId={activeMoveTemplate}
+            history={history}
+            liveOverrides={liveOverrides}
+            currentMonth={currentMonth}
+            availableMonths={availableMonths}
+            onSubmit={handleMoveSubmit}
+            onClose={() => setActiveMoveTemplate(null)}
+          />
         </div>
+      )}
 
-        {/* Right: forecast chart + goal diff cards */}
-        <div>
-          <div className="space-y-8">
-            <ForecastChart
-              baseline={baselineResult.projection}
-              scenarios={[
-                {
-                  id: selectedScenarioId ?? 'current',
-                  name: selectedScenario?.name ?? 'Current scenario',
-                  projection: engineResult.projection,
-                  colorVar: '--chart-1',
-                },
-              ]}
-            />
-            <GoalDiffCards
-              goalImpacts={engineResult.goalImpacts}
-              history={history}
-              hypotheticalGoals={liveOverrides.hypotheticalGoals}
-              currentMonth={currentMonth}
-            />
-            <NarrativePanel
-              scenarioId={selectedScenarioId}
-              overrides={liveOverrides}
-              isDirty={isDirty}
-              hasOverrides={hasOverrides}
-            />
+      {view === 'comparison' && (
+        <div className="space-y-8">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-[260px_1fr] md:gap-10">
+            <div>
+              <p className="text-eyebrow mb-3">Overrides</p>
+              <OverrideSection
+                label="Categories"
+                count={liveOverrides.categoryDeltas?.length ?? 0}
+                open={openSections.has('categories')}
+                onToggle={() => toggleSection('categories')}
+              >
+                <CategoryOverrides
+                  value={liveOverrides.categoryDeltas}
+                  onChange={(next) => setLiveOverrides((o) => ({ ...o, categoryDeltas: next }))}
+                  knownCategories={history.categories}
+                />
+              </OverrideSection>
+              <OverrideSection
+                label="Lump sums"
+                count={liveOverrides.lumpSums?.length ?? 0}
+                open={openSections.has('lumpSums')}
+                onToggle={() => toggleSection('lumpSums')}
+              >
+                <LumpSumOverrides
+                  value={liveOverrides.lumpSums}
+                  onChange={(next) => setLiveOverrides((o) => ({ ...o, lumpSums: next }))}
+                  availableMonths={availableMonths}
+                />
+              </OverrideSection>
+              <OverrideSection
+                label="Recurring"
+                count={liveOverrides.recurringChanges?.length ?? 0}
+                open={openSections.has('recurring')}
+                onToggle={() => toggleSection('recurring')}
+              >
+                <RecurringOverrides
+                  value={liveOverrides.recurringChanges}
+                  onChange={(next) => setLiveOverrides((o) => ({ ...o, recurringChanges: next }))}
+                  baseStreams={history.recurringStreams}
+                />
+              </OverrideSection>
+              <OverrideSection
+                label="Income"
+                count={liveOverrides.incomeDelta ? 1 : 0}
+                open={openSections.has('income')}
+                onToggle={() => toggleSection('income')}
+              >
+                <IncomeOverrides
+                  value={liveOverrides.incomeDelta}
+                  onChange={(next) => setLiveOverrides((o) => ({ ...o, incomeDelta: next }))}
+                  availableMonths={availableMonths}
+                />
+              </OverrideSection>
+              <OverrideSection
+                label="Hypothetical goals"
+                count={liveOverrides.hypotheticalGoals?.length ?? 0}
+                open={openSections.has('hypotheticalGoals')}
+                onToggle={() => toggleSection('hypotheticalGoals')}
+              >
+                <HypotheticalGoalOverrides
+                  value={liveOverrides.hypotheticalGoals}
+                  onChange={(next) => setLiveOverrides((o) => ({ ...o, hypotheticalGoals: next }))}
+                />
+              </OverrideSection>
+              <OverrideSection
+                label="Existing goal edits"
+                count={liveOverrides.goalTargetEdits?.length ?? 0}
+                open={openSections.has('goalTargetEdits')}
+                onToggle={() => toggleSection('goalTargetEdits')}
+              >
+                <GoalTargetOverrides
+                  value={liveOverrides.goalTargetEdits}
+                  onChange={(next) => setLiveOverrides((o) => ({ ...o, goalTargetEdits: next }))}
+                  realGoals={history.goals}
+                />
+              </OverrideSection>
+              <OverrideSection
+                label="Skip recurring"
+                count={liveOverrides.skipRecurringInstances?.length ?? 0}
+                open={openSections.has('skipRecurring')}
+                onToggle={() => toggleSection('skipRecurring')}
+              >
+                <SkipRecurringOverrides
+                  value={liveOverrides.skipRecurringInstances}
+                  onChange={(next) => setLiveOverrides((o) => ({ ...o, skipRecurringInstances: next }))}
+                  baseStreams={history.recurringStreams}
+                  availableMonths={availableMonths}
+                />
+              </OverrideSection>
+            </div>
+
+            <div className="space-y-6">
+              <div className="flex items-center justify-end">
+                <ChartRangeTabs range={range} onChange={setRange} />
+              </div>
+              <ForecastChart
+                baseline={baselineResult.projection}
+                scenario={engineResult.projection}
+                markers={chartMarkers}
+                range={range}
+                showScenario={true}
+                subtitle={subtitle}
+                freshnessHeadline={freshness.headline}
+                freshnessCaveat={freshness.caveat}
+              />
+              <ScenarioCards
+                scenarios={scenarios}
+                selectedScenarioId={selectedScenarioId}
+                liveOverrides={liveOverrides}
+                baselineEndCash={baselineResult.projection[lastVisible]?.endCash ?? 0}
+                scenarioEndCash={horizonProjected}
+                baselineLabel={`Projected ${horizonMonth} · no overrides`}
+                scenarioLabel={selectedScenario?.name ?? null}
+                onSelect={handleSelectScenario}
+              />
+              <GoalImpacts goalImpacts={engineResult.goalImpacts} />
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      <MobileScenarioSaveBar
-        scenarios={scenarios}
-        selectedScenarioId={selectedScenarioId}
-        liveOverrides={liveOverrides}
-        isDirty={isDirty}
-        onSelect={handleSelectScenario}
-      />
+      {view === 'comparison' && (
+        <MobileScenarioSaveBar
+          scenarios={scenarios}
+          selectedScenarioId={selectedScenarioId}
+          liveOverrides={liveOverrides}
+          isDirty={isDirty}
+          onSelect={handleSelectScenario}
+        />
+      )}
     </div>
   );
 }
