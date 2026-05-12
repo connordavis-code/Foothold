@@ -1,100 +1,71 @@
 'use client';
 
-import Link from 'next/link';
+import { useState, useRef, useEffect } from 'react';
 import type { Scenario } from '@/lib/db/schema';
-import { MAX_COMPARE_SCENARIOS } from '@/lib/forecast/comparison';
 import { cn } from '@/lib/utils';
 
 type Props = {
-  scenarios: Scenario[];
-  selectedIds: string[];
-  /**
-   * Called with the next selected-id list. Caller writes this back to the
-   * URL (`?scenarios=...`) — picker stays controlled.
-   */
-  onChange: (next: string[]) => void;
+  scenarios: Pick<Scenario, 'id' | 'name'>[];
+  selectedScenarioId: string | null;
+  onSelect: (id: string | null) => void;
 };
 
-/**
- * Chip-toggle picker for the compare view. Each saved scenario is a chip;
- * click toggles it in or out of the comparison. The cap at
- * MAX_COMPARE_SCENARIOS (3) is enforced visually — chips beyond the cap
- * grey out and reject clicks until the user removes one.
- *
- * No scenarios at all → empty-state copy with a link to /simulator. The
- * compare view is useless without saved scenarios; surfacing the path
- * forward beats showing an empty picker.
- */
-export function ScenarioPicker({ scenarios, selectedIds, onChange }: Props) {
-  if (scenarios.length === 0) {
-    return (
-      <div className="rounded-card border border-border bg-surface-elevated px-5 py-6 text-sm text-muted-foreground">
-        <p className="mb-2 text-foreground">No saved scenarios yet.</p>
-        <p>
-          Build one in the{' '}
-          <Link
-            href="/simulator"
-            className="text-foreground underline-offset-4 hover:underline"
-          >
-            Simulator
-          </Link>{' '}
-          and click &ldquo;Save as…&rdquo; to keep it for comparison.
-        </p>
-      </div>
-    );
-  }
+export function ScenarioPicker({ scenarios, selectedScenarioId, onSelect }: Props) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
-  const atCap = selectedIds.length >= MAX_COMPARE_SCENARIOS;
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [open]);
 
-  const toggle = (id: string) => {
-    const isSelected = selectedIds.includes(id);
-    if (isSelected) {
-      onChange(selectedIds.filter((x) => x !== id));
-    } else if (!atCap) {
-      onChange([...selectedIds, id]);
-    }
-  };
+  if (scenarios.length === 0) return null;
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="text-eyebrow">Scenarios</p>
-        <p className="text-[11px] text-muted-foreground">
-          {selectedIds.length} of {MAX_COMPARE_SCENARIOS} selected
-        </p>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {scenarios.map((s) => {
-          const isSelected = selectedIds.includes(s.id);
-          const isDisabled = !isSelected && atCap;
-          return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex items-center gap-1 rounded-btn border border-hairline px-3 py-1.5 text-sm text-text-2 hover:text-foreground hover:border-text-3"
+      >
+        Load…
+        <span aria-hidden className="text-xs">▾</span>
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full z-30 mt-1 w-56 rounded-card border border-hairline bg-surface-elevated p-1 shadow-sm"
+        >
+          <button
+            role="menuitem"
+            onClick={() => { onSelect(null); setOpen(false); }}
+            className={cn(
+              'block w-full rounded px-3 py-1.5 text-left text-sm hover:bg-bg-2',
+              selectedScenarioId === null && 'text-foreground',
+              selectedScenarioId !== null && 'text-text-2',
+            )}
+          >
+            Baseline
+          </button>
+          {scenarios.map((s) => (
             <button
               key={s.id}
-              type="button"
-              onClick={() => toggle(s.id)}
-              disabled={isDisabled}
-              aria-pressed={isSelected}
+              role="menuitem"
+              onClick={() => { onSelect(s.id); setOpen(false); }}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-pill border px-3 py-1.5 text-xs font-medium transition-colors',
-                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-                isSelected
-                  ? 'border-foreground bg-foreground text-background'
-                  : 'border-border bg-transparent text-foreground hover:bg-accent',
-                isDisabled && 'cursor-not-allowed opacity-40 hover:bg-transparent',
+                'block w-full rounded px-3 py-1.5 text-left text-sm hover:bg-bg-2',
+                selectedScenarioId === s.id ? 'text-foreground' : 'text-text-2',
               )}
-              title={
-                isDisabled
-                  ? `Remove a selection to add another (max ${MAX_COMPARE_SCENARIOS})`
-                  : isSelected
-                    ? 'Remove from comparison'
-                    : 'Add to comparison'
-              }
             >
               {s.name}
             </button>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
