@@ -129,8 +129,10 @@ function Field({ name, field, value, error, availableMonths, recurringStreams, o
         <input
           type="number"
           inputMode="decimal"
+          step={50}
           value={value as number}
           onChange={(e) => onChange(Number(e.target.value))}
+          onFocus={(e) => e.target.select()}
           className="rounded-btn border border-hairline bg-surface px-3 py-2 text-sm font-mono tabular-nums"
         />
       )}
@@ -138,8 +140,11 @@ function Field({ name, field, value, error, availableMonths, recurringStreams, o
         <input
           type="number"
           inputMode="numeric"
+          step={1}
+          min={0}
           value={value as number}
           onChange={(e) => onChange(parseInt(e.target.value, 10))}
+          onFocus={(e) => e.target.select()}
           className="rounded-btn border border-hairline bg-surface px-3 py-2 text-sm font-mono tabular-nums"
         />
       )}
