@@ -4,11 +4,11 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
 import { ForecastChart } from '@/components/simulator/forecast-chart';
-import { GoalDiffMatrix } from '@/components/simulator/goal-diff-matrix';
-import { ScenarioDeltaCards } from '@/components/simulator/scenario-delta-cards';
+import { GoalImpacts } from '@/components/simulator/goal-impacts';
+import { ScenarioCards } from '@/components/simulator/scenario-cards';
 import { ScenarioPicker } from '@/components/simulator/scenario-picker';
 import type { Scenario } from '@/lib/db/schema';
-import { pickScenarioColor } from '@/lib/forecast/comparison';
+import { deriveChartMarkers } from '@/lib/simulator/markers';
 import { projectCash } from '@/lib/forecast/engine';
 import type { ForecastHistory, ScenarioOverrides } from '@/lib/forecast/types';
 
@@ -16,50 +16,44 @@ type Props = {
   history: ForecastHistory;
   scenarios: Scenario[];
   currentMonth: string;
-  initialSelectedIds: string[];
+  initialScenarioId: string | null;
 };
 
 /**
- * Client owner of the compare view. Keeps URL as the source of truth for
- * picker state — selection is round-tripped through `?scenarios=...` so
- * the comparison is shareable + bookmark-able + back-button-correct.
+ * Client owner of the compare view.
  *
- * Engine runs are pure and memoized: baseline once, plus one projectCash
- * per selected scenario. With max 3 scenarios + baseline, that's 4 calls
- * total on each picker change — projectCash is microsecond-class so the
- * recompute is invisible.
+ * Reduced from "overlay up to 3 scenarios" to "baseline vs one saved
+ * scenario" — the new <ForecastChart> accepts a singular `scenario` prop
+ * (not an array). Multi-scenario overlay is deferred.
+ *
+ * URL source of truth: `?scenario=<id>` (single). Picker writes the param;
+ * back/forward correctly restores selection.
  */
 export function CompareClient({
   history,
   scenarios,
   currentMonth,
-  initialSelectedIds,
+  initialScenarioId,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Re-derive selectedIds from URL each render so the back/forward buttons
-  // correctly restore picker state. Server provides initialSelectedIds for
-  // the first render (avoids a flash); subsequent navigation updates the
-  // URL and we read from searchParams.
-  const selectedIds = useMemo(() => {
-    const raw = searchParams.get('scenarios');
-    if (!raw) return initialSelectedIds;
-    return raw
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .slice(0, 3);
-  }, [searchParams, initialSelectedIds]);
+  // Re-derive from URL on every render so back/forward works correctly.
+  const selectedScenarioId = useMemo<string | null>(() => {
+    const raw = searchParams.get('scenario');
+    if (!raw) return initialScenarioId;
+    // Validate against owned scenarios — stale URL with deleted id → null.
+    return scenarios.some((s) => s.id === raw) ? raw : null;
+  }, [searchParams, initialScenarioId, scenarios]);
 
-  const setSelectedIds = useCallback(
-    (next: string[]) => {
+  const setSelectedScenarioId = useCallback(
+    (next: string | null) => {
       const params = new URLSearchParams(searchParams.toString());
-      if (next.length === 0) {
-        params.delete('scenarios');
+      if (!next) {
+        params.delete('scenario');
       } else {
-        params.set('scenarios', next.join(','));
+        params.set('scenario', next);
       }
       const qs = params.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
@@ -72,61 +66,93 @@ export function CompareClient({
     [history, currentMonth],
   );
 
-  // Per-scenario engine results. Carries the full `goalImpacts` so the
-  // matrix can compose without re-running projectCash.
-  const scenarioResults = useMemo(() => {
-    return selectedIds.map((id, idx) => {
-      const scn = scenarios.find((s) => s.id === id);
-      if (!scn) return null;
-      const overrides = scn.overrides as ScenarioOverrides;
-      const result = projectCash({ history, overrides, currentMonth });
-      return {
-        id: scn.id,
-        name: scn.name,
-        projection: result.projection,
-        goalImpacts: result.goalImpacts,
-        colorVar: pickScenarioColor(idx),
-      };
-    }).filter((r): r is NonNullable<typeof r> => r !== null);
-  }, [selectedIds, scenarios, history, currentMonth]);
+  const scenarioResult = useMemo(() => {
+    if (!selectedScenarioId) return null;
+    const scn = scenarios.find((s) => s.id === selectedScenarioId);
+    if (!scn) return null;
+    const overrides = scn.overrides as ScenarioOverrides;
+    return projectCash({ history, overrides, currentMonth });
+  }, [selectedScenarioId, scenarios, history, currentMonth]);
+
+  const scenarioProjection = scenarioResult?.projection ?? baseline;
+  const goalImpacts = scenarioResult?.goalImpacts ?? [];
+
+  const markers = useMemo(
+    () => deriveChartMarkers(baseline, scenarioProjection, goalImpacts, currentMonth, '1Y'),
+    [baseline, scenarioProjection, goalImpacts, currentMonth],
+  );
+
+  const selectedScenario = scenarios.find((s) => s.id === selectedScenarioId) ?? null;
+  const baselineEndCash = baseline[baseline.length - 1]?.endCash ?? 0;
+  const scenarioEndCash = scenarioProjection[scenarioProjection.length - 1]?.endCash ?? 0;
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 px-4 py-6 sm:px-8 sm:py-8">
-      <header className="space-y-1.5 border-b border-border pb-4">
+      <header className="space-y-1.5 border-b border-hairline pb-4">
         <p className="text-eyebrow">Plan</p>
         <div className="flex items-baseline justify-between gap-3">
-          <h1 className="text-xl font-semibold tracking-tight">
+          <h1 className="font-display italic text-3xl text-foreground md:text-4xl">
             Compare scenarios
           </h1>
           <Link
             href="/simulator"
-            className="text-sm text-muted-foreground hover:text-foreground"
+            className="text-sm text-text-3 hover:text-foreground"
           >
             ← back to Simulator
           </Link>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Overlay up to 3 saved scenarios on the baseline forecast.
+        <p className="text-sm text-text-3">
+          Select a saved scenario to compare against the baseline forecast.
         </p>
       </header>
 
-      <ScenarioPicker
-        scenarios={scenarios}
-        selectedIds={selectedIds}
-        onChange={setSelectedIds}
-      />
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-text-3">
+          {selectedScenario
+            ? <>Comparing <span className="text-foreground">{selectedScenario.name}</span> vs baseline</>
+            : 'No scenario selected — showing baseline only.'}
+        </p>
+        <ScenarioPicker
+          scenarios={scenarios}
+          selectedScenarioId={selectedScenarioId}
+          onSelect={setSelectedScenarioId}
+        />
+      </div>
 
-      {selectedIds.length === 0 && scenarios.length > 0 ? (
-        <div className="rounded-card border border-dashed border-border bg-surface-elevated px-5 py-10 text-center">
-          <p className="text-sm text-muted-foreground">
-            Select scenarios above to overlay them on the baseline forecast.
+      {scenarios.length === 0 ? (
+        <div className="rounded-card border border-dashed border-hairline bg-surface px-5 py-10 text-center">
+          <p className="text-sm text-text-3">
+            No saved scenarios yet. Create one in the{' '}
+            <Link href="/simulator" className="underline hover:text-foreground">
+              Simulator
+            </Link>
+            .
           </p>
         </div>
       ) : (
         <>
-          <ForecastChart baseline={baseline} scenarios={scenarioResults} />
-          <ScenarioDeltaCards baseline={baseline} scenarios={scenarioResults} />
-          <GoalDiffMatrix scenarios={scenarioResults} />
+          <ForecastChart
+            baseline={baseline}
+            scenario={scenarioProjection}
+            markers={markers}
+            range="1Y"
+            showScenario={selectedScenarioId !== null}
+          />
+
+          <ScenarioCards
+            scenarios={scenarios}
+            selectedScenarioId={selectedScenarioId}
+            liveOverrides={(selectedScenario?.overrides as ScenarioOverrides) ?? {}}
+            baselineEndCash={baselineEndCash}
+            scenarioEndCash={scenarioEndCash}
+            baselineLabel="Baseline projection"
+            scenarioLabel={selectedScenario?.name ?? null}
+            onSelect={setSelectedScenarioId}
+          />
+
+          {goalImpacts.length > 0 && (
+            <GoalImpacts goalImpacts={goalImpacts} />
+          )}
         </>
       )}
     </div>
