@@ -8,6 +8,13 @@ import {
 } from '@/lib/forecast/override-helpers';
 import { formatCurrency } from '@/lib/utils';
 import type { ScenarioOverrides } from '@/lib/forecast/types';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 type Props = {
   value: ScenarioOverrides['categoryDeltas'];
@@ -67,22 +74,24 @@ export function CategoryOverrides({ value, onChange, knownCategories }: Props) {
       })}
 
       {availableCategories.length > 0 ? (
-        <select
+        <Select
           value=""
-          onChange={(e) => {
-            const id = e.target.value;
+          onValueChange={(id) => {
             if (!id) return;
             onChange(addItem(items, { categoryId: id, monthlyDelta: 0 }));
           }}
-          className="w-full bg-background border border-dashed border-hairline rounded-btn px-2 py-1.5 text-text-3 hover:text-foreground"
         >
-          <option value="">+ add category override</option>
-          {availableCategories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger className="w-full bg-background border border-dashed border-hairline rounded-btn px-2 py-1.5 text-text-3 hover:text-foreground">
+            <SelectValue placeholder="+ add category override" />
+          </SelectTrigger>
+          <SelectContent>
+            {availableCategories.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       ) : (
         <div className="text-xs text-text-3/60 italic">
           All known categories already overridden.

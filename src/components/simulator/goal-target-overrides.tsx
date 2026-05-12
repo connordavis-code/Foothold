@@ -7,6 +7,13 @@ import {
   updateItem,
 } from '@/lib/forecast/override-helpers';
 import type { ForecastHistory, ScenarioOverrides } from '@/lib/forecast/types';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 type Props = {
   value: ScenarioOverrides['goalTargetEdits'];
@@ -69,22 +76,24 @@ export function GoalTargetOverrides({ value, onChange, realGoals }: Props) {
       })}
 
       {availableGoals.length > 0 ? (
-        <select
+        <Select
           value=""
-          onChange={(e) => {
-            const id = e.target.value;
+          onValueChange={(id) => {
             if (!id) return;
             onChange(addItem(items, { goalId: id }));
           }}
-          className="w-full bg-background border border-dashed border-hairline rounded-btn px-2 py-1.5 text-text-3 hover:text-foreground"
         >
-          <option value="">+ edit a real goal</option>
-          {availableGoals.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger className="w-full bg-background border border-dashed border-hairline rounded-btn px-2 py-1.5 text-text-3 hover:text-foreground">
+            <SelectValue placeholder="+ edit a real goal" />
+          </SelectTrigger>
+          <SelectContent>
+            {availableGoals.map((g) => (
+              <SelectItem key={g.id} value={g.id}>
+                {g.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       ) : realGoals.length === 0 ? (
         <div className="text-xs text-text-3/60 italic">
           No real goals to edit yet.

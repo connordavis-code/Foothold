@@ -7,6 +7,13 @@ import {
   updateItem,
 } from '@/lib/forecast/override-helpers';
 import type { ScenarioOverrides } from '@/lib/forecast/types';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 type Props = {
   value: ScenarioOverrides['lumpSums'];
@@ -48,17 +55,21 @@ export function LumpSumOverrides({ value, onChange, availableMonths }: Props) {
             placeholder="Label"
           />
           <div className="flex items-center gap-1.5">
-            <select
+            <Select
               value={item.month}
-              onChange={(e) =>
-                onChange(updateItem(items, (i) => i.id === item.id, { month: e.target.value }))
+              onValueChange={(v) =>
+                onChange(updateItem(items, (i) => i.id === item.id, { month: v }))
               }
-              className="flex-1 min-w-0 bg-background border border-hairline rounded-btn px-2 py-1 text-foreground"
             >
-              {availableMonths.map((m) => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
+              <SelectTrigger className="flex-1 min-w-0 bg-background border border-hairline rounded-btn px-2 py-1 text-foreground">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {availableMonths.map((m) => (
+                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <input
               type="number"
               // Show placeholder when amount is 0 so an unfilled stub is

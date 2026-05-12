@@ -7,6 +7,13 @@ import {
   updateItemAt,
 } from '@/lib/forecast/override-helpers';
 import type { ForecastHistory, ScenarioOverrides } from '@/lib/forecast/types';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 type Props = {
   value: ScenarioOverrides['skipRecurringInstances'];
@@ -26,29 +33,37 @@ export function SkipRecurringOverrides({
         const stream = baseStreams.find((s) => s.id === item.streamId);
         return (
           <div key={`${item.streamId}-${item.skipMonth}-${i}`} className="flex items-center gap-2">
-            <select
+            <Select
               value={item.streamId}
-              onChange={(e) =>
-                onChange(updateItemAt(items, i, { streamId: e.target.value }))
+              onValueChange={(v) =>
+                onChange(updateItemAt(items, i, { streamId: v }))
               }
-              className="flex-1 bg-background border border-hairline rounded-btn px-2 py-1 text-foreground"
             >
-              {baseStreams.map((s) => (
-                <option key={s.id} value={s.id}>{s.label}</option>
-              ))}
-            </select>
+              <SelectTrigger className="flex-1 bg-background border border-hairline rounded-btn px-2 py-1 text-foreground">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {baseStreams.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <span className="text-xs text-text-3">in</span>
-            <select
+            <Select
               value={item.skipMonth}
-              onChange={(e) =>
-                onChange(updateItemAt(items, i, { skipMonth: e.target.value }))
+              onValueChange={(v) =>
+                onChange(updateItemAt(items, i, { skipMonth: v }))
               }
-              className="bg-background border border-hairline rounded-btn px-2 py-1 text-foreground"
             >
-              {availableMonths.map((m) => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
+              <SelectTrigger className="bg-background border border-hairline rounded-btn px-2 py-1 text-foreground">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {availableMonths.map((m) => (
+                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <button
               onClick={() => onChange(removeItemAt(items, i))}
               className="p-1 text-text-3 hover:text-destructive"

@@ -4,6 +4,13 @@ import { X } from 'lucide-react';
 import { addItem, removeItemAt, updateItemAt } from '@/lib/forecast/override-helpers';
 import { formatCurrency } from '@/lib/utils';
 import type { ForecastHistory, ScenarioOverrides } from '@/lib/forecast/types';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 // 52w/y, 26 biweeklies/y, 12 months/y. Used to annualize amounts for the
 // inline impact preview shown under each recurring row.
@@ -99,19 +106,23 @@ export function RecurringOverrides({ value, onChange, baseStreams }: Props) {
           </div>
 
           {(item.action === 'pause' || item.action === 'edit') && (
-            <select
+            <Select
               value={item.streamId ?? ''}
-              onChange={(e) =>
-                onChange(updateItemAt(items, i, { streamId: e.target.value }))
+              onValueChange={(v) =>
+                onChange(updateItemAt(items, i, { streamId: v }))
               }
-              className="w-full bg-background border border-hairline rounded-btn px-2 py-1 text-foreground"
             >
-              {baseStreams.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.label} (${s.amount} {s.cadence})
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full bg-background border border-hairline rounded-btn px-2 py-1 text-foreground">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {baseStreams.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.label} (${s.amount} {s.cadence})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
 
           {(item.action === 'edit' || item.action === 'add') && (
@@ -148,36 +159,44 @@ export function RecurringOverrides({ value, onChange, baseStreams }: Props) {
                   }
                   className="w-20 bg-background border border-hairline rounded-btn px-2 py-1 text-right text-foreground"
                 />
-                <select
+                <Select
                   value={item.cadence ?? 'monthly'}
-                  onChange={(e) =>
+                  onValueChange={(v) =>
                     onChange(
                       updateItemAt(items, i, {
-                        cadence: e.target.value as 'weekly' | 'biweekly' | 'monthly',
+                        cadence: v as 'weekly' | 'biweekly' | 'monthly',
                       }),
                     )
                   }
-                  className="flex-1 min-w-0 bg-background border border-hairline rounded-btn px-2 py-1 text-foreground"
                 >
-                  <option value="weekly">weekly</option>
-                  <option value="biweekly">biweekly</option>
-                  <option value="monthly">monthly</option>
-                </select>
+                  <SelectTrigger className="flex-1 min-w-0 bg-background border border-hairline rounded-btn px-2 py-1 text-foreground">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="weekly">weekly</SelectItem>
+                    <SelectItem value="biweekly">biweekly</SelectItem>
+                    <SelectItem value="monthly">monthly</SelectItem>
+                  </SelectContent>
+                </Select>
                 {item.action === 'add' && (
-                  <select
+                  <Select
                     value={item.direction ?? 'outflow'}
-                    onChange={(e) =>
+                    onValueChange={(v) =>
                       onChange(
                         updateItemAt(items, i, {
-                          direction: e.target.value as 'inflow' | 'outflow',
+                          direction: v as 'inflow' | 'outflow',
                         }),
                       )
                     }
-                    className="bg-background border border-hairline rounded-btn px-2 py-1 text-foreground"
                   >
-                    <option value="outflow">out</option>
-                    <option value="inflow">in</option>
-                  </select>
+                    <SelectTrigger className="bg-background border border-hairline rounded-btn px-2 py-1 text-foreground">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="outflow">out</SelectItem>
+                      <SelectItem value="inflow">in</SelectItem>
+                    </SelectContent>
+                  </Select>
                 )}
               </div>
             </>

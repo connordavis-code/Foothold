@@ -2,6 +2,13 @@
 
 import { formatCurrency } from '@/lib/utils';
 import type { ScenarioOverrides } from '@/lib/forecast/types';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 type Props = {
   value: ScenarioOverrides['incomeDelta'];
@@ -46,27 +53,35 @@ export function IncomeOverrides({ value, onChange, availableMonths }: Props) {
       )}
       <div className="flex items-center gap-2 text-xs">
         <span className="text-text-3">From</span>
-        <select
+        <Select
           value={value.startMonth ?? ''}
-          onChange={(e) => onChange({ ...value, startMonth: e.target.value || undefined })}
-          className="bg-background border border-hairline rounded-btn px-2 py-1 text-foreground"
+          onValueChange={(v) => onChange({ ...value, startMonth: v || undefined })}
         >
-          <option value="">always</option>
-          {availableMonths.map((m) => (
-            <option key={m} value={m}>{m}</option>
-          ))}
-        </select>
+          <SelectTrigger className="bg-background border border-hairline rounded-btn px-2 py-1 text-foreground">
+            <SelectValue placeholder="always" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">always</SelectItem>
+            {availableMonths.map((m) => (
+              <SelectItem key={m} value={m}>{m}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <span className="text-text-3">to</span>
-        <select
+        <Select
           value={value.endMonth ?? ''}
-          onChange={(e) => onChange({ ...value, endMonth: e.target.value || undefined })}
-          className="bg-background border border-hairline rounded-btn px-2 py-1 text-foreground"
+          onValueChange={(v) => onChange({ ...value, endMonth: v || undefined })}
         >
-          <option value="">end of horizon</option>
-          {availableMonths.map((m) => (
-            <option key={m} value={m}>{m}</option>
-          ))}
-        </select>
+          <SelectTrigger className="bg-background border border-hairline rounded-btn px-2 py-1 text-foreground">
+            <SelectValue placeholder="end of horizon" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">end of horizon</SelectItem>
+            {availableMonths.map((m) => (
+              <SelectItem key={m} value={m}>{m}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );

@@ -2,6 +2,13 @@
 
 import { useMemo, useState } from 'react';
 import type { MoveTemplate, MoveFieldKind } from '@/lib/simulator/moves/templates';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 type Props = {
   template: MoveTemplate;
@@ -107,15 +114,16 @@ function Field({ name, field, value, error, availableMonths, recurringStreams, o
     <label className="flex flex-col gap-1.5">
       <span className="text-eyebrow">{field.label}</span>
       {field.kind === 'month' && (
-        <select
-          value={value as string}
-          onChange={(e) => onChange(e.target.value)}
-          className="rounded-btn border border-hairline bg-surface px-3 py-2 text-sm"
-        >
-          {availableMonths.map((m) => (
-            <option key={m} value={m}>{m}</option>
-          ))}
-        </select>
+        <Select value={value as string} onValueChange={(v) => onChange(v)}>
+          <SelectTrigger className="rounded-btn border border-hairline bg-surface px-3 py-2 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {availableMonths.map((m) => (
+              <SelectItem key={m} value={m}>{m}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       )}
       {field.kind === 'currency' && (
         <input
@@ -158,18 +166,18 @@ function Field({ name, field, value, error, availableMonths, recurringStreams, o
         </div>
       )}
       {field.kind === 'streamPicker' && (
-        <select
-          value={value as string}
-          onChange={(e) => onChange(e.target.value)}
-          className="rounded-btn border border-hairline bg-surface px-3 py-2 text-sm"
-        >
-          <option value="">Select…</option>
-          {recurringStreams
-            .filter((s) => !field.direction || s.direction === field.direction)
-            .map((s) => (
-              <option key={s.id} value={s.id}>{s.label}</option>
-            ))}
-        </select>
+        <Select value={value as string} onValueChange={(v) => onChange(v)}>
+          <SelectTrigger className="rounded-btn border border-hairline bg-surface px-3 py-2 text-sm">
+            <SelectValue placeholder="Select…" />
+          </SelectTrigger>
+          <SelectContent>
+            {recurringStreams
+              .filter((s) => !field.direction || s.direction === field.direction)
+              .map((s) => (
+                <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
+              ))}
+          </SelectContent>
+        </Select>
       )}
       {('helpText' in field) && field.helpText && !error && (
         <span className="text-xs text-text-3">{field.helpText}</span>
