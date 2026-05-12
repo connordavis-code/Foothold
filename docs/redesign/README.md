@@ -22,7 +22,7 @@ This milestone replaces the visual + IA layer wholesale while preserving the dat
 | R.3.2 Recurring | ✓ shipped — merged to `feat/redesign` (layered IA: Hike alerts → PFC-clustered category sections → Inflows → Recently cancelled; merchant drilldown). [r3-2-recurring/SPEC.md](r3-2-recurring/SPEC.md) + [PLAN.md](r3-2-recurring/PLAN.md) |
 | R.3.3 Transactions | ✓ shipped — merged to `feat/redesign` (operator-table date grouping, mobile shell, chips, page rewrite, revalidatePath). [r3-3-transactions/SPEC.md](r3-3-transactions/SPEC.md) + [PLAN.md](r3-3-transactions/PLAN.md) |
 | R.3.4 Investments | ✓ shipped — on `feat/redesign` (portfolio_snapshot table + walkback chart, wholesale-IA restyle with Allocation/Holdings/Recent-activity sections, capability-aware freshness). [r3-4-investments/SPEC.md](r3-4-investments/SPEC.md) + [PLAN.md](r3-4-investments/PLAN.md) |
-| R.3.5 Simulator | not started |
+| R.3.5 Simulator | ✓ shipped — on `feat/redesign` (URL-state tabs Empty/Moves/Comparison, hand-rolled SVG ForecastChart with position-dot pulse + goal markers + 1Y/2Y range, 8 guided Move template forms abstracting the override editor, scenario cards row + goal impacts cards, narrative panel removed, /simulator/compare reduced to baseline-vs-one). [r3-5-simulator/SPEC.md](r3-5-simulator/SPEC.md) + [PLAN.md](r3-5-simulator/PLAN.md) |
 | R.3.6 Settings | not started |
 | R.4 Goals Moves + scenario unification | not started |
 | R.5 Mobile rebuild | not started |
