@@ -84,6 +84,24 @@ describe('deriveChartMarkers', () => {
     expect(markers.filter((m) => m.kind === 'goalArrival')).toHaveLength(3);
   });
 
+  it('caps to the 3 earliest goal arrivals when more than 3 fall in range', () => {
+    const goalImpacts: GoalImpact[] = [
+      { goalId: 'late', name: 'Late', baselineETA: '2027-10', scenarioETA: '2027-10', shiftMonths: 0 },
+      { goalId: 'early1', name: 'Early1', baselineETA: '2026-08', scenarioETA: '2026-08', shiftMonths: 0 },
+      { goalId: 'mid', name: 'Mid', baselineETA: '2027-02', scenarioETA: '2027-02', shiftMonths: 0 },
+      { goalId: 'early2', name: 'Early2', baselineETA: '2026-10', scenarioETA: '2026-10', shiftMonths: 0 },
+      { goalId: 'early3', name: 'Early3', baselineETA: '2026-12', scenarioETA: '2026-12', shiftMonths: 0 },
+    ];
+    const markers = deriveChartMarkers(baseline, scenario, goalImpacts, '2026-06', '2Y');
+    const arrivals = markers.filter((m) => m.kind === 'goalArrival');
+    expect(arrivals).toHaveLength(3);
+    expect(arrivals.map((m) => (m as { goalName: string }).goalName)).toEqual([
+      'Early1',  // monthIndex 2
+      'Early2',  // monthIndex 4
+      'Early3',  // monthIndex 6
+    ]);
+  });
+
   it('drops goals with null scenarioETA', () => {
     const goalImpacts: GoalImpact[] = [
       { goalId: 'g1', name: 'Unreachable', baselineETA: null, scenarioETA: null, shiftMonths: 0 },

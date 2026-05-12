@@ -47,6 +47,7 @@ export function deriveChartMarkers(
       monthIndex: monthDiff(currentMonth, g.scenarioETA!),
     }))
     .filter(({ monthIndex }) => monthIndex >= 0 && monthIndex < horizonMonths)
+    .sort((a, b) => a.monthIndex - b.monthIndex)
     .slice(0, GOAL_ARRIVAL_CAP);
 
   for (const { goal, monthIndex } of arrivals) {
