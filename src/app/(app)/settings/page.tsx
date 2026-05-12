@@ -42,7 +42,12 @@ export default async function SettingsPage() {
 
   return (
     <div className="px-8 py-8 max-w-3xl mx-auto space-y-6">
-      <h1 className="text-3xl font-semibold tracking-tight">Settings</h1>
+      <h1
+        className="font-display italic text-3xl text-foreground md:text-4xl"
+        style={{ letterSpacing: "-0.02em" }}
+      >
+        Settings
+      </h1>
 
       <Card>
         <CardHeader>

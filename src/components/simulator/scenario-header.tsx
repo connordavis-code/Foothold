@@ -94,7 +94,10 @@ export function ScenarioHeader({
     <header className="mb-6 flex items-start justify-between gap-4">
       <div>
         <p className="text-eyebrow">Plan</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
+        <h1
+          className="mt-1 font-display italic text-3xl text-foreground md:text-4xl"
+          style={{ letterSpacing: "-0.02em" }}
+        >
           Simulator
         </h1>
       </div>

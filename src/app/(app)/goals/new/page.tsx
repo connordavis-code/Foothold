@@ -25,7 +25,10 @@ export default async function NewGoalPage({
         <div className="text-xs uppercase tracking-[0.16em] text-[--text-3]">
           Plan
         </div>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[--text]">
+        <h1
+          className="mt-1 font-display italic text-3xl text-foreground md:text-4xl"
+          style={{ letterSpacing: "-0.02em" }}
+        >
           New goal
         </h1>
         <p className="mt-1 text-sm text-[--text-2]">
