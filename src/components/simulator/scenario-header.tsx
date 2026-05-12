@@ -1,13 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
-import {
-  createScenario,
-  deleteScenario,
-  updateScenario,
-} from '@/lib/forecast/scenario-actions';
 import type { Scenario } from '@/lib/db/schema';
 import type { ScenarioOverrides } from '@/lib/forecast/types';
 import {
@@ -19,55 +13,45 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Button, buttonVariants } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import {
+  createScenario,
+  updateScenario,
+  deleteScenario,
+} from '@/lib/forecast/scenario-actions';
+import { ScenarioPicker } from './scenario-picker';
+import { toast } from 'sonner';
 
 type Props = {
-  scenarios: Scenario[];
+  scenarios: Pick<Scenario, 'id' | 'name'>[];
   selectedScenarioId: string | null;
   liveOverrides: ScenarioOverrides;
   isDirty: boolean;
   onSelect: (id: string | null) => void;
+  onReset: () => void;
 };
 
-/**
- * Top-of-page header. Scenario name + selector + actions.
- *
- * Save semantics:
- *   - No scenario selected (baseline): inline name input → createScenario.
- *   - Scenario selected and dirty: updateScenario in place.
- *
- * Sonner surfaces success/failure toasts; AlertDialog gates Delete.
- * After mutation, router.refresh() re-fetches the scenarios list. The
- * Save button doubles as a Cmd/Ctrl+S target via document keydown.
- */
 export function ScenarioHeader({
   scenarios,
   selectedScenarioId,
   liveOverrides,
   isDirty,
   onSelect,
+  onReset,
 }: Props) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-  const [nameDraft, setNameDraft] = useState<string | null>(null);
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  const nameInputRef = useRef<HTMLInputElement>(null);
+  const [pending, startTransition] = useTransition();
+  const [saveAsName, setSaveAsName] = useState('');
+  const [saveAsOpen, setSaveAsOpen] = useState(false);
 
-  const selected = scenarios.find((s) => s.id === selectedScenarioId) ?? null;
-
-  // Focus the name input the moment it appears so the user can just type.
-  useEffect(() => {
-    if (nameDraft !== null) nameInputRef.current?.focus();
-  }, [nameDraft]);
-
-  const persistUpdate = (id: string) => {
+  const saveCurrent = () => {
+    if (!selectedScenarioId) return;
     startTransition(async () => {
-      const result = await updateScenario({ id, overrides: liveOverrides });
+      const result = await updateScenario({ id: selectedScenarioId, overrides: liveOverrides });
       if (result.ok) {
-        toast.success('Saved.');
+        toast.success('Scenario saved');
         router.refresh();
       } else {
         toast.error(result.error);
@@ -75,51 +59,29 @@ export function ScenarioHeader({
     });
   };
 
-  const persistCreate = (name: string) => {
-    if (!name.trim()) {
-      toast.error("Name can't be empty.");
-      return;
-    }
+  const saveAs = () => {
+    const name = saveAsName.trim();
+    if (!name) return;
     startTransition(async () => {
-      const result = await createScenario({
-        name: name.trim(),
-        overrides: liveOverrides,
-      });
+      const result = await createScenario({ name, overrides: liveOverrides });
       if (result.ok) {
-        toast.success(`Saved "${name.trim()}".`);
-        setNameDraft(null);
-        // Auto-redirect to compare with the new scenario pre-selected (Phase 1
-        // PR 3 decision): save = moment of payoff. The user immediately sees
-        // their new scenario overlaid on baseline.
-        router.push(`/simulator/compare?scenarios=${result.data.id}`);
+        toast.success(`Saved "${name}"`);
+        setSaveAsOpen(false);
+        setSaveAsName('');
+        onSelect(result.data.id);
+        router.refresh();
       } else {
         toast.error(result.error);
       }
     });
   };
 
-  const handleSave = () => {
-    if (!isDirty || isPending) return;
-    if (selected) {
-      persistUpdate(selected.id);
-    } else {
-      // Open the inline name editor instead of window.prompt.
-      setNameDraft('');
-    }
-  };
-
-  const handleDelete = () => {
-    if (!selected) return;
-    setConfirmDeleteOpen(true);
-  };
-
-  const performDelete = () => {
-    if (!selected) return;
+  const deleteCurrent = () => {
+    if (!selectedScenarioId) return;
     startTransition(async () => {
-      const result = await deleteScenario({ id: selected.id });
+      const result = await deleteScenario({ id: selectedScenarioId });
       if (result.ok) {
-        toast.success('Deleted.');
-        setConfirmDeleteOpen(false);
+        toast.success('Scenario deleted');
         onSelect(null);
         router.refresh();
       } else {
@@ -128,156 +90,96 @@ export function ScenarioHeader({
     });
   };
 
-  const handleReset = () => {
-    onSelect(selectedScenarioId);
-  };
-
-  // Cmd/Ctrl+S triggers Save. Listen at document level so the shortcut works
-  // regardless of which input has focus inside the simulator page.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const isSave = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's';
-      if (!isSave) return;
-      e.preventDefault();
-      handleSave();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-    // handleSave closes over isDirty/isPending/selected/liveOverrides, but
-    // re-binding the listener on every keystroke would churn document
-    // listeners. Reading current values via refs is overkill for this scope —
-    // just re-bind on the deps that change save targets.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDirty, isPending, selected?.id, liveOverrides]);
-
   return (
-    <header className="mb-6 flex items-baseline justify-between border-b border-border pb-4 md:mb-8">
-      <div className="space-y-1.5">
+    <header className="mb-6 flex items-start justify-between gap-4">
+      <div>
         <p className="text-eyebrow">Plan</p>
-        <h1 className="text-xl font-semibold tracking-tight">Simulator</h1>
-        <div className="flex items-baseline gap-2 text-sm text-muted-foreground">
-          <select
-            value={selectedScenarioId ?? ''}
-            onChange={(e) => onSelect(e.target.value || null)}
-            className="-ml-1 cursor-pointer rounded border-0 bg-transparent px-1 py-0 hover:bg-accent"
-            disabled={isPending}
-          >
-            <option value="">Baseline (no overrides)</option>
-            {scenarios.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          {isDirty && (
-            <span className="font-medium text-amber-600 dark:text-amber-400">
-              · unsaved changes
-            </span>
-          )}
-        </div>
+        <h1
+          className="mt-1 font-display italic text-3xl text-foreground md:text-4xl"
+          style={{ letterSpacing: '-0.02em' }}
+        >
+          Simulator
+        </h1>
       </div>
-
-      {/* Action cluster: desktop only. Mobile renders <MobileScenarioSaveBar>
-          fixed above the tab bar so the primary CTA stays thumb-reachable
-          while scrolling overrides. */}
-      <div className="hidden items-center gap-2 md:flex">
-        {nameDraft !== null ? (
-          // Inline name editor — replaces window.prompt for new scenarios.
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              persistCreate(nameDraft);
-            }}
-            className="flex items-center gap-2"
-          >
-            <Input
-              ref={nameInputRef}
-              value={nameDraft}
-              onChange={(e) => setNameDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') setNameDraft(null);
-              }}
-              placeholder="Scenario name"
-              maxLength={120}
-              disabled={isPending}
-              className="h-9 w-48 text-sm"
-            />
-            <Button type="submit" size="sm" disabled={isPending}>
-              {isPending ? 'Saving…' : 'Save'}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setNameDraft(null)}
-              disabled={isPending}
-            >
-              Cancel
-            </Button>
-          </form>
+      <div className="flex flex-wrap items-center gap-2">
+        {isDirty ? (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="sm">Reset</Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Discard changes?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Your unsaved overrides will be removed. The loaded scenario stays selected.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={onReset}>Discard</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         ) : (
-          <>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleReset}
-              disabled={!isDirty || isPending}
-            >
-              Reset
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleSave}
-              disabled={!isDirty || isPending}
-              title={selected ? 'Save (⌘S)' : 'Save as new scenario (⌘S)'}
-            >
-              {isPending ? 'Saving…' : selected ? 'Save' : 'Save as…'}
-            </Button>
-            {selected && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleDelete}
-                disabled={isPending}
-                className="text-muted-foreground hover:text-destructive"
-              >
-                Delete
-              </Button>
-            )}
-          </>
+          <Button variant="ghost" size="sm" onClick={onReset} disabled={!isDirty}>Reset</Button>
+        )}
+
+        <ScenarioPicker
+          scenarios={scenarios}
+          selectedScenarioId={selectedScenarioId}
+          onSelect={onSelect}
+        />
+
+        <AlertDialog open={saveAsOpen} onOpenChange={setSaveAsOpen}>
+          <AlertDialogTrigger asChild>
+            <Button variant="default" size="sm" disabled={pending}>Save as…</Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Save scenario</AlertDialogTitle>
+              <AlertDialogDescription>Name this what-if so you can return to it.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="my-2">
+              <input
+                className="w-full rounded-btn border border-hairline bg-surface px-3 py-2 text-sm"
+                placeholder="e.g. Trim recurring"
+                value={saveAsName}
+                onChange={(e) => setSaveAsName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') saveAs(); }}
+                autoFocus
+              />
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={saveAs} disabled={!saveAsName.trim() || pending}>Save</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {selectedScenarioId && isDirty && (
+          <Button variant="default" size="sm" onClick={saveCurrent} disabled={pending}>Save</Button>
+        )}
+
+        {selectedScenarioId && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm" disabled={pending}>Delete</Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete scenario?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This removes the saved scenario but keeps your current overrides in the editor as unsaved work.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={deleteCurrent}>Delete</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         )}
       </div>
-
-      <AlertDialog
-        open={confirmDeleteOpen}
-        onOpenChange={setConfirmDeleteOpen}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              Delete &ldquo;{selected?.name ?? ''}&rdquo;?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              This scenario&apos;s overrides and any cached AI summary will
-              be removed. The baseline forecast and your real goals are
-              untouched.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault();
-                performDelete();
-              }}
-              disabled={isPending}
-              className={cn(buttonVariants({ variant: 'destructive' }))}
-            >
-              {isPending ? 'Deleting…' : 'Delete scenario'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </header>
   );
 }

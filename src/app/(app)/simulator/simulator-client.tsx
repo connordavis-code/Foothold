@@ -88,6 +88,12 @@ export function SimulatorClient({
     setLiveOverrides((scn?.overrides as ScenarioOverrides | undefined) ?? {});
   };
 
+  const handleReset = () => {
+    setLiveOverrides(
+      (selectedScenario?.overrides as ScenarioOverrides | undefined) ?? {},
+    );
+  };
+
   // Override-section accordion state. Single Set keyed by section id;
   // toggleSection collapses siblings on mobile (single-open accordion
   // per spec §5) and toggles independently on desktop. Breakpoint
@@ -126,6 +132,7 @@ export function SimulatorClient({
           liveOverrides={liveOverrides}
           isDirty={isDirty}
           onSelect={handleSelectScenario}
+          onReset={handleReset}
         />
         <div className="rounded-card border border-border bg-surface-elevated p-8 text-center">
           <h2 className="mb-2 text-lg font-semibold text-foreground">
@@ -149,6 +156,7 @@ export function SimulatorClient({
         liveOverrides={liveOverrides}
         isDirty={isDirty}
         onSelect={handleSelectScenario}
+        onReset={handleReset}
       />
 
       {scenarios.length === 0 && (
