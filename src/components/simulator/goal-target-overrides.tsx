@@ -24,21 +24,21 @@ export function GoalTargetOverrides({ value, onChange, realGoals }: Props) {
       {items.map((item) => {
         const goal = realGoals.find((g) => g.id === item.goalId);
         return (
-          <div key={item.goalId} className="bg-muted/30 rounded p-2 space-y-1.5">
+          <div key={item.goalId} className="bg-muted/30 rounded-card p-2 space-y-1.5">
             <div className="flex items-center justify-between">
               <span className="font-medium text-foreground text-sm">
                 {goal?.name ?? '(unknown)'}
               </span>
               <button
                 onClick={() => onChange(removeItem(items, (i) => i.goalId === item.goalId))}
-                className="p-1 text-muted-foreground hover:text-destructive"
+                className="p-1 text-text-3 hover:text-destructive"
                 aria-label="Remove"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
             <div className="flex items-center gap-2 text-xs">
-              <span className="text-muted-foreground">Target $</span>
+              <span className="text-text-3">Target $</span>
               <input
                 type="number"
                 min={0}
@@ -48,9 +48,9 @@ export function GoalTargetOverrides({ value, onChange, realGoals }: Props) {
                     newTargetAmount: Math.max(0, Number(e.target.value)) || 0,
                   }))
                 }
-                className="w-24 bg-background border border-border rounded px-2 py-1 text-right text-foreground"
+                className="w-24 bg-background border border-hairline rounded-btn px-2 py-1 text-right text-foreground"
               />
-              <span className="text-muted-foreground">@ $</span>
+              <span className="text-text-3">@ $</span>
               <input
                 type="number"
                 min={0}
@@ -60,9 +60,9 @@ export function GoalTargetOverrides({ value, onChange, realGoals }: Props) {
                     newMonthlyContribution: Math.max(0, Number(e.target.value)) || 0,
                   }))
                 }
-                className="w-20 bg-background border border-border rounded px-2 py-1 text-right text-foreground"
+                className="w-20 bg-background border border-hairline rounded-btn px-2 py-1 text-right text-foreground"
               />
-              <span className="text-muted-foreground">/mo</span>
+              <span className="text-text-3">/mo</span>
             </div>
           </div>
         );
@@ -76,7 +76,7 @@ export function GoalTargetOverrides({ value, onChange, realGoals }: Props) {
             if (!id) return;
             onChange(addItem(items, { goalId: id }));
           }}
-          className="w-full bg-background border border-dashed border-border rounded px-2 py-1.5 text-muted-foreground hover:text-foreground"
+          className="w-full bg-background border border-dashed border-hairline rounded-btn px-2 py-1.5 text-text-3 hover:text-foreground"
         >
           <option value="">+ edit a real goal</option>
           {availableGoals.map((g) => (
@@ -86,11 +86,11 @@ export function GoalTargetOverrides({ value, onChange, realGoals }: Props) {
           ))}
         </select>
       ) : realGoals.length === 0 ? (
-        <div className="text-xs text-muted-foreground/60 italic">
+        <div className="text-xs text-text-3/60 italic">
           No real goals to edit yet.
         </div>
       ) : (
-        <div className="text-xs text-muted-foreground/60 italic">
+        <div className="text-xs text-text-3/60 italic">
           All real goals already have edits.
         </div>
       )}

@@ -84,14 +84,14 @@ export function RecurringOverrides({ value, onChange, baseStreams }: Props) {
   return (
     <div className="space-y-2">
       {items.map((item, i) => (
-        <div key={changeKey(item, i)} className="bg-muted/30 rounded p-2 space-y-1.5">
+        <div key={changeKey(item, i)} className="bg-muted/30 rounded-card p-2 space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-xs uppercase tracking-wider text-muted-foreground">
+            <span className="text-xs uppercase tracking-wider text-text-3">
               {item.action}
             </span>
             <button
               onClick={() => onChange(removeItemAt(items, i))}
-              className="p-0.5 text-muted-foreground hover:text-destructive"
+              className="p-0.5 text-text-3 hover:text-destructive"
               aria-label="Remove"
             >
               <X className="h-3.5 w-3.5" />
@@ -104,7 +104,7 @@ export function RecurringOverrides({ value, onChange, baseStreams }: Props) {
               onChange={(e) =>
                 onChange(updateItemAt(items, i, { streamId: e.target.value }))
               }
-              className="w-full bg-background border border-border rounded px-2 py-1 text-foreground"
+              className="w-full bg-background border border-hairline rounded-btn px-2 py-1 text-foreground"
             >
               {baseStreams.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -127,7 +127,7 @@ export function RecurringOverrides({ value, onChange, baseStreams }: Props) {
                     onChange(updateItemAt(items, i, { label: e.target.value }))
                   }
                   placeholder="Label"
-                  className="w-full bg-background border border-border rounded px-2 py-1 text-foreground"
+                  className="w-full bg-background border border-hairline rounded-btn px-2 py-1 text-foreground"
                 />
               )}
               <div className="flex gap-1.5">
@@ -146,7 +146,7 @@ export function RecurringOverrides({ value, onChange, baseStreams }: Props) {
                       }),
                     )
                   }
-                  className="w-20 bg-background border border-border rounded px-2 py-1 text-right text-foreground"
+                  className="w-20 bg-background border border-hairline rounded-btn px-2 py-1 text-right text-foreground"
                 />
                 <select
                   value={item.cadence ?? 'monthly'}
@@ -157,7 +157,7 @@ export function RecurringOverrides({ value, onChange, baseStreams }: Props) {
                       }),
                     )
                   }
-                  className="flex-1 min-w-0 bg-background border border-border rounded px-2 py-1 text-foreground"
+                  className="flex-1 min-w-0 bg-background border border-hairline rounded-btn px-2 py-1 text-foreground"
                 >
                   <option value="weekly">weekly</option>
                   <option value="biweekly">biweekly</option>
@@ -173,7 +173,7 @@ export function RecurringOverrides({ value, onChange, baseStreams }: Props) {
                         }),
                       )
                     }
-                    className="bg-background border border-border rounded px-2 py-1 text-foreground"
+                    className="bg-background border border-hairline rounded-btn px-2 py-1 text-foreground"
                   >
                     <option value="outflow">out</option>
                     <option value="inflow">in</option>
@@ -187,7 +187,7 @@ export function RecurringOverrides({ value, onChange, baseStreams }: Props) {
             const annual = impactPerYear(item);
             if (annual === null || annual === 0) return null;
             return (
-              <div className="text-[11px] text-muted-foreground pt-0.5">
+              <div className="text-[11px] text-text-3 pt-0.5">
                 {formatCurrency(annual, { signed: true })}/yr
               </div>
             );
@@ -199,20 +199,20 @@ export function RecurringOverrides({ value, onChange, baseStreams }: Props) {
         <button
           onClick={addPause}
           disabled={baseStreams.length === 0}
-          className="flex-1 text-muted-foreground hover:text-foreground bg-background border border-dashed border-border rounded px-2 py-1 disabled:opacity-50 text-xs"
+          className="flex-1 text-text-3 hover:text-foreground bg-background border border-dashed border-hairline rounded-btn px-2 py-1 disabled:opacity-50 text-xs"
         >
           + pause
         </button>
         <button
           onClick={addEdit}
           disabled={baseStreams.length === 0}
-          className="flex-1 text-muted-foreground hover:text-foreground bg-background border border-dashed border-border rounded px-2 py-1 disabled:opacity-50 text-xs"
+          className="flex-1 text-text-3 hover:text-foreground bg-background border border-dashed border-hairline rounded-btn px-2 py-1 disabled:opacity-50 text-xs"
         >
           + edit
         </button>
         <button
           onClick={addNew}
-          className="flex-1 text-muted-foreground hover:text-foreground bg-background border border-dashed border-border rounded px-2 py-1 text-xs"
+          className="flex-1 text-text-3 hover:text-foreground bg-background border border-dashed border-hairline rounded-btn px-2 py-1 text-xs"
         >
           + add new
         </button>

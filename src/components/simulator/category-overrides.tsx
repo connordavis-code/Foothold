@@ -30,7 +30,7 @@ export function CategoryOverrides({ value, onChange, knownCategories }: Props) {
           <div key={item.categoryId} className="space-y-0.5">
             <div className="flex items-center gap-2">
               <span className="flex-1 text-foreground">{cat?.name ?? item.categoryId}</span>
-              <span className="text-muted-foreground">$</span>
+              <span className="text-text-3">$</span>
               <input
                 type="number"
                 value={item.monthlyDelta === 0 ? '' : item.monthlyDelta}
@@ -44,21 +44,21 @@ export function CategoryOverrides({ value, onChange, knownCategories }: Props) {
                     ),
                   )
                 }
-                className="w-24 bg-background border border-border rounded px-2 py-1 text-right text-foreground"
+                className="w-24 bg-background border border-hairline rounded-btn px-2 py-1 text-right text-foreground"
               />
-              <span className="text-muted-foreground text-xs">/mo</span>
+              <span className="text-text-3 text-xs">/mo</span>
               <button
                 onClick={() =>
                   onChange(removeItem(items, (i) => i.categoryId === item.categoryId))
                 }
-                className="p-1 text-muted-foreground hover:text-destructive"
+                className="p-1 text-text-3 hover:text-destructive"
                 aria-label="Remove"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
             {annual !== 0 && (
-              <div className="text-[11px] text-muted-foreground pl-1">
+              <div className="text-[11px] text-text-3 pl-1">
                 {formatCurrency(annual, { signed: true })}/yr
               </div>
             )}
@@ -74,7 +74,7 @@ export function CategoryOverrides({ value, onChange, knownCategories }: Props) {
             if (!id) return;
             onChange(addItem(items, { categoryId: id, monthlyDelta: 0 }));
           }}
-          className="w-full bg-background border border-dashed border-border rounded px-2 py-1.5 text-muted-foreground hover:text-foreground"
+          className="w-full bg-background border border-dashed border-hairline rounded-btn px-2 py-1.5 text-text-3 hover:text-foreground"
         >
           <option value="">+ add category override</option>
           {availableCategories.map((c) => (
@@ -84,7 +84,7 @@ export function CategoryOverrides({ value, onChange, knownCategories }: Props) {
           ))}
         </select>
       ) : (
-        <div className="text-xs text-muted-foreground/60 italic">
+        <div className="text-xs text-text-3/60 italic">
           All known categories already overridden.
         </div>
       )}

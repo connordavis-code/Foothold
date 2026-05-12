@@ -31,19 +31,19 @@ export function SkipRecurringOverrides({
               onChange={(e) =>
                 onChange(updateItemAt(items, i, { streamId: e.target.value }))
               }
-              className="flex-1 bg-background border border-border rounded px-2 py-1 text-foreground"
+              className="flex-1 bg-background border border-hairline rounded-btn px-2 py-1 text-foreground"
             >
               {baseStreams.map((s) => (
                 <option key={s.id} value={s.id}>{s.label}</option>
               ))}
             </select>
-            <span className="text-xs text-muted-foreground">in</span>
+            <span className="text-xs text-text-3">in</span>
             <select
               value={item.skipMonth}
               onChange={(e) =>
                 onChange(updateItemAt(items, i, { skipMonth: e.target.value }))
               }
-              className="bg-background border border-border rounded px-2 py-1 text-foreground"
+              className="bg-background border border-hairline rounded-btn px-2 py-1 text-foreground"
             >
               {availableMonths.map((m) => (
                 <option key={m} value={m}>{m}</option>
@@ -51,7 +51,7 @@ export function SkipRecurringOverrides({
             </select>
             <button
               onClick={() => onChange(removeItemAt(items, i))}
-              className="p-1 text-muted-foreground hover:text-destructive"
+              className="p-1 text-text-3 hover:text-destructive"
               aria-label="Remove"
             >
               <X className="h-3.5 w-3.5" />
@@ -67,12 +67,12 @@ export function SkipRecurringOverrides({
               skipMonth: availableMonths[0] ?? '2026-01',
             }))
           }
-          className="w-full text-left text-muted-foreground hover:text-foreground bg-background border border-dashed border-border rounded px-2 py-1.5"
+          className="w-full text-left text-text-3 hover:text-foreground bg-background border border-dashed border-hairline rounded-btn px-2 py-1.5"
         >
           + add skip
         </button>
       ) : (
-        <div className="text-xs text-muted-foreground/60 italic">
+        <div className="text-xs text-text-3/60 italic">
           No recurring streams to skip.
         </div>
       )}

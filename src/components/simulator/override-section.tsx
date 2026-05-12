@@ -28,7 +28,7 @@ export function OverrideSection({
   const isEmpty = count === 0;
 
   return (
-    <div className="border-b border-border/60 py-2.5">
+    <div className="border-b border-hairline/60 py-2.5">
       <button
         onClick={onToggle}
         aria-expanded={open}
@@ -36,11 +36,11 @@ export function OverrideSection({
       >
         <span className="flex items-center gap-1.5 text-foreground">
           <ChevronRight
-            className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`}
+            className={`h-3.5 w-3.5 text-text-3 transition-transform ${open ? 'rotate-90' : ''}`}
           />
           {label}
         </span>
-        <span className={isEmpty ? 'text-muted-foreground/60' : 'text-muted-foreground'}>
+        <span className={isEmpty ? 'text-text-3/60' : 'text-text-3'}>
           {isEmpty ? '—' : count}
         </span>
       </button>

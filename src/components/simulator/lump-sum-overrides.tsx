@@ -37,14 +37,14 @@ export function LumpSumOverrides({ value, onChange, availableMonths }: Props) {
       {items.map((item) => (
         // Stacked: label on its own row (full width), then month+amount+remove on
         // a second row. Single-row layout overflowed the 260px override column.
-        <div key={item.id} className="bg-muted/30 rounded p-2 space-y-1.5">
+        <div key={item.id} className="bg-muted/30 rounded-card p-2 space-y-1.5">
           <input
             type="text"
             value={item.label}
             onChange={(e) =>
               onChange(updateItem(items, (i) => i.id === item.id, { label: e.target.value }))
             }
-            className="w-full bg-background border border-border rounded px-2 py-1 text-foreground"
+            className="w-full bg-background border border-hairline rounded-btn px-2 py-1 text-foreground"
             placeholder="Label"
           />
           <div className="flex items-center gap-1.5">
@@ -53,7 +53,7 @@ export function LumpSumOverrides({ value, onChange, availableMonths }: Props) {
               onChange={(e) =>
                 onChange(updateItem(items, (i) => i.id === item.id, { month: e.target.value }))
               }
-              className="flex-1 min-w-0 bg-background border border-border rounded px-2 py-1 text-foreground"
+              className="flex-1 min-w-0 bg-background border border-hairline rounded-btn px-2 py-1 text-foreground"
             >
               {availableMonths.map((m) => (
                 <option key={m} value={m}>{m}</option>
@@ -69,11 +69,11 @@ export function LumpSumOverrides({ value, onChange, availableMonths }: Props) {
               onChange={(e) =>
                 onChange(updateItem(items, (i) => i.id === item.id, { amount: Number(e.target.value) }))
               }
-              className="w-20 bg-background border border-border rounded px-2 py-1 text-right text-foreground"
+              className="w-20 bg-background border border-hairline rounded-btn px-2 py-1 text-right text-foreground"
             />
             <button
               onClick={() => onChange(removeItem(items, (i) => i.id === item.id))}
-              className="p-1 text-muted-foreground hover:text-destructive"
+              className="p-1 text-text-3 hover:text-destructive"
               aria-label="Remove"
             >
               <X className="h-3.5 w-3.5" />
@@ -83,7 +83,7 @@ export function LumpSumOverrides({ value, onChange, availableMonths }: Props) {
       ))}
       <button
         onClick={addNew}
-        className="w-full text-left text-muted-foreground hover:text-foreground bg-background border border-dashed border-border rounded px-2 py-1.5"
+        className="w-full text-left text-text-3 hover:text-foreground bg-background border border-dashed border-hairline rounded-btn px-2 py-1.5"
       >
         + add lump sum
       </button>

@@ -21,7 +21,7 @@ export function HypotheticalGoalOverrides({ value, onChange }: Props) {
   return (
     <div className="space-y-2">
       {items.map((item) => (
-        <div key={item.id} className="bg-muted/30 rounded p-2 space-y-1.5">
+        <div key={item.id} className="bg-muted/30 rounded-card p-2 space-y-1.5">
           <div className="flex items-center gap-2">
             <input
               type="text"
@@ -30,18 +30,18 @@ export function HypotheticalGoalOverrides({ value, onChange }: Props) {
                 onChange(updateItem(items, (i) => i.id === item.id, { name: e.target.value }))
               }
               placeholder="Goal name"
-              className="flex-1 bg-background border border-border rounded px-2 py-1 text-foreground"
+              className="flex-1 bg-background border border-hairline rounded-btn px-2 py-1 text-foreground"
             />
             <button
               onClick={() => onChange(removeItem(items, (i) => i.id === item.id))}
-              className="p-1 text-muted-foreground hover:text-destructive"
+              className="p-1 text-text-3 hover:text-destructive"
               aria-label="Remove"
             >
               <X className="h-3.5 w-3.5" />
             </button>
           </div>
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-muted-foreground">Target $</span>
+            <span className="text-text-3">Target $</span>
             <input
               type="number"
               min={0}
@@ -52,9 +52,9 @@ export function HypotheticalGoalOverrides({ value, onChange }: Props) {
                   targetAmount: Math.max(0, Number(e.target.value)) || 0,
                 }))
               }
-              className="w-24 bg-background border border-border rounded px-2 py-1 text-right text-foreground"
+              className="w-24 bg-background border border-hairline rounded-btn px-2 py-1 text-right text-foreground"
             />
-            <span className="text-muted-foreground">@ $</span>
+            <span className="text-text-3">@ $</span>
             <input
               type="number"
               min={0}
@@ -69,9 +69,9 @@ export function HypotheticalGoalOverrides({ value, onChange }: Props) {
                   monthlyContribution: Math.max(0, Number(e.target.value)) || 0,
                 }))
               }
-              className="w-20 bg-background border border-border rounded px-2 py-1 text-right text-foreground"
+              className="w-20 bg-background border border-hairline rounded-btn px-2 py-1 text-right text-foreground"
             />
-            <span className="text-muted-foreground">/mo</span>
+            <span className="text-text-3">/mo</span>
           </div>
         </div>
       ))}
@@ -88,7 +88,7 @@ export function HypotheticalGoalOverrides({ value, onChange }: Props) {
             monthlyContribution: 0,
           }))
         }
-        className="w-full text-left text-muted-foreground hover:text-foreground bg-background border border-dashed border-border rounded px-2 py-1.5"
+        className="w-full text-left text-text-3 hover:text-foreground bg-background border border-dashed border-hairline rounded-btn px-2 py-1.5"
       >
         + add hypothetical goal
       </button>
