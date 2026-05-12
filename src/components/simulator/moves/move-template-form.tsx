@@ -48,7 +48,7 @@ export function MoveTemplateForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-1">
       {conflictMessage && (
-        <div className="rounded-btn border border-hairline bg-bg-2 p-3 text-xs text-text-2">
+        <div className="rounded-btn border border-hairline bg-surface-sunken p-3 text-xs text-text-2">
           ⚠ {conflictMessage}
         </div>
       )}
@@ -126,7 +126,7 @@ function Field({ name, field, value, error, availableMonths, recurringStreams, o
       <span className="text-eyebrow">{field.label}</span>
       {field.kind === 'month' && (
         <Select value={value as string} onValueChange={(v) => onChange(v)}>
-          <SelectTrigger className="rounded-btn border border-hairline bg-bg-2 px-3 py-2 text-sm">
+          <SelectTrigger className="rounded-btn border border-hairline bg-surface-sunken px-3 py-2 text-sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -144,7 +144,7 @@ function Field({ name, field, value, error, availableMonths, recurringStreams, o
           value={value as number}
           onChange={(e) => onChange(Number(e.target.value))}
           onFocus={(e) => e.target.select()}
-          className="rounded-btn border border-hairline bg-bg-2 px-3 py-2 text-sm font-mono tabular-nums"
+          className="rounded-btn border border-hairline bg-surface-sunken px-3 py-2 text-sm font-mono tabular-nums"
         />
       )}
       {field.kind === 'integerMonths' && (
@@ -156,7 +156,7 @@ function Field({ name, field, value, error, availableMonths, recurringStreams, o
           value={value as number}
           onChange={(e) => onChange(parseInt(e.target.value, 10))}
           onFocus={(e) => e.target.select()}
-          className="rounded-btn border border-hairline bg-bg-2 px-3 py-2 text-sm font-mono tabular-nums"
+          className="rounded-btn border border-hairline bg-surface-sunken px-3 py-2 text-sm font-mono tabular-nums"
         />
       )}
       {field.kind === 'text' && (
@@ -164,7 +164,7 @@ function Field({ name, field, value, error, availableMonths, recurringStreams, o
           type="text"
           value={value as string}
           onChange={(e) => onChange(e.target.value)}
-          className="rounded-btn border border-hairline bg-bg-2 px-3 py-2 text-sm"
+          className="rounded-btn border border-hairline bg-surface-sunken px-3 py-2 text-sm"
         />
       )}
       {field.kind === 'directionToggle' && (
@@ -183,7 +183,7 @@ function Field({ name, field, value, error, availableMonths, recurringStreams, o
       )}
       {field.kind === 'streamPicker' && (
         <Select value={value as string} onValueChange={(v) => onChange(v)}>
-          <SelectTrigger className="rounded-btn border border-hairline bg-bg-2 px-3 py-2 text-sm">
+          <SelectTrigger className="rounded-btn border border-hairline bg-surface-sunken px-3 py-2 text-sm">
             <SelectValue placeholder="Select…" />
           </SelectTrigger>
           <SelectContent>
