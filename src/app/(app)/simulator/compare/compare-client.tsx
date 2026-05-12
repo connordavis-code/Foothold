@@ -91,7 +91,7 @@ export function CompareClient({
       <header className="space-y-1.5 border-b border-hairline pb-4">
         <p className="text-eyebrow">Plan</p>
         <div className="flex items-baseline justify-between gap-3">
-          <h1 className="font-display italic text-3xl text-foreground md:text-4xl">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Compare scenarios
           </h1>
           <Link
