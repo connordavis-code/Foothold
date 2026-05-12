@@ -141,7 +141,7 @@ export function MobileScenarioSaveBar({
           // bottom-14 = above the 56px MobileTabBar; safe-area handled
           // by tab bar's own pb-[env(safe-area-inset-bottom)] so this
           // bar sits directly on top of it.
-          'fixed inset-x-0 bottom-14 z-30 flex items-center gap-2 border-t border-border bg-surface-elevated/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-surface-elevated/80',
+          'fixed inset-x-0 bottom-14 z-30 flex items-center gap-2 border-t border-hairline bg-surface-elevated/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-surface-elevated/80',
           'md:hidden',
         )}
       >
@@ -171,7 +171,7 @@ export function MobileScenarioSaveBar({
             onClick={() => setConfirmDeleteOpen(true)}
             disabled={isPending}
             aria-label="Delete scenario"
-            className="text-muted-foreground hover:text-destructive"
+            className="text-text-3 hover:text-destructive"
           >
             <Trash2 className="h-5 w-5" />
           </Button>
@@ -185,7 +185,7 @@ export function MobileScenarioSaveBar({
             aria-describedby={undefined}
             className={cn(
               'fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] flex-col',
-              'rounded-t-card border-t border-border bg-surface-elevated',
+              'rounded-t-card border-t border-hairline bg-surface-elevated',
               'pb-[env(safe-area-inset-bottom)]',
               'outline-none',
             )}
