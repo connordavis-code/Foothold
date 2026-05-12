@@ -48,7 +48,7 @@ export function GoalImpacts({ goalImpacts }: Props) {
 function GoalImpactCard({ impact }: { impact: GoalImpact }) {
   const f = formatGoalImpact(impact);
   return (
-    <div className="rounded-card border border-hairline bg-surface p-5">
+    <div className="rounded-card border border-hairline-strong bg-surface-elevated p-5 shadow-sm">
       <div className="mb-2 flex items-center justify-between text-sm">
         <span className="text-foreground">{impact.name}</span>
         <Pill statusKey={f.statusKey} />
