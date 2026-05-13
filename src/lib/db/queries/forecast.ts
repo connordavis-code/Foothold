@@ -1,4 +1,4 @@
-import { and, eq, gte } from 'drizzle-orm';
+import { and, eq, gte, isNull, notInArray, or } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   financialAccounts,
@@ -7,6 +7,7 @@ import {
   recurringStreams,
   transactions,
 } from '@/lib/db/schema';
+import { INTERNAL_TRANSFER_CATEGORIES } from '@/lib/forecast/exclusions';
 import type { ForecastHistory } from '@/lib/forecast/types';
 
 const TRAILING_MONTHS = 3;
@@ -124,7 +125,10 @@ export async function getForecastHistory(userId: string): Promise<ForecastHistor
         ),
       ),
 
-    // Trailing transactions for category/income history
+    // Trailing transactions for category/income history.
+    // Internal transfers (TRANSFER_IN/OUT) are excluded — they're asset
+    // reallocations, not real cash outflows or inflows. Null-PFC rows
+    // are preserved (they bucket as UNCATEGORIZED downstream).
     db
       .select({
         amount: transactions.amount,
@@ -138,6 +142,10 @@ export async function getForecastHistory(userId: string): Promise<ForecastHistor
         and(
           eq(externalItems.userId, userId),
           gte(transactions.date, sinceDate),
+          or(
+            isNull(transactions.primaryCategory),
+            notInArray(transactions.primaryCategory, [...INTERNAL_TRANSFER_CATEGORIES]),
+          ),
         ),
       ),
 
