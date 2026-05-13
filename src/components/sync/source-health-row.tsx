@@ -97,10 +97,11 @@ function StatePill({ state }: { state: SourceHealth['state'] }) {
       <span
         className={cn(
           'inline-flex items-center rounded-full',
-          'border border-amber-500/50 bg-amber-500/10',
+          'border bg-[var(--semantic-caution)]/10',
           'px-2 py-0.5 text-xs font-medium',
-          'text-amber-700 dark:text-amber-400',
+          'text-[var(--semantic-caution)]',
         )}
+        style={{ borderColor: 'color-mix(in oklab, var(--semantic-caution) 50%, transparent)' }}
       >
         {state === 'degraded' ? 'Partial' : 'Reconnect'}
       </span>
