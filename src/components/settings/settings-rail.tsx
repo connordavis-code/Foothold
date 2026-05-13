@@ -75,7 +75,7 @@ export function SettingsRail({ sections }: Props) {
                     'inline-block w-1.5 h-1.5 rounded-full shrink-0',
                     'transition-all duration-200',
                     isActive
-                      ? 'bg-[var(--accent)] scale-100 opacity-100'
+                      ? 'bg-accent scale-100 opacity-100'
                       : 'bg-transparent scale-50 opacity-0',
                   )}
                 />
