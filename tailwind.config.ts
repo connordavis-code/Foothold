@@ -62,6 +62,15 @@ const config: Config = {
         // `border-hairline-strong`, `divide-hairline`, etc.
         hairline: 'var(--hairline)',
         'hairline-strong': 'var(--hairline-strong)',
+        // Editorial neutral text — quiet hierarchy below `foreground`.
+        // TYPE 2 complete-color tokens (rgba/var) so no hsl() wrap.
+        // Used as text-text-2, text-text-3, border-text-3.
+        'text-2': 'var(--text-2)',
+        'text-3': 'var(--text-3)',
+        // Editorial canvas tokens — the layer below paper/elevated/sunken.
+        // Used as bg-surface (raw canvas) and hover:bg-bg-2 (hover row).
+        surface: 'var(--surface)',
+        'bg-2': 'var(--bg-2)',
         // Chart palette — brand-tinted earth/green family for multi-line
         // viz. See globals.css for the hue rationale.
         'chart-1': 'hsl(var(--chart-1))',
@@ -77,6 +86,9 @@ const config: Config = {
         sm: 'calc(var(--radius) - 4px)',
         card: 'var(--radius-card)',
         pill: 'var(--radius-pill)',
+        // Button radius — slightly tighter than card; --r-btn is 6px.
+        // Used as `rounded-btn` across simulator forms + ui/select trigger.
+        btn: 'var(--r-btn)',
       },
       backgroundImage: {
         'gradient-hero': 'var(--gradient-hero)',
@@ -94,6 +106,12 @@ const config: Config = {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
         mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
         serif: ['var(--font-serif)', 'ui-serif', 'Georgia', 'serif'],
+        // --font-display aliases --font-serif (Fraunces) for page-title
+        // semantics. The 11 `font-display italic` page-title h1 elements
+        // depend on this mapping; commit 456f6b5 added the classes without
+        // ever wiring `display` into Tailwind, so the Fraunces sweep was
+        // silently no-op until this commit.
+        display: ['var(--font-display)', 'ui-serif', 'Georgia', 'serif'],
       },
       keyframes: {
         'accordion-down': {
