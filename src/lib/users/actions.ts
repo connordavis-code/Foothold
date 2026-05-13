@@ -12,7 +12,9 @@ import { profileSchema, deleteSchema } from './schemas';
 // scenario-actions.ts). No centralized types file exists.
 type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
-export { profileSchema, deleteSchema } from './schemas';
+// Schemas are re-exported by `./schemas`, not by this 'use server' module
+// (Next.js's 'use server' rule disallows non-function exports). Tests +
+// other consumers import from `./schemas` directly.
 
 export async function updateProfileAction(
   input: z.input<typeof profileSchema>,
