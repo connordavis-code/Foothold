@@ -3,6 +3,7 @@ import { formatRelative } from '@/lib/format/date';
 import type { Provider } from '@/lib/sync/health';
 import { summarizeSourceHealth } from '@/lib/sync/health-summary';
 import { cn } from '@/lib/utils';
+import { statePillKind } from './state-pill-kind';
 import { DisconnectItemButton } from '@/components/plaid/disconnect-item-button';
 import { ReconnectButton } from '@/components/plaid/reconnect-button';
 import { SyncButton } from '@/components/plaid/sync-button';
@@ -90,7 +91,8 @@ function StatePill({ state }: { state: SourceHealth['state'] }) {
   // healthy / syncing / stale / unknown render as no-pill (the
   // secondary line carries the signal for stale + unknown; healthy
   // earns silence per the operator-tier intent).
-  if (state === 'degraded' || state === 'needs_reconnect') {
+  const kind = statePillKind(state);
+  if (kind === 'caution') {
     return (
       <span
         className={cn(
@@ -104,7 +106,7 @@ function StatePill({ state }: { state: SourceHealth['state'] }) {
       </span>
     );
   }
-  if (state === 'failed') {
+  if (kind === 'destructive') {
     return (
       <span
         className={cn(
