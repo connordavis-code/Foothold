@@ -278,7 +278,7 @@ export function SimulatorClient({
                 ]}
               />
               <p className="mt-3 font-mono text-xs text-muted-foreground">
-                Transfers between your accounts are not counted as spend or income.
+                Movements between your own accounts are excluded — they&rsquo;re not income or spend.
               </p>
             </div>
             <GoalDiffCards
