@@ -1,0 +1,17 @@
+  { 
+    "hooks": {
+      "PostToolUse": [
+        {
+          "matcher": "Edit|Write",
+          "hooks": [
+            { 
+              "type": "command",
+              "command": ".claude/hooks/verify-tailwind.sh",
+              "timeout": 10,
+              "statusMessage": "Verifying Tailwind tokens"
+            }
+          ]
+        }
+      ]
+    }
+  }
