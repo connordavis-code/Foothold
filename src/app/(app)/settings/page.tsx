@@ -1,23 +1,31 @@
-import { inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { auth } from '@/auth';
-import { ConnectAccountButton } from '@/components/connect/connect-account-button';
-import { SourceHealthRow } from '@/components/sync/source-health-row';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { db } from '@/lib/db';
+import { financialAccounts, users } from '@/lib/db/schema';
 import { getSourceHealth } from '@/lib/db/queries/health';
-import { financialAccounts } from '@/lib/db/schema';
 import { snaptradeConfigured } from '@/lib/snaptrade/client';
-import { formatCurrency } from '@/lib/utils';
+import { ConnectedAccountsSection } from '@/components/settings/connected-accounts-section';
+import { DangerZoneSection } from '@/components/settings/danger-zone-section';
+import { DataExportSection } from '@/components/settings/data-export-section';
+import { ProfileSection } from '@/components/settings/profile-section';
+import { SettingsRail, type RailSection } from '@/components/settings/settings-rail';
+
+const RAIL_SECTIONS: ReadonlyArray<RailSection> = [
+  { id: 'profile', label: 'Profile' },
+  { id: 'connected', label: 'Connected accounts' },
+  { id: 'export', label: 'Data & export' },
+  { id: 'danger', label: 'Danger zone' },
+];
 
 export default async function SettingsPage() {
   const session = await auth();
-  if (!session?.user) return null;
+  if (!session?.user?.id || !session.user.email) return null;
+
+  const [profileRow] = await db
+    .select({ name: users.name, timezone: users.timezone })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
 
   const sources = await getSourceHealth(session.user.id);
 
@@ -41,93 +49,43 @@ export default async function SettingsPage() {
   }
 
   return (
-    <div className="px-8 py-8 max-w-3xl mx-auto space-y-6">
+    <div className="px-8 py-8 max-w-6xl mx-auto space-y-8">
       <h1
         className="font-display italic text-3xl text-foreground md:text-4xl"
-        style={{ letterSpacing: "-0.02em" }}
+        style={{ letterSpacing: '-0.02em' }}
       >
         Settings
       </h1>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Account</CardTitle>
-          <CardDescription>Your sign-in identity.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <dl className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-muted-foreground">Email</dt>
-              <dd className="font-mono">{session.user.email}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-muted-foreground">User ID</dt>
-              <dd className="font-mono text-xs">{session.user.id}</dd>
-            </div>
-          </dl>
-        </CardContent>
-      </Card>
+      <div className="flex gap-8">
+        <SettingsRail sections={RAIL_SECTIONS} />
 
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4">
-          <div className="space-y-1.5">
-            <CardTitle>Connected institutions</CardTitle>
-            <CardDescription>
-              Banks and credit cards via Plaid; brokerages via SnapTrade
-              when SnapTrade keys are configured.
-            </CardDescription>
-          </div>
-          <ConnectAccountButton snaptradeEnabled={snaptradeConfigured()} />
-        </CardHeader>
-        <CardContent>
-          {sources.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No institutions connected yet.
-            </p>
-          ) : (
-            <ul className="space-y-6">
-              {sources.map((source) => {
-                const itemAccounts = accountsByItem.get(source.itemId) ?? [];
-                return (
-                  <li key={source.itemId} className="space-y-3">
-                    <SourceHealthRow source={source} />
-                    {itemAccounts.length > 0 && (
-                      <ul className="rounded-md border border-border divide-y divide-border text-sm">
-                        {itemAccounts.map((a) => (
-                          <li
-                            key={a.id}
-                            className="px-3 py-2 flex items-center justify-between"
-                          >
-                            <div>
-                              <p>
-                                {a.name}
-                                {a.mask && (
-                                  <span className="text-muted-foreground">
-                                    {' '}
-                                    ····{a.mask}
-                                  </span>
-                                )}
-                              </p>
-                              <p className="text-xs text-muted-foreground capitalize">
-                                {a.subtype ?? a.type}
-                              </p>
-                            </div>
-                            <p className="tabular text-sm">
-                              {a.currentBalance != null
-                                ? formatCurrency(Number(a.currentBalance))
-                                : '—'}
-                            </p>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+        <div className="flex-1 min-w-0 space-y-6">
+          <section id="profile">
+            <ProfileSection
+              email={session.user.email}
+              initialDisplayName={profileRow?.name ?? null}
+              initialTimezone={profileRow?.timezone ?? 'UTC'}
+            />
+          </section>
+
+          <section id="connected">
+            <ConnectedAccountsSection
+              sources={sources}
+              accountsByItem={accountsByItem}
+              snaptradeEnabled={snaptradeConfigured()}
+            />
+          </section>
+
+          <section id="export">
+            <DataExportSection />
+          </section>
+
+          <section id="danger">
+            <DangerZoneSection userEmail={session.user.email} />
+          </section>
+        </div>
+      </div>
     </div>
   );
 }
