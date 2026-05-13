@@ -39,6 +39,7 @@ export const users = pgTable('user', {
   email: text('email').unique().notNull(),
   emailVerified: ts('email_verified'),
   image: text('image'),
+  timezone: text('timezone').notNull().default('UTC'),
   createdAt: ts('created_at').defaultNow().notNull(),
 });
 
