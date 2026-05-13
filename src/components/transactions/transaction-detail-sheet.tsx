@@ -8,7 +8,11 @@ import { Drawer } from 'vaul';
 import { Button } from '@/components/ui/button';
 import type { CategoryOption } from '@/lib/db/queries/categories';
 import { humanizeCategory } from '@/lib/format/category';
-import { updateTransactionCategoriesAction } from '@/lib/transactions/actions';
+import {
+  setTransactionTransferOverrideAction,
+  updateTransactionCategoriesAction,
+} from '@/lib/transactions/actions';
+import { shouldTreatAsTransfer } from '@/lib/transactions/predicates';
 import { cn, formatCurrency } from '@/lib/utils';
 
 /**
@@ -29,6 +33,13 @@ export type DetailRow = {
   accountName: string;
   accountMask: string | null;
   overrideCategoryName: string | null;
+  /**
+   * Tri-state manual transfer-classification override.
+   *   true  → user marked this as a transfer (excluded from cash forecast)
+   *   false → user marked this as NOT a transfer (re-included even if PFC says transfer)
+   *   null  → no override; fall back to the Plaid PFC.
+   */
+  isTransferOverride: boolean | null;
 };
 
 /**
@@ -98,6 +109,48 @@ export function TransactionDetailSheet({
     });
   }
 
+  function applyTransferOverride(next: boolean | null) {
+    if (!row) return;
+    const prior = row.isTransferOverride;
+    if (prior === next) return; // no-op tap on the current state
+    startTransition(async () => {
+      try {
+        const { updated } = await setTransactionTransferOverrideAction(
+          row.id,
+          next,
+        );
+        if (updated === 0) {
+          toast.error('Could not update. Try again?');
+          return;
+        }
+        const successCopy =
+          next === true
+            ? 'Marked as transfer.'
+            : next === false
+              ? 'Marked as not a transfer.'
+              : 'Cleared transfer override.';
+        toast.success(successCopy, {
+          action: {
+            label: 'Undo',
+            onClick: async () => {
+              try {
+                await setTransactionTransferOverrideAction(row.id, prior);
+                toast.success('Undone.');
+                router.refresh();
+              } catch {
+                toast.error('Undo failed. The change is still applied.');
+              }
+            },
+          },
+        });
+        onClose();
+        router.refresh();
+      } catch {
+        toast.error('Update failed. Try again in a moment.');
+      }
+    });
+  }
+
   // Plaid sign convention: positive = money OUT. Flip for display.
   const display = row ? -row.amount : 0;
   const isIncome = display > 0;
@@ -106,6 +159,15 @@ export function TransactionDetailSheet({
     : row?.primaryCategory
       ? humanizeCategory(row.primaryCategory)
       : '—';
+
+  // Effective transfer classification — mirrors the SQL filter in
+  // getForecastHistory. Used to label the current state in the override UI.
+  const isEffectivelyTransfer = row
+    ? shouldTreatAsTransfer({
+        primaryCategory: row.primaryCategory,
+        isTransferOverride: row.isTransferOverride,
+      })
+    : false;
 
   return (
     <Drawer.Root
@@ -233,6 +295,47 @@ export function TransactionDetailSheet({
                       kind="pfc"
                     />
                   ))}
+                </div>
+
+                <div className="mt-2 border-t border-border pt-3">
+                  <p className="text-eyebrow">Transfer classification</p>
+                  <p className="mt-1 text-sm">
+                    {isEffectivelyTransfer
+                      ? 'Treated as transfer · excluded from cash forecast'
+                      : 'Not a transfer · included in cash forecast'}
+                    {row.isTransferOverride !== null && (
+                      <span className="ml-1.5 text-xs italic text-muted-foreground">
+                        manual override
+                      </span>
+                    )}
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  {row.isTransferOverride !== null && (
+                    <CategoryOptionRow
+                      label="Clear override"
+                      muted
+                      onSelect={() => applyTransferOverride(null)}
+                      disabled={isPending}
+                      isCurrent={false}
+                      kind="clear"
+                    />
+                  )}
+                  <CategoryOptionRow
+                    label="Mark as transfer"
+                    onSelect={() => applyTransferOverride(true)}
+                    disabled={isPending}
+                    isCurrent={row.isTransferOverride === true}
+                    kind="user"
+                  />
+                  <CategoryOptionRow
+                    label="Mark as not a transfer"
+                    onSelect={() => applyTransferOverride(false)}
+                    disabled={isPending}
+                    isCurrent={row.isTransferOverride === false}
+                    kind="user"
+                  />
                 </div>
               </div>
             </>

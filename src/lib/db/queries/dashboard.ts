@@ -116,6 +116,8 @@ export type RecentTransaction = {
   pending: boolean;
   /** Set when the user has manually re-categorized this row. */
   overrideCategoryName: string | null;
+  /** Manual transfer-classification override; null = use the PFC. */
+  isTransferOverride: boolean | null;
 };
 
 /**
@@ -142,6 +144,7 @@ export async function getRecentTransactions(
       accountMask: financialAccounts.mask,
       pending: transactions.pending,
       overrideCategoryName: categories.name,
+      isTransferOverride: transactions.isTransferOverride,
     })
     .from(transactions)
     .innerJoin(

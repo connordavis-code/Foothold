@@ -222,6 +222,8 @@ export type SpendCapFeedRow = {
   pending: boolean;
   accountMask: string | null;
   overrideCategoryName: string | null;
+  /** Manual transfer-classification override; null = use the PFC. */
+  isTransferOverride: boolean | null;
 };
 
 export type SavingsFeedRow = {
@@ -288,6 +290,7 @@ async function getSpendCapFeed(
       accountName: financialAccounts.name,
       accountMask: financialAccounts.mask,
       overrideCategoryName: categories.name,
+      isTransferOverride: transactions.isTransferOverride,
     })
     .from(transactions)
     .innerJoin(
@@ -313,6 +316,7 @@ async function getSpendCapFeed(
       pending: r.pending,
       accountMask: r.accountMask,
       overrideCategoryName: r.overrideCategoryName,
+      isTransferOverride: r.isTransferOverride,
     })),
   };
 }

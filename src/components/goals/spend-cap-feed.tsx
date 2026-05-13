@@ -95,6 +95,7 @@ export function SpendCapFeed({ rows, categoryHref, categoryOptions }: Props) {
                 accountName: active.accountName,
                 accountMask: active.accountMask,
                 overrideCategoryName: active.overrideCategoryName,
+                isTransferOverride: active.isTransferOverride,
               }
             : null
         }
