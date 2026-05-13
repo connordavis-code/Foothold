@@ -112,6 +112,7 @@ export async function getTransactions(
         accountType: financialAccounts.type,
         overrideCategoryId: transactions.categoryOverrideId,
         overrideCategoryName: categories.name,
+        isTransferOverride: transactions.isTransferOverride,
       })
       .from(transactions)
       .innerJoin(
