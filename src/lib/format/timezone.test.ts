@@ -23,9 +23,7 @@ describe('isValidIanaTimezone', () => {
   });
 
   it('rejects non-string input', () => {
-    // @ts-expect-error testing runtime guard
     expect(isValidIanaTimezone(null)).toBe(false);
-    // @ts-expect-error testing runtime guard
     expect(isValidIanaTimezone(undefined)).toBe(false);
   });
 });
