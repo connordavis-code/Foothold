@@ -57,6 +57,11 @@ const config: Config = {
         'surface-paper': 'hsl(var(--surface-paper))',
         'surface-elevated': 'hsl(var(--surface-elevated))',
         'surface-sunken': 'hsl(var(--surface-sunken))',
+        // Hairline divider tokens — already complete rgba() values in
+        // globals.css, so no hsl() wrap. Used as `border-hairline`,
+        // `border-hairline-strong`, `divide-hairline`, etc.
+        hairline: 'var(--hairline)',
+        'hairline-strong': 'var(--hairline-strong)',
         // Chart palette — brand-tinted earth/green family for multi-line
         // viz. See globals.css for the hue rationale.
         'chart-1': 'hsl(var(--chart-1))',
