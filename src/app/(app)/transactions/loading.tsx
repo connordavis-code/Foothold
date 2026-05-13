@@ -29,7 +29,7 @@ export default function TransactionsLoading() {
       </div>
 
       {/* Table */}
-      <div className="overflow-hidden rounded-card border border-border bg-surface-elevated">
+      <div className="overflow-hidden rounded-2xl border border-[--hairline] bg-[--surface]">
         <div className="border-b border-border px-3 py-2">
           <div className="flex gap-3 text-[10px] uppercase tracking-[0.08em]">
             <Skeleton className="h-3 w-12" />

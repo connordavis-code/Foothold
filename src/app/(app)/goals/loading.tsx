@@ -15,7 +15,7 @@ export default function GoalsLoading() {
         {[0, 1, 2, 3].map((i) => (
           <article
             key={i}
-            className="space-y-4 rounded-card border border-border bg-surface-elevated p-5 sm:p-6"
+            className="space-y-4 rounded-2xl border border-[--hairline] bg-[--surface] p-5 sm:p-6"
           >
             <div className="flex items-start justify-between">
               <div className="flex-1 space-y-1.5">

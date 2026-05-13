@@ -53,7 +53,7 @@ export function MobileList<T>({ rows, config, empty }: Props<T>) {
     return (
       <div className="md:hidden">
         {empty ?? (
-          <div className="rounded-card border border-border bg-surface-elevated px-4 py-12 text-center text-sm text-muted-foreground">
+          <div className="rounded-2xl border border-[--hairline] bg-[--surface] px-4 py-12 text-center text-sm text-muted-foreground">
             Nothing to show.
           </div>
         )}
@@ -64,7 +64,7 @@ export function MobileList<T>({ rows, config, empty }: Props<T>) {
   if (sections) {
     return (
       <div className="md:hidden">
-        <div className="overflow-hidden rounded-card border border-border bg-surface-elevated">
+        <div className="overflow-hidden rounded-2xl border border-[--hairline] bg-[--surface]">
           {sections.map((section, idx) => (
             <Section
               key={section.dateKey}
@@ -80,7 +80,7 @@ export function MobileList<T>({ rows, config, empty }: Props<T>) {
 
   return (
     <div className="md:hidden">
-      <div className="overflow-hidden rounded-card border border-border bg-surface-elevated">
+      <div className="overflow-hidden rounded-2xl border border-[--hairline] bg-[--surface]">
         <ul role="list" className="divide-y divide-border/60">
           {rows.map((row) => (
             <Row key={config.rowKey(row)} row={row} config={config} />

@@ -44,7 +44,7 @@ export function NetWorthHero({
       </div>
 
       <header className="relative flex items-start justify-between">
-        <div className="text-[10px] uppercase tracking-[0.16em] text-[--text-3]">
+        <div className="text-eyebrow-sm">
           Net Worth
         </div>
         <div className="flex items-center gap-2 text-xs text-[--text-2]">

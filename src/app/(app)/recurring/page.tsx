@@ -134,7 +134,7 @@ function EmptyState() {
           <Repeat className="h-6 w-6" />
         </span>
         <div className="space-y-2">
-          <h1 className="text-2xl font-semibold tracking-tight text-[--text]">
+          <h1 className="font-serif text-2xl font-semibold italic tracking-tight text-[--text]">
             Not enough history yet
           </h1>
           <p className="mx-auto max-w-md text-sm text-[--text-2]">

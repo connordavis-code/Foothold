@@ -14,7 +14,7 @@ export function TransactionsPageHeader({
   return (
     <header className="flex items-end justify-between gap-4">
       <div>
-        <div className="text-xs uppercase tracking-[0.16em] text-[--text-3]">
+        <div className="text-eyebrow">
           Records
         </div>
         <h1

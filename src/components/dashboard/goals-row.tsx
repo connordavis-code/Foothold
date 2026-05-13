@@ -75,7 +75,7 @@ function GoalTile({ goal }: { goal: GoalWithProgress }) {
         <p className="truncate text-xs text-[--text-3]">{tileSubtitle(goal)}</p>
       </div>
       <div className="space-y-1.5">
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-hairline">
           <div
             className="h-full rounded-full"
             style={{ width: `${fraction * 100}%`, background: barColor }}

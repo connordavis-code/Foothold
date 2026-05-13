@@ -291,7 +291,7 @@ export function SimulatorClient({
       {view === 'comparison' && (
         <div className="space-y-8">
           <div className="grid grid-cols-1 gap-6 md:grid-cols-[260px_1fr] md:gap-10">
-            <div className="rounded-card border border-hairline-strong bg-surface-elevated p-5 shadow-sm">
+            <div className="rounded-2xl border border-[--hairline] bg-[--surface] p-5">
               <p className="text-eyebrow mb-3">Overrides</p>
               <OverrideSection
                 label="Categories"

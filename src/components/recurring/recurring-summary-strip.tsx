@@ -64,7 +64,7 @@ function Stat({
 }) {
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-[0.16em] text-[--text-3]">
+      <div className="text-eyebrow-sm">
         {label}
       </div>
       <div

@@ -40,7 +40,7 @@ export function StreamRow({
       className={cn(
         'relative px-5 py-3 sm:px-6',
         drillHref &&
-          'transition-colors duration-fast ease-out-quart hover:bg-[--surface-sunken]/60',
+          'transition-colors duration-fast ease-out-quart hover:bg-surface-sunken/60',
       )}
     >
       {drillHref && (
@@ -72,7 +72,7 @@ export function StreamRow({
               )}
               {humanizeFrequency(stream.frequency)}
               {variant === 'outflow' && stream.status === 'EARLY_DETECTION' && (
-                <span className="ml-1.5 text-[--text-3]/80">· early</span>
+                <span className="ml-1.5 text-[--text-3]">· early</span>
               )}
             </p>
             <div className="flex items-center gap-2">

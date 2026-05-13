@@ -56,7 +56,7 @@ function Window({
     <section className="space-y-3">
       <header className="flex items-baseline justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.16em] text-[--text-3]">
+          <p className="text-eyebrow">
             {label}
           </p>
           <p className="mt-0.5 text-xs text-[--text-3]">
@@ -68,7 +68,7 @@ function Window({
           {formatCurrency(total)}/mo total
         </p>
       </header>
-      <ul className="divide-y divide-[--border]/60 overflow-hidden rounded-card bg-[--surface]">
+      <ul className="divide-y divide-border/60 overflow-hidden rounded-card bg-[--surface]">
         {streams.map((s) => (
           <StreamRow
             key={s.id}

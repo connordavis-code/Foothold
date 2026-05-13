@@ -14,7 +14,7 @@ type Props = {
 export function HikeAlertBanner({ streams }: Props) {
   return (
     <section
-      className="rounded-card border border-[--semantic-caution]/40 bg-[--semantic-caution]/5 p-4"
+      className="rounded-card border border-[color-mix(in_oklab,var(--semantic-caution)_40%,transparent)] bg-[color-mix(in_oklab,var(--semantic-caution)_5%,transparent)] p-4"
       role="region"
       aria-label="Hike alerts"
     >
@@ -27,7 +27,7 @@ export function HikeAlertBanner({ streams }: Props) {
           {streams.length} hike alert{streams.length === 1 ? '' : 's'}
         </p>
       </header>
-      <ul className="divide-y divide-[--semantic-caution]/20">
+      <ul className="divide-y divide-[color-mix(in_oklab,var(--semantic-caution)_20%,transparent)]">
         {streams.map((s) => (
           <HikeAlertRow key={s.id} stream={s} />
         ))}

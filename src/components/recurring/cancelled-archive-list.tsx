@@ -25,14 +25,14 @@ export function CancelledArchiveList({ streams }: Props) {
   return (
     <section className="space-y-3">
       <header>
-        <p className="text-xs uppercase tracking-[0.16em] text-[--text-3]">
+        <p className="text-eyebrow">
           All cancelled
         </p>
         <p className="mt-0.5 text-xs text-[--text-3]">
           {streams.length} {streams.length === 1 ? 'stream' : 'streams'} · all-time
         </p>
       </header>
-      <ul className="divide-y divide-[--border]/60 overflow-hidden rounded-card bg-[--surface]">
+      <ul className="divide-y divide-border/60 overflow-hidden rounded-card bg-[--surface]">
         {streams.map((s) => (
           <StreamRow key={s.id} stream={s} variant="cancelled-archive" />
         ))}

@@ -115,7 +115,7 @@ export function TransactionDetailSheet({
       }}
     >
       <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 z-40 bg-[--text]/40 backdrop-blur-[2px]" />
+        <Drawer.Overlay className="fixed inset-0 z-40 bg-[color-mix(in_oklab,var(--text)_40%,transparent)] backdrop-blur-[2px]" />
         <Drawer.Content
           aria-describedby={undefined}
           className={cn(
@@ -127,7 +127,7 @@ export function TransactionDetailSheet({
         >
           <div
             aria-hidden
-            className="mx-auto mt-2 h-1 w-10 rounded-full bg-[--text-3]/40"
+            className="mx-auto mt-2 h-1 w-10 rounded-full bg-[color-mix(in_oklab,var(--text-3)_40%,transparent)]"
           />
           {row && (
             <>
@@ -169,7 +169,7 @@ export function TransactionDetailSheet({
                   {formatCurrency(display, { signed: true })}
                 </p>
                 {row.pending && (
-                  <span className="mt-1 inline-flex rounded-md bg-[--surface-sunken] px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-[--text-3]">
+                  <span className="mt-1 inline-flex rounded-md bg-surface-sunken px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-[--text-3]">
                     pending
                   </span>
                 )}
@@ -271,8 +271,8 @@ function CategoryOptionRow({
       className={cn(
         'flex min-h-[44px] items-center justify-between gap-2 rounded-card px-3 py-2 text-left text-sm transition-colors duration-fast ease-out-quart',
         muted
-          ? 'text-[--text-2] hover:bg-[--surface-sunken]'
-          : 'text-[--text] hover:bg-[--surface-sunken]',
+          ? 'text-[--text-2] hover:bg-surface-sunken'
+          : 'text-[--text] hover:bg-surface-sunken',
         'disabled:cursor-not-allowed disabled:opacity-60',
       )}
     >

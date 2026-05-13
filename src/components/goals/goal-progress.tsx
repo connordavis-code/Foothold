@@ -63,7 +63,7 @@ export function GoalProgress({ goal, verdict }: Props) {
         </span>
       </div>
 
-      <div className="relative h-2 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+      <div className="relative h-2 w-full overflow-hidden rounded-full bg-hairline">
         <div
           className="absolute left-0 top-0 h-full rounded-full"
           style={{ width: `${fraction * 100}%`, background: fillColor }}

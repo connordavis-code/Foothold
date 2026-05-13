@@ -32,7 +32,7 @@ export default async function EditGoalPage({
   return (
     <div className="mx-auto max-w-2xl space-y-6 px-4 py-6 sm:px-8 sm:py-8">
       <header>
-        <div className="text-xs uppercase tracking-[0.16em] text-[--text-3]">
+        <div className="text-eyebrow">
           Plan
         </div>
         <h1

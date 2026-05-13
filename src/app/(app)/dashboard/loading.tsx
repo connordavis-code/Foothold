@@ -25,7 +25,7 @@ export default function DashboardLoading() {
       </div>
 
       {/* Split card */}
-      <div className="grid grid-cols-1 divide-y divide-border rounded-card border border-border bg-surface-elevated sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+      <div className="grid grid-cols-1 divide-y divide-border rounded-2xl border border-[--hairline] bg-[--surface] sm:grid-cols-2 sm:divide-x sm:divide-y-0">
         {[0, 1].map((i) => (
           <div key={i} className="space-y-2 p-5 sm:p-6">
             <Skeleton className="h-3 w-24" />
@@ -48,7 +48,7 @@ export default function DashboardLoading() {
           {[0, 1, 2].map((i) => (
             <div
               key={i}
-              className="flex w-64 shrink-0 flex-col gap-3 rounded-card border border-border bg-surface-elevated p-4"
+              className="flex w-64 shrink-0 flex-col gap-3 rounded-2xl border border-[--hairline] bg-[--surface] p-4"
             >
               <Skeleton className="h-4 w-32" />
               <Skeleton className="h-3 w-44" />
@@ -66,7 +66,7 @@ export default function DashboardLoading() {
       <CardSkeleton rowCount={3} />
 
       {/* Insight teaser */}
-      <section className="rounded-card border border-border bg-surface-elevated p-5 sm:p-6">
+      <section className="rounded-2xl border border-[--hairline] bg-[--surface] p-5 sm:p-6">
         <div className="flex items-start gap-4">
           <Skeleton className="h-9 w-9 rounded-pill" />
           <div className="flex-1 space-y-2">
@@ -85,7 +85,7 @@ export default function DashboardLoading() {
 
 function CardSkeleton({ rowCount }: { rowCount: number }) {
   return (
-    <section className="rounded-card border border-border bg-surface-elevated p-5 sm:p-6">
+    <section className="rounded-2xl border border-[--hairline] bg-[--surface] p-5 sm:p-6">
       <header className="mb-4 flex items-baseline justify-between">
         <div className="space-y-1.5">
           <Skeleton className="h-3 w-28" />

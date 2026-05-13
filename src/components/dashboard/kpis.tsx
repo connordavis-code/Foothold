@@ -7,7 +7,7 @@ type KpiCellProps = {
 function KpiCell({ label, value, sub }: KpiCellProps) {
   return (
     <div className="flex-1 rounded-card bg-[--surface] p-5">
-      <div className="text-[10px] uppercase tracking-[0.16em] text-[--text-3]">
+      <div className="text-eyebrow-sm">
         {label}
       </div>
       <div className="mt-1.5 font-mono text-2xl font-semibold tabular-nums text-[--text]">

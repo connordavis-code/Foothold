@@ -9,7 +9,7 @@ type Props = {
 
 export function EmptyStateCard({ onPickMove }: Props) {
   return (
-    <div className="relative overflow-hidden rounded-card border border-hairline-strong bg-surface-elevated p-10 text-center shadow-sm">
+    <div className="relative overflow-hidden rounded-2xl border border-[--hairline] bg-[--surface] p-10 text-center">
       <div className="relative">
         <div className="mb-3 flex justify-center text-foreground">
           <FootholdMark size={48} />

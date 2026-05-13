@@ -21,10 +21,10 @@ export function MovesGrid({ onPick, disabledTemplates }: Props) {
             disabled={disabled}
             onClick={() => onPick(t.id)}
             className={cn(
-              'group flex items-center gap-3 rounded-card border border-hairline-strong bg-surface-elevated p-4 text-left shadow-sm transition-all',
+              'group flex items-center gap-3 rounded-2xl border border-[--hairline] bg-[--surface] p-4 text-left transition-colors duration-fast ease-out-quart',
               disabled
                 ? 'cursor-not-allowed opacity-50'
-                : 'hover:-translate-y-0.5 hover:border-text-3 hover:shadow-md',
+                : 'hover:border-text-3',
             )}
             title={disabled ? 'Connect accounts first — needs at least one recurring charge.' : undefined}
           >

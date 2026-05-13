@@ -9,8 +9,9 @@ interface Props {
 export function DangerZoneSection({ userEmail }: Props) {
   return (
     <section
-      className="rounded-lg border bg-[var(--semantic-caution)]/10 shadow-sm p-6 space-y-4"
+      className="rounded-lg border shadow-sm p-6 space-y-4"
       style={{
+        backgroundColor: 'color-mix(in oklab, var(--semantic-caution) 10%, transparent)',
         borderColor: 'color-mix(in oklab, var(--semantic-caution) 50%, transparent)',
       }}
     >

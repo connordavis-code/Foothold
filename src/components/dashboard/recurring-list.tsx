@@ -27,7 +27,7 @@ export function RecurringList({ upcoming, days = 7 }: Props) {
     <section className="rounded-card bg-[--surface] p-5">
       <header className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.16em] text-[--text-3]">
+          <div className="text-eyebrow-sm">
             Recurring · next {days} days
           </div>
           <div className="mt-1 font-mono text-sm tabular-nums text-[--text]">

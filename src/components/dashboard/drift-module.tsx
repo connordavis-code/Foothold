@@ -41,7 +41,7 @@ export function DriftModule({ elevated }: Props) {
             {hotCount} {label} running hot this week
           </span>
         </div>
-        <div className="flex items-center gap-3 text-[10px] uppercase tracking-[0.16em] text-[--text-3]">
+        <div className="flex items-center gap-3 text-eyebrow-sm">
           <div className="flex items-center gap-1.5">
             <span
               aria-hidden
@@ -84,7 +84,7 @@ export function DriftModule({ elevated }: Props) {
               <div className="truncate font-medium text-[--text]">
                 {humanizeCategory(row.category)}
               </div>
-              <div className="relative h-2 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+              <div className="relative h-2 w-full overflow-hidden rounded-full bg-hairline">
                 {/* Baseline segment: theme-aware — --text-2 reads with enough
                     contrast against the paper-tinted light card; --text-3 sits
                     well on the dark slate without overpowering the amber drift. */}

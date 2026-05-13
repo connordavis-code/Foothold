@@ -10,7 +10,7 @@ import { Download } from 'lucide-react';
 
 export function DataExportSection() {
   return (
-    <Card className="bg-surface-elevated border-hairline-strong shadow-sm">
+    <Card className="rounded-2xl border-[--hairline] bg-[--surface] shadow-none">
       <CardHeader>
         <CardTitle>Data &amp; export</CardTitle>
         <CardDescription>

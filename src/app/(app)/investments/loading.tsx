@@ -17,7 +17,7 @@ export default function InvestmentsLoading() {
       </div>
 
       {/* Portfolio summary — 3 cells */}
-      <div className="grid grid-cols-1 divide-y divide-border rounded-card border border-border bg-surface-elevated md:grid-cols-3 md:divide-x md:divide-y-0">
+      <div className="grid grid-cols-1 divide-y divide-border rounded-2xl border border-[--hairline] bg-[--surface] md:grid-cols-3 md:divide-x md:divide-y-0">
         {[0, 1, 2].map((i) => (
           <div key={i} className="space-y-2 p-5 sm:p-6">
             <Skeleton className="h-3 w-24" />
@@ -47,7 +47,7 @@ export default function InvestmentsLoading() {
 
 function TableSkeleton({ rowCount }: { rowCount: number }) {
   return (
-    <div className="overflow-hidden rounded-card border border-border bg-surface-elevated">
+    <div className="overflow-hidden rounded-2xl border border-[--hairline] bg-[--surface]">
       <div className="border-b border-border px-3 py-2">
         <Skeleton className="h-3 w-44" />
       </div>

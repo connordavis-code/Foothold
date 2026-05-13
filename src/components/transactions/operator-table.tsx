@@ -81,7 +81,7 @@ export function OperatorTable({
   }
 
   return (
-    <div className="overflow-hidden rounded-card border border-border bg-[--surface]">
+    <div className="overflow-hidden rounded-2xl border border-[--hairline] bg-[--surface]">
       <div className="max-h-[calc(100vh-18rem)] overflow-auto">
         <table className="w-full text-sm">
           <colgroup>
@@ -92,7 +92,7 @@ export function OperatorTable({
             <col className="w-[160px]" />
             <col className="w-[120px]" />
           </colgroup>
-          <thead className="sticky top-0 z-10 bg-[--surface]/95 backdrop-blur">
+          <thead className="sticky top-0 z-10 bg-[color-mix(in_oklab,var(--surface)_95%,transparent)] backdrop-blur">
             <tr className="border-b border-border text-[10px] uppercase tracking-[0.12em] text-[--text-3]">
               <Th>
                 <SelectAllCheckbox
@@ -113,7 +113,7 @@ export function OperatorTable({
             <tbody key={group.dateIso}>
               <tr
                 aria-hidden
-                className="border-y border-border/70 bg-[--surface-sunken]/40"
+                className="border-y border-border/70 bg-surface-sunken/40"
               >
                 <td colSpan={5} className="px-3 py-1.5">
                   <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[--text-2]">
@@ -227,8 +227,8 @@ function NoMatchEmpty() {
   const hasFilters = params.size > 0;
 
   return (
-    <div className="flex flex-col items-center justify-center gap-4 rounded-card border border-border bg-[--surface] px-6 py-16 text-center">
-      <span className="grid h-12 w-12 place-items-center rounded-pill bg-[--surface-sunken] text-[--text-2]">
+    <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-[--hairline] bg-[--surface] px-6 py-16 text-center">
+      <span className="grid h-12 w-12 place-items-center rounded-pill bg-surface-sunken text-[--text-2]">
         <SearchX className="h-5 w-5" />
       </span>
       <div className="space-y-1">
@@ -287,10 +287,10 @@ function Row({
       className={cn(
         'group border-b border-border/60 transition-colors duration-fast ease-out-quart last:border-b-0',
         isChecked
-          ? 'bg-[--accent]/20 hover:bg-[--accent]/30'
+          ? 'bg-accent/20 hover:bg-accent/30'
           : isSelected
-            ? 'bg-[--surface-sunken]'
-            : 'hover:bg-[--surface-sunken]/60',
+            ? 'bg-surface-sunken'
+            : 'hover:bg-surface-sunken/60',
       )}
     >
       <td className="px-3 py-1.5 text-center">
@@ -315,7 +315,7 @@ function Row({
             {t.merchantName ?? t.name}
           </span>
           {t.pending && (
-            <span className="shrink-0 rounded-md bg-[--surface-sunken] px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-[--text-3]">
+            <span className="shrink-0 rounded-md bg-surface-sunken px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-[--text-3]">
               pending
             </span>
           )}

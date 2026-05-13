@@ -43,7 +43,7 @@ export function AllocationSection({
   return (
     <section className="space-y-4 rounded-2xl border border-[--hairline] bg-[--surface] p-6 md:p-8">
       <header>
-        <p className="text-xs uppercase tracking-[0.16em] text-[--text-3]">
+        <p className="text-eyebrow">
           Allocation
         </p>
         <h2 className="mt-1 text-lg font-semibold text-[--text]">

@@ -39,7 +39,7 @@ export function TransactionsSummaryStrip({
   activeFilters,
 }: Props) {
   return (
-    <div className="grid grid-cols-2 gap-3 rounded-card bg-[--surface] p-5 sm:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 rounded-2xl border border-[--hairline] bg-[--surface] p-5 sm:grid-cols-4">
       <Stat
         label="Spend · this month"
         value={formatCurrencyCompact(spend)}
@@ -84,7 +84,7 @@ function Stat({
 }) {
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-[0.16em] text-[--text-3]">
+      <div className="text-eyebrow-sm">
         {label}
       </div>
       <div

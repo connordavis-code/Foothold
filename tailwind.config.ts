@@ -11,7 +11,10 @@ const config: Config = {
     },
     extend: {
       colors: {
-        border: 'hsl(var(--border))',
+        // TYPE 1 HSL-fragment tokens — use `hsl(var(--x) / <alpha-value>)` so
+        // bg-border/60, bg-accent/20, etc. produce real opacity. Plain
+        // bg-border substitutes <alpha-value> with 1.
+        border: 'hsl(var(--border) / <alpha-value>)',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
         background: 'hsl(var(--background))',
@@ -33,7 +36,7 @@ const config: Config = {
           foreground: 'hsl(var(--muted-foreground))',
         },
         accent: {
-          DEFAULT: 'hsl(var(--accent))',
+          DEFAULT: 'hsl(var(--accent) / <alpha-value>)',
           foreground: 'hsl(var(--accent-foreground))',
         },
         popover: {
@@ -53,10 +56,19 @@ const config: Config = {
           DEFAULT: 'hsl(var(--negative))',
           foreground: 'hsl(var(--negative-foreground))',
         },
-        // Editorial surfaces — warm canvas / elevated card / sunken row
-        'surface-paper': 'hsl(var(--surface-paper))',
-        'surface-elevated': 'hsl(var(--surface-elevated))',
-        'surface-sunken': 'hsl(var(--surface-sunken))',
+        // Editorial surfaces — warm canvas / elevated card / sunken row.
+        // <alpha-value> enables bg-surface-sunken/40 etc.
+        'surface-paper': 'hsl(var(--surface-paper) / <alpha-value>)',
+        'surface-elevated': 'hsl(var(--surface-elevated) / <alpha-value>)',
+        'surface-sunken': 'hsl(var(--surface-sunken) / <alpha-value>)',
+        // Semantic colors — TYPE 2 hex tokens. Registered for bare-class
+        // usage (border-semantic-caution, text-semantic-danger). Opacity
+        // suffixes (/N) don't apply through Tailwind's pipeline for hex
+        // sources — use inline color-mix at call sites that need alpha.
+        'semantic-success': 'var(--semantic-success)',
+        'semantic-caution': 'var(--semantic-caution)',
+        'semantic-danger': 'var(--semantic-danger)',
+        'semantic-info': 'var(--semantic-info)',
         // Hairline divider tokens — already complete rgba() values in
         // globals.css, so no hsl() wrap. Used as `border-hairline`,
         // `border-hairline-strong`, `divide-hairline`, etc.

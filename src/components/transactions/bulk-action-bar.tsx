@@ -141,12 +141,12 @@ export function BulkActionBar({
     <div
       role="region"
       aria-label="Bulk actions"
-      className="sticky top-14 z-20 -mx-4 mb-1 flex items-center gap-3 border-b border-border bg-[--surface]/95 px-4 py-2 backdrop-blur sm:-mx-8 sm:px-8"
+      className="sticky top-14 z-20 -mx-4 mb-1 flex items-center gap-3 border-b border-border bg-[color-mix(in_oklab,var(--surface)_95%,transparent)] px-4 py-2 backdrop-blur sm:-mx-8 sm:px-8"
     >
       <span className="font-mono text-xs tabular-nums text-[--text]">
         {selectedCount.toLocaleString()} selected
       </span>
-      <span className="h-4 w-px bg-[--border]" />
+      <span className="h-4 w-px bg-border" />
       <CategoryPicker
         options={categoryOptions}
         onApply={applyCategory}

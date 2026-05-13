@@ -92,8 +92,8 @@ function Card({ active, accent, name, deltaLabel, figure, meta, onClick }: CardP
       type="button"
       onClick={onClick}
       className={cn(
-        'group relative min-w-[260px] flex-1 rounded-card border border-hairline-strong bg-surface-elevated p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md',
-        active && 'border-text-3',
+        'group relative min-w-[260px] flex-1 rounded-2xl border border-[--hairline] bg-[--surface] p-5 text-left transition-colors duration-fast ease-out-quart hover:border-[--hairline-strong]',
+        active && 'border-text-3 hover:border-text-3',
       )}
     >
       {active && (

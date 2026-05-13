@@ -19,7 +19,7 @@ export function MobileInvestments({
 
   return (
     <section className="space-y-3 rounded-2xl border border-[--hairline] bg-[--surface] p-5 md:hidden">
-      <p className="text-xs uppercase tracking-[0.16em] text-[--text-3]">
+      <p className="text-eyebrow">
         Recent activity · {transactions.length}
       </p>
       <MobileList<RecentInvestmentTxn>

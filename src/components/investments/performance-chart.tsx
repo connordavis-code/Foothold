@@ -58,7 +58,7 @@ export function PerformanceChart({ history }: { history: PortfolioHistory }) {
     <section className="space-y-4 rounded-2xl border border-[--hairline] bg-[--surface] p-6 md:p-8">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.16em] text-[--text-3]">
+          <p className="text-eyebrow">
             Performance
           </p>
           <p className="mt-1 text-sm text-[--text-2]">

@@ -110,7 +110,7 @@ export function ForecastChart({
     tipBaseline !== null && tipScenario !== null ? tipScenario - tipBaseline : null;
 
   return (
-    <div className="rounded-card border border-hairline-strong bg-surface-elevated p-6 shadow-sm">
+    <div className="rounded-2xl border border-[--hairline] bg-[--surface] p-6">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
           <h3 className="text-base font-medium text-foreground">Cash forecast</h3>

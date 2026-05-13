@@ -141,7 +141,7 @@ export function MobileTransactionsShell({
 
   return (
     <div className="space-y-3 md:hidden">
-      <div className="sticky top-14 z-10 -mx-4 flex items-center gap-2 border-b border-border bg-[--surface]/95 px-4 py-2 backdrop-blur sm:-mx-8 sm:px-8">
+      <div className="sticky top-14 z-10 -mx-4 flex items-center gap-2 border-b border-border bg-[color-mix(in_oklab,var(--surface)_95%,transparent)] px-4 py-2 backdrop-blur sm:-mx-8 sm:px-8">
         <div className="relative flex-1">
           <Search
             aria-hidden
@@ -164,7 +164,7 @@ export function MobileTransactionsShell({
       </p>
 
       {groups.length === 0 ? (
-        <div className="rounded-card border border-border bg-[--surface] px-4 py-12 text-center text-sm text-[--text-2]">
+        <div className="rounded-2xl border border-[--hairline] bg-[--surface] px-4 py-12 text-center text-sm text-[--text-2]">
           {params.size > 0
             ? 'No transactions match these filters.'
             : 'No transactions synced yet.'}
@@ -195,13 +195,13 @@ export function MobileTransactionsShell({
                   {formatCurrency(-group.dayNet, { signed: true })}
                 </span>
               </header>
-              <ul className="overflow-hidden rounded-card border border-border bg-[--surface]">
+              <ul className="overflow-hidden rounded-2xl border border-[--hairline] bg-[--surface]">
                 {group.rows.map((r) => (
                   <li key={r.id}>
                     <button
                       type="button"
                       onClick={() => setActive(r)}
-                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors active:bg-[--surface-sunken]/60"
+                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors active:bg-surface-sunken/60"
                     >
                       <div className="min-w-0 flex-1 space-y-0.5">
                         <div className="flex items-center gap-2">
@@ -209,7 +209,7 @@ export function MobileTransactionsShell({
                             {r.merchantName ?? r.name}
                           </span>
                           {r.pending && (
-                            <span className="shrink-0 rounded-md bg-[--surface-sunken] px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-[--text-3]">
+                            <span className="shrink-0 rounded-md bg-surface-sunken px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-[--text-3]">
                               pending
                             </span>
                           )}
@@ -254,7 +254,7 @@ export function MobileTransactionsShell({
         </p>
       )}
       {!hasMore && groups.length > 0 && (
-        <p className="py-3 text-center text-[11px] uppercase tracking-[0.12em] text-[--text-3]/80">
+        <p className="py-3 text-center text-[11px] uppercase tracking-[0.12em] text-[--text-3]">
           End of list
         </p>
       )}

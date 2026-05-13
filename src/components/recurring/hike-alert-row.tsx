@@ -33,7 +33,7 @@ export function HikeAlertRow({ stream }: Props) {
       className={cn(
         'relative px-5 py-3 sm:px-6',
         drillHref &&
-          'transition-colors duration-fast ease-out-quart hover:bg-[--surface-sunken]/60',
+          'transition-colors duration-fast ease-out-quart hover:bg-surface-sunken/60',
       )}
     >
       {drillHref && (

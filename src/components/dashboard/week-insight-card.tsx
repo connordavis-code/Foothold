@@ -106,7 +106,7 @@ export function WeekInsightCard({ insight, sequenceNumber, stats }: Props) {
 
   return (
     <article id="brief" className="rounded-card bg-[--surface] p-6">
-      <header className="flex items-center gap-3 text-[10px] uppercase tracking-[0.16em] text-[--text-3]">
+      <header className="flex items-center gap-3 text-eyebrow-sm">
         <span>Weekly Brief</span>
         <span className="h-px flex-1 bg-[--text-3] opacity-30" />
         <span>

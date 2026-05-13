@@ -120,6 +120,65 @@ Filmic grain (~10–13% opacity) + topo contour layer (~7–9% opacity) as fixed
 
 ---
 
+## Card recipe (locked 2026-05-12, R.3.6 UAT polish)
+
+Primary content cards across every page use a single class string:
+
+```
+rounded-2xl border border-[--hairline] bg-[--surface]
+```
+
+Three things matter here:
+
+1. **`--hairline` over `--border`** — `--border` is an HSL fragment that resolves to a near-bg dark-teal in dark mode and is effectively invisible against the deep-forest canvas. `--hairline` is a semitransparent rgba overlay (8% black light, 10% white dark) that reads as a clear rim in both themes. `border-border` is reserved for shadcn-default contexts (form inputs, dividers); primary cards use `border-[--hairline]`.
+2. **`bg-[--surface]` over `bg-surface-elevated`** — editorial layering is one step (page-bg → card-bg), not two. `bg-surface-elevated` exists but is reserved for the three "lift" roles below.
+3. **No `shadow-sm`** — editorial restraint rule. Border + radius do the framing; shadows are reserved for genuine elevation (popovers, drawers).
+
+### Three legitimate roles for `bg-surface-elevated`
+
+| Role | Examples |
+|---|---|
+| **Floating chrome** — element is conceptually *above* the page | `ui/select` dropdown, `command-palette/palette-trigger`, `forecast-chart` tooltip, vaul drawer contents, `mobile-tab-bar`, `mobile-scenario-save-bar`, `nav/sync-pill` |
+| **Raised affordance on a flat surface** — pill or tab rendering on page-bg, not in a card | `recurring/recurring-tabs` active tab |
+| **Interactive control on a card** — button or input *inside* a recipe-A card | `connect/connect-account-button`, `transactions/category-picker` |
+
+If a new component doesn't fit one of those three roles, it's a primary card and must use recipe A.
+
+### Hover affordance on interactive cards
+
+Recipe A drops `hover:-translate-y-0.5` and `hover:shadow-md` because (a) they clip when parent containers use `overflow-hidden` (root cause of the simulator scenario-cards bug fixed 2026-05-12), and (b) they're decorative shadows that violate the restraint rule. Interactive cards (scenario-cards, moves-grid items) signal hover via border darkening instead:
+
+```
+hover:border-[--hairline-strong]    # subtle, when active state is also border-color
+hover:border-text-3                  # bolder, when no separate active state
+```
+
+This pattern preserves the click affordance without any transform or shadow.
+
+---
+
+## Eyebrow utility family (locked 2026-05-12)
+
+Editorial eyebrow labels — the uppercase, letter-spaced rubrics above titles, KPI labels, and section markers — come in two canonical scales. Both share `0.16em` letter-spacing and `var(--text-3)` color so they read as one typographic family at different sizes.
+
+```css
+.text-eyebrow      /* 12px / 500 / 0.16em / --text-3 */
+.text-eyebrow-sm   /* 10px / 500 / 0.16em / --text-3 */
+```
+
+**When to use which:**
+- `text-eyebrow` — `<*PageHeader>` components, section-card headers, allocation/holdings labels. Default eyebrow.
+- `text-eyebrow-sm` — KPI strip cells, dashboard mini-labels, summary strip rows. Use when vertical density is at a premium and the eyebrow is paired with a larger numeral or title close below it.
+
+**Variants that intentionally stay manual** (not utility-class candidates):
+- Mono table-column headers — `font-mono text-[11px] uppercase tracking-[0.12em] text-[--text-2]`. The font family and tighter tracking are load-bearing for table-row alignment; a utility would obscure that intent.
+- Caution-colored eyebrows — e.g., the hike-alert banner uses `text-[--semantic-caution]`. Different color = different signal; keep manual.
+- `tracking-wider` variants (~5 sites: recent-activity, hero-trajectory, transaction-detail-sheet labels). These predate the canonicalization and use the older Tailwind `tracking-wider` (0.05em) constant. They render slightly looser than the canonical eyebrow. Migrate opportunistically; not a forced sweep.
+
+The utility's earlier spec (10px / 0.08em / muted-foreground/0.7) didn't match the codebase's converged usage. The 2026-05-12 R.3.6 UAT pass retro-fitted the utility to the dominant manual pattern, then propagated it across 26 call-sites.
+
+---
+
 ## Phase sequencing
 
 | Phase | Scope | Estimate |

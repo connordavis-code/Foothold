@@ -29,7 +29,7 @@ export function InvestmentTxnsTable({ transactions }: Props) {
   return (
     <section className="hidden space-y-4 rounded-2xl border border-[--hairline] bg-[--surface] p-6 md:block md:p-8">
       <header>
-        <p className="text-xs uppercase tracking-[0.16em] text-[--text-3]">
+        <p className="text-eyebrow">
           Recent activity · {transactions.length}
         </p>
       </header>

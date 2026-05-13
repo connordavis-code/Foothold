@@ -28,7 +28,7 @@ interface Props {
 
 export function ConnectedAccountsSection({ sources, accountsByItem, snaptradeEnabled }: Props) {
   return (
-    <Card className="bg-surface-elevated border-hairline-strong shadow-sm">
+    <Card className="rounded-2xl border-[--hairline] bg-[--surface] shadow-none">
       <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div className="space-y-1.5">
           <CardTitle>Connected institutions</CardTitle>

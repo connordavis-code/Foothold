@@ -22,7 +22,7 @@ export function PortfolioHero({ summary }: { summary: PortfolioSummary }) {
   return (
     <section className="grid grid-cols-1 gap-6 rounded-2xl border border-[--hairline] bg-[--surface] p-6 md:grid-cols-3 md:gap-8 md:p-8">
       <div className="md:col-span-2">
-        <p className="text-xs uppercase tracking-[0.16em] text-[--text-3]">
+        <p className="text-eyebrow">
           Portfolio value · today
         </p>
         <p className="mt-2 font-mono text-4xl font-semibold tabular-nums tracking-tight text-[--text] md:text-5xl">
@@ -54,7 +54,7 @@ export function PortfolioHero({ summary }: { summary: PortfolioSummary }) {
 
       <div className="grid grid-cols-2 gap-6 md:grid-cols-1 md:gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.16em] text-[--text-3]">
+          <p className="text-eyebrow">
             Cost basis
           </p>
           <p className="mt-1 font-mono text-base font-semibold tabular-nums text-[--text]">
@@ -62,7 +62,7 @@ export function PortfolioHero({ summary }: { summary: PortfolioSummary }) {
           </p>
         </div>
         <div>
-          <p className="text-xs uppercase tracking-[0.16em] text-[--text-3]">
+          <p className="text-eyebrow">
             Holdings
           </p>
           <p className="mt-1 font-mono text-base font-semibold tabular-nums text-[--text]">

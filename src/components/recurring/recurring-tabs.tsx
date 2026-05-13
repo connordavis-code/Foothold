@@ -61,7 +61,7 @@ function TabPill({
       className={cn(
         'rounded-pill px-3 py-1.5 text-xs font-medium transition-colors',
         active
-          ? 'bg-[--surface-elevated] text-[--text]'
+          ? 'bg-surface-elevated text-[--text]'
           : 'text-[--text-2] hover:text-[--text]',
       )}
     >

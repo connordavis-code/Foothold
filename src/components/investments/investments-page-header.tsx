@@ -19,7 +19,7 @@ export function InvestmentsPageHeader({
     <header className="space-y-3">
       <div className="flex items-end justify-between gap-4">
         <div>
-          <div className="text-xs uppercase tracking-[0.16em] text-[--text-3]">
+          <div className="text-eyebrow">
             Long horizon
           </div>
           <h1

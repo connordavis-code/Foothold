@@ -222,7 +222,7 @@ function EmptyState() {
           <Mountain className="h-6 w-6" />
         </span>
         <div className="space-y-2">
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 className="font-serif text-2xl font-semibold italic tracking-tight">
             Welcome to Foothold
           </h1>
           <p className="mx-auto max-w-md text-sm text-muted-foreground">
