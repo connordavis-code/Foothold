@@ -23,7 +23,7 @@ This milestone replaces the visual + IA layer wholesale while preserving the dat
 | R.3.3 Transactions | ✓ shipped — merged to `feat/redesign` (operator-table date grouping, mobile shell, chips, page rewrite, revalidatePath). [r3-3-transactions/SPEC.md](r3-3-transactions/SPEC.md) + [PLAN.md](r3-3-transactions/PLAN.md) |
 | R.3.4 Investments | ✓ shipped — on `feat/redesign` (portfolio_snapshot table + walkback chart, wholesale-IA restyle with Allocation/Holdings/Recent-activity sections, capability-aware freshness). [r3-4-investments/SPEC.md](r3-4-investments/SPEC.md) + [PLAN.md](r3-4-investments/PLAN.md) |
 | R.3.5 Simulator | ✓ shipped — on `feat/redesign` (URL-state tabs Empty/Moves/Comparison, hand-rolled SVG ForecastChart with position-dot pulse + goal markers + 1Y/2Y range, 8 guided Move template forms abstracting the override editor, scenario cards row + goal impacts cards, narrative panel removed, /simulator/compare reduced to baseline-vs-one). [r3-5-simulator/SPEC.md](r3-5-simulator/SPEC.md) + [PLAN.md](r3-5-simulator/PLAN.md) |
-| R.3.6 Settings | not started |
+| R.3.6 Settings | ✓ shipped — on `feat/redesign` (two-column sticky 220px rail w/ IntersectionObserver active tracking, Profile editable display name + timezone via users.name + new users.timezone column, Connected accounts restyled + StatePill palette migrated to --semantic-caution token, Data & export route handler streams transactions CSV, Danger zone amber-tinted with type-email-confirmation account delete; +35 vitest tests). [r3-6-settings/SPEC.md](r3-6-settings/SPEC.md) + [PLAN.md](r3-6-settings/PLAN.md) |
 | R.4 Goals Moves + scenario unification | not started |
 | R.5 Mobile rebuild | not started |
 | R.6 Polish | not started |
