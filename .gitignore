@@ -47,6 +47,12 @@ next-env.d.ts
 # claude code local settings (per-machine, never commit)
 .claude/settings.local.json
 
+# /uat-fix and other slash-command audit reports (scratch artifacts)
+.claude-reports/
+
+# EnterWorktree creates isolated worktrees here — never commit these
+.claude/worktrees/
+
 # superpowers brainstorm session artifacts (HTML mockups, ephemeral state)
 .superpowers/
 
