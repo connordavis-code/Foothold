@@ -394,50 +394,99 @@ added to the `NON_LINK_CONSENTABLE` set). 7 regression tests in
 in the same PR as the env change.**
 
 ### Don't author the feature and its UAT plan from the same mental model (2026-05-13)
-PR #16's `setTransactionTransferOverrideAction` shipped with the correct
-action code, correct `<TransactionDetailSheet>` component, correct
-read-side filter — but the detail sheet was only mounted in
-`<MobileTransactionsShell>`, never in the desktop `<OperatorShell>`. The
-"Mark as transfer" affordance defined at lines 325–338 of the sheet was
-literally unreachable on desktop: no row-click handler, no Enter-on-focus
-binding, no per-row menu. The PR's UAT plan said *"open a transaction in
-/transactions, mark X"* — an instruction with no available path on the
-surface the reviewer tested on.
+The agent that wrote `setTransactionTransferOverrideAction` for #16
+also wrote the PR's UAT plan. The plan said *"open a transaction in
+/transactions, mark X"* — an instruction that had no available path
+on desktop because `<TransactionDetailSheet>` was never mounted in
+`<OperatorShell>`. The author's mental model assumed reachability
+that didn't exist in the rendered UI; the plan tested the model, not
+the product.
 
-Reviewer on desktop reached for the visually-adjacent bulk-recategorize
-bar's category picker (which renders PFC entries including "Transfer
-Out" / "Transfer In"), clicked one, saw `"Re-categorized as Transfer Out"`
-success toast, and concluded the test passed. Toast was real, recategorize
-was real, success state was real — but the write went to
-`category_override_id`, a column the forecast filter never reads. Forecast
-didn't move; bug discovered only by querying the DB.
+Symptom: a PR description checklist passes locally and via reviewer
+walkthrough, but exercises a different code path than the one the
+plan describes. The discrepancy is invisible until someone queries
+the DB.
 
-Root failure: the UAT plan was authored by the same agent as the feature.
-The plan was checking the agent's mental model of how the feature worked,
-not testing the feature against the real product. *"Open a transaction"*
-sat unexamined because the author assumed reachability that wasn't there.
+Structural antidote in [docs/uat-runbook-template.md](docs/uat-runbook-template.md):
+the **authorship rule** — write the UAT plan BEFORE implementation
+(plan becomes spec the implementation must satisfy), or have a
+different agent/reviewer pass over it independently. When neither is
+possible, force the **reachability pre-check** discipline: a literal
+click path from a fresh page load, naming the visible control at
+each step. Writing *"click description cell → sheet opens → scroll
+to Transfer classification → click Mark as transfer"* exposes the
+gaps that *"open a transaction"* papers over.
 
-Fixed in `bbfea96` (desktop entry point: clickable description cell +
-detail sheet mount in OperatorShell) and `8adc60f` (foot-gun filter:
-`filterCategoryPickerOptions` + `<CategoryWritePicker>` wrapper applied
-at every category-write boundary). New
-[docs/uat-runbook-template.md](docs/uat-runbook-template.md) enforces
-three discipline points per UAT step:
+Fixed via desktop entry point in `bbfea96`. See also Lessons B and C
+from the same 2026-05-13 incident — each contributes its own first
+strike to distinct discipline gaps.
 
-1. **Reachability pre-check** — literal click path from a fresh page
-   load. If you can't write the click sequence, the affordance is
-   unreachable.
-2. **Action + UI assertion** — expected button text, toast wording,
-   visual state change.
-3. **DB-state SELECT verification** — literal SQL that confirms the row
-   matches the UI claim. Toast + caption can fire from optimistic local
-   state OR from the wrong action path; the SELECT cannot lie.
+### Don't verify a DB-writing feature with UI state alone (2026-05-13)
+PR #16's UAT criteria checked toast appearance, caption text
+changes, and forecast-line movement. All three passed for clicks
+that ACTUALLY wrote to the wrong column (`category_override_id` via
+`updateTransactionCategoriesAction`, when the intended action was
+`setTransactionTransferOverrideAction`). The toast was correct for
+the action that DID run; the caption changed because the displayed
+category flipped; the forecast appeared to move enough to look
+affected. None of those signals proved the intended column was
+written.
 
-Plus authorship discipline: write the UAT plan BEFORE implementation
-(plan becomes spec), or have a different agent/reviewer pass over it
-independently. In solo-dev mode, the click-path discipline is the
-structural antidote — the act of writing *"click here, then here, then
-here"* exposes gaps that *"open a transaction"* papers over.
+Symptom: feature ships, "passes" UAT, lives in prod silently broken
+until a user runs `SELECT … WHERE target_column IS NOT NULL` and
+discovers zero rows after multiple "successful" actions.
+
+Structural antidote in [docs/uat-runbook-template.md](docs/uat-runbook-template.md):
+every UAT step targeting a DB write MUST include a **DB-state SELECT
+verification** — literal SQL against the target column, post-state
+values asserted explicitly. UI signals (toast, caption, visual
+state, even derived totals like forecast lines) are insufficient
+because they can fire from optimistic local state, from a different
+action path than intended, or from `revalidatePath` not reaching
+the surface where the data is rendered.
+
+Fixed via runbook discipline in `8e6f68e`. Pairs with Lesson A
+(same incident — author-as-UAT-planner failure mode that allowed
+this gap to ship).
+
+### Don't trust an adjacent affordance that looks like the right one (2026-05-13)
+Desktop `/transactions` had two affordances that visually resembled
+"mark this as a transfer" but invoked different actions:
+
+1. The (unreachable) `<TransactionDetailSheet>` "Mark as transfer"
+   button → `setTransactionTransferOverrideAction` →
+   writes `is_transfer_override` (read by forecast).
+2. The (reachable, pre-existing) bulk-recategorize bar's category
+   picker, with PFC entries including "Transfer Out" / "Transfer In"
+   → `updateTransactionCategoriesAction` →
+   writes `category_override_id` (NOT read by forecast).
+
+A user trying to mark a transfer reasonably clicked (2) — it was
+visible, the toast said *"Re-categorized as Transfer Out"* (a
+success-shaped affirmation), and the row's displayed category
+flipped. The user believed they had completed (1) but had actually
+completed (2). **Two write-side affordances that look like they do
+the same thing but produce structurally different writes is a
+foot-gun** — and a foot-gun that creates fake-success feedback
+masks itself.
+
+Symptom: real-data UAT passes from the operator's perspective
+because every click produces success toast + visible state change,
+but downstream behavior (forecast, classification queries, etc.)
+doesn't reflect the intended semantics.
+
+Structural antidote in `8adc60f`: `filterCategoryPickerOptions` at
+the write-picker boundary strips PFC "Transfer Out" / "Transfer In"
+from the category-write picker, removing the look-alike path at its
+source. `<CategoryWritePicker>` wrapper makes the filter automatic
+for every write-path mount; bare `<CategoryPicker>` stays
+presentational. **Generalizable rule**: when adding a new write-side
+affordance to a surface that already has adjacent write affordances,
+audit whether existing affordances offer a look-alike path. If yes,
+either disambiguate visually OR remove the misleading entries from
+the adjacent surface.
+
+Pairs with Lessons A and B from the same 2026-05-13 incident.
 
 ### Don't auto-merge Dependabot major-version bumps (2026-05-11)
 Four dependabot PRs (eslint-config-next 14→16, tailwindcss 3→4,
