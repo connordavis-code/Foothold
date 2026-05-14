@@ -16,6 +16,7 @@ import { BulkActionBar } from './bulk-action-bar';
 import { FilterRow, SEARCH_INPUT_ID } from './filter-row';
 import { OperatorPagination } from './operator-pagination';
 import { OperatorTable } from './operator-table';
+import { TransactionDetailSheet } from './transaction-detail-sheet';
 
 type Props = {
   rows: TransactionListRow[];
@@ -53,6 +54,10 @@ export function OperatorShell({
   const searchParams = useSearchParams();
   const [selectedIndex, setSelectedIndex] = useState(rows.length > 0 ? 0 : -1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  // Active row drives the TransactionDetailSheet. Mirrors mobile-
+  // transactions-shell.tsx's pattern verbatim — same component, same
+  // open/close contract, same DetailRow shape.
+  const [active, setActive] = useState<TransactionListRow | null>(null);
   const lastClickedRef = useRef<number | null>(null);
 
   // Reset selection when the row set changes (filters / pagination).
@@ -194,12 +199,18 @@ export function OperatorShell({
         selectedIds={selectedIds}
         onToggle={onToggle}
         onToggleAllVisible={toggleAllVisible}
+        onOpenDetail={setActive}
       />
       <OperatorPagination
         page={page}
         totalPages={totalPages}
         totalCount={totalCount}
         onPage={goToPage}
+      />
+      <TransactionDetailSheet
+        row={active}
+        categoryOptions={categoryOptions}
+        onClose={() => setActive(null)}
       />
     </div>
   );

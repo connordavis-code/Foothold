@@ -17,6 +17,14 @@ type Props = {
     opts: { range?: boolean },
   ) => void;
   onToggleAllVisible: () => void;
+  /**
+   * Open the detail sheet for a single row. Wired by the shell to
+   * `setActive(row)`. The Description cell is the click target — the
+   * decorative hover state on the whole row used to imply an
+   * affordance that didn't exist; making one specific cell clickable
+   * with cursor-pointer + hover-underline makes the hover honest.
+   */
+  onOpenDetail: (row: TransactionListRow) => void;
 };
 
 /**
@@ -34,6 +42,7 @@ export function OperatorTable({
   selectedIds,
   onToggle,
   onToggleAllVisible,
+  onOpenDetail,
 }: Props) {
   const rowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
   const allChecked =
@@ -84,6 +93,7 @@ export function OperatorTable({
                 isSelected={i === selectedIndex}
                 isChecked={selectedIds.has(t.id)}
                 onToggle={onToggle}
+                onOpenDetail={onOpenDetail}
                 rowRef={(el) => {
                   rowRefs.current[i] = el;
                 }}
@@ -195,6 +205,7 @@ function Row({
   isSelected,
   isChecked,
   onToggle,
+  onOpenDetail,
   rowRef,
 }: {
   t: TransactionListRow;
@@ -206,6 +217,7 @@ function Row({
     index: number,
     opts: { range?: boolean },
   ) => void;
+  onOpenDetail: (row: TransactionListRow) => void;
   rowRef: (el: HTMLTableRowElement | null) => void;
 }) {
   // Plaid sign convention: positive = money OUT. Flip for display.
@@ -256,19 +268,29 @@ function Row({
         {formatTxDate(t.date)}
       </td>
       <td className="max-w-0 px-3 py-1.5">
-        <div className="flex items-center gap-2">
-          <span className="truncate font-medium">
-            {t.merchantName ?? t.name}
-          </span>
-          {t.pending && (
-            <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-              pending
-            </span>
+        <button
+          type="button"
+          onClick={() => onOpenDetail(t)}
+          aria-label={`Open details for ${t.merchantName ?? t.name}`}
+          className={cn(
+            'group/cell flex w-full flex-col items-start gap-0 rounded-sm text-left',
+            'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           )}
-        </div>
-        {t.merchantName && t.merchantName !== t.name && (
-          <p className="truncate text-xs text-muted-foreground">{t.name}</p>
-        )}
+        >
+          <div className="flex w-full items-center gap-2">
+            <span className="truncate font-medium group-hover/cell:underline underline-offset-2">
+              {t.merchantName ?? t.name}
+            </span>
+            {t.pending && (
+              <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                pending
+              </span>
+            )}
+          </div>
+          {t.merchantName && t.merchantName !== t.name && (
+            <p className="truncate text-xs text-muted-foreground">{t.name}</p>
+          )}
+        </button>
       </td>
       <td className="px-3 py-1.5 whitespace-nowrap text-xs">
         <span
