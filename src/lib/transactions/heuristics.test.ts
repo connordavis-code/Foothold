@@ -214,6 +214,85 @@ describe('findMirrorImageTransferPairs', () => {
     ]);
     expect(result).toEqual([]);
   });
+
+  it('catches AmEx credit-card payment pairs (regression: real-data UAT 2026-05-13)', () => {
+    // Real bug reported: AmEx payments show as green inflows on
+    // /transactions and hit the forecast as fake income. Plaid PFCs
+    // both legs as LOAN_PAYMENTS, which 1a's exclusion list correctly
+    // does NOT touch (real mortgage / auto-loan outflows to external
+    // lenders must keep counting). The mirror-image detector is the
+    // right closer — it's PFC-agnostic and fires on shape, so
+    // LOAN_PAYMENTS pairs between user-owned accounts auto-flip to
+    // is_transfer_override=true without a category-list hack.
+    //
+    // This case is the cross-day variant (Plaid often posts the card-
+    // side credit a day after the bank-side debit).
+    const result = findMirrorImageTransferPairs([
+      baseTxn({
+        id: 'checking-payment',
+        amount: 500,
+        accountId: 'checking',
+        date: '2026-05-05',
+      }),
+      baseTxn({
+        id: 'amex-credit',
+        amount: -500,
+        accountId: 'amex',
+        date: '2026-05-06',
+      }),
+    ]);
+    expect(result).toEqual([
+      { outflowId: 'checking-payment', inflowId: 'amex-credit' },
+    ]);
+  });
+
+  it('catches AmEx pairs where both legs post on the same day (regression: matches actual May-06/May-06 screenshot)', () => {
+    // Some institutions clear both legs through the same ACH batch
+    // and Plaid surfaces both with identical date. The bug user
+    // reported in real-data UAT showed exactly this shape.
+    const result = findMirrorImageTransferPairs([
+      baseTxn({
+        id: 'checking-payment',
+        amount: 1240.75,
+        accountId: 'checking',
+        date: '2026-05-06',
+      }),
+      baseTxn({
+        id: 'amex-credit',
+        amount: -1240.75,
+        accountId: 'amex',
+        date: '2026-05-06',
+      }),
+    ]);
+    expect(result).toEqual([
+      { outflowId: 'checking-payment', inflowId: 'amex-credit' },
+    ]);
+  });
+
+  it('catches AmEx pairs with $0.01 amount drift (regression: rounding tolerance in LOAN_PAYMENTS context)', () => {
+    // Belt-and-suspenders for the AmEx case: even when ACH rounding
+    // leaves the two legs one cent apart, the $0.01 tolerance keeps
+    // them paired. Locks the tolerance against a future tightening
+    // that would silently re-open this regression for a subset of
+    // real-world AmEx flows.
+    const result = findMirrorImageTransferPairs([
+      baseTxn({
+        id: 'checking-payment',
+        amount: 500.01,
+        accountId: 'checking',
+        date: '2026-05-06',
+      }),
+      baseTxn({
+        id: 'amex-credit',
+        amount: -500.0,
+        accountId: 'amex',
+        date: '2026-05-06',
+      }),
+    ]);
+    expect(result).toEqual([
+      { outflowId: 'checking-payment', inflowId: 'amex-credit' },
+    ]);
+  });
 });
 
 describe('merchantMatchesInvestmentInstitution', () => {
