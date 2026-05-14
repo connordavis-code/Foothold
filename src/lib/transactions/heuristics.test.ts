@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  findMatchedInvestmentInstitution,
   findMirrorImageTransferPairs,
   merchantMatchesInvestmentInstitution,
   type CandidateTransaction,
@@ -321,5 +322,40 @@ describe('merchantMatchesInvestmentInstitution', () => {
         ['M1   Finance'],
       ),
     ).toBe(true);
+  });
+});
+
+describe('findMatchedInvestmentInstitution', () => {
+  it('returns the institution string verbatim — preserves original case and punctuation', () => {
+    // Detail-log consumers (smoke test, future analytics) need the
+    // original human-readable institution name. Normalization is an
+    // internal matching detail; the return value must round-trip.
+    // `'Vanguard.'` normalizes to `'vanguard'`, which IS a substring
+    // of the merchant — the trailing period is decorative for matching
+    // but must come back intact in the return value.
+    expect(
+      findMatchedInvestmentInstitution('VANGUARD BUY INVESTMENT', [
+        'Vanguard.',
+      ]),
+    ).toBe('Vanguard.');
+  });
+
+  it('returns the FIRST matching institution when multiple could match (input-order precedence)', () => {
+    // If a merchant string contains tokens of two known institutions
+    // (e.g., a "Fidelity → Vanguard" rebalancing notation in the
+    // memo), the iteration order of the input list is the precedence.
+    // Pins the contract against a future refactor to Set/find/sort.
+    expect(
+      findMatchedInvestmentInstitution('FIDELITY VANGUARD TRANSFER', [
+        'Vanguard',
+        'Fidelity',
+      ]),
+    ).toBe('Vanguard');
+    expect(
+      findMatchedInvestmentInstitution('FIDELITY VANGUARD TRANSFER', [
+        'Fidelity',
+        'Vanguard',
+      ]),
+    ).toBe('Fidelity');
   });
 });

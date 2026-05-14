@@ -75,10 +75,14 @@ export async function syncExternalItem(
   // case. Fail-soft: provider sync succeeded; heuristic failure is
   // logged but doesn't poison the dispatch result.
   try {
-    const { mirrorPairs, merchantMatches } = await applyTransferHeuristics(
-      row.userId,
-    );
+    const { mirrorPairs, merchantMatches, details } =
+      await applyTransferHeuristics(row.userId);
     if (mirrorPairs > 0 || merchantMatches > 0) {
+      // Per-match details land in context.details — the smoke-test
+      // surface for Phase 1c. Inspect with:
+      //   SELECT context FROM error_log
+      //   WHERE op = 'sync.heuristics.transfer-override'
+      //   ORDER BY occurred_at DESC LIMIT 1;
       await logRun(
         'sync.heuristics.transfer-override',
         `Auto-classified ${mirrorPairs * 2 + merchantMatches} transfer(s)`,
@@ -87,6 +91,7 @@ export async function syncExternalItem(
           externalItemId,
           mirrorPairs,
           merchantMatches,
+          details,
         },
       );
     }

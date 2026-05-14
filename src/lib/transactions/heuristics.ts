@@ -42,6 +42,15 @@ const DATE_WINDOW_DAYS = 1;
  * across runs. Each transaction can appear in at most one pair — if 3
  * identical outflows face 1 inflow, only the earliest+lowest-id outflow
  * pairs; the stragglers wait for a future inflow or a manual override.
+ *
+ * Perf: O(n²) worst case. Benchmarked at 5000 candidates + 50 pairs
+ * (forced worst-case shape — most candidates have no pair, forcing the
+ * inner loop to scan the full list before giving up):
+ *   median 303ms, max 343ms, ±2.56% RME over 20 samples (Vitest 4.1).
+ * Sub-second under typical 90-day windows (1–3k unmarked txns:
+ * ~12–110ms). Watch for heavy users with >10k unmarked txns in window
+ * — at that point the curve clears 1s and warrants a smarter algo
+ * (date-bucket pre-index, e.g.). See heuristics.bench.ts.
  */
 export function findMirrorImageTransferPairs(
   transactions: readonly CandidateTransaction[],
@@ -88,9 +97,13 @@ function daysBetween(a: string, b: string): number {
 const MIN_INSTITUTION_NAME_LENGTH = 4;
 
 /**
- * Detect whether a transaction's merchant string looks like one of the
- * user's own investment institutions — a signal that the outflow is a
- * funding transfer into a brokerage rather than real spend.
+ * Detect which (if any) of the user's investment institutions a
+ * transaction's merchant string matches — used by the heuristic
+ * applier to track WHY a row was auto-marked in the per-match log.
+ *
+ * Returns the original (un-normalized) institution string that matched,
+ * or null. First-match wins — iteration follows input order, so
+ * callers wanting a particular precedence should sort upstream.
  *
  * Rule: normalize merchant and each institution to lowercase, strip
  * punctuation, collapse whitespace; match if a normalized institution
@@ -99,21 +112,35 @@ const MIN_INSTITUTION_NAME_LENGTH = 4;
  * 2–3-letter codes ("TD", "AT", "PNC"); callers passing those should
  * disambiguate upstream.
  */
-export function merchantMatchesInvestmentInstitution(
+export function findMatchedInvestmentInstitution(
   merchantName: string | null,
   investmentInstitutions: readonly (string | null)[],
-): boolean {
-  if (!merchantName) return false;
+): string | null {
+  if (!merchantName) return null;
   const merchant = normalize(merchantName);
-  if (!merchant) return false;
+  if (!merchant) return null;
 
   for (const institution of investmentInstitutions) {
     if (!institution) continue;
     const candidate = normalize(institution);
     if (candidate.length < MIN_INSTITUTION_NAME_LENGTH) continue;
-    if (merchant.includes(candidate)) return true;
+    if (merchant.includes(candidate)) return institution;
   }
-  return false;
+  return null;
+}
+
+/**
+ * Boolean wrapper over findMatchedInvestmentInstitution for call sites
+ * that only need the yes/no answer.
+ */
+export function merchantMatchesInvestmentInstitution(
+  merchantName: string | null,
+  investmentInstitutions: readonly (string | null)[],
+): boolean {
+  return (
+    findMatchedInvestmentInstitution(merchantName, investmentInstitutions) !==
+    null
+  );
 }
 
 function normalize(s: string): string {
