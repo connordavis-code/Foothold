@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { updateTransactionCategoriesAction } from '@/lib/transactions/actions';
 import type { CategoryOption } from '@/lib/db/queries/categories';
 import type { TransactionListRow } from '@/lib/db/queries/transactions';
-import { CategoryPicker } from './category-picker';
+import { CategoryWritePicker } from './category-write-picker';
 
 type Props = {
   selectedCount: number;
@@ -147,7 +147,7 @@ export function BulkActionBar({
         {selectedCount.toLocaleString()} selected
       </span>
       <span className="h-4 w-px bg-border" />
-      <CategoryPicker
+      <CategoryWritePicker
         options={categoryOptions}
         onApply={applyCategory}
         busy={isPending}

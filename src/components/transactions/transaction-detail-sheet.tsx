@@ -12,6 +12,7 @@ import {
   setTransactionTransferOverrideAction,
   updateTransactionCategoriesAction,
 } from '@/lib/transactions/actions';
+import { filterCategoryPickerOptions } from '@/lib/transactions/category-picker-filter';
 import { shouldTreatAsTransfer } from '@/lib/transactions/predicates';
 import { cn, formatCurrency } from '@/lib/utils';
 
@@ -66,8 +67,15 @@ export function TransactionDetailSheet({
 
   const open = row !== null;
 
-  const userOpts = categoryOptions.filter((o) => o.source === 'user');
-  const pfcOpts = categoryOptions.filter((o) => o.source === 'pfc');
+  // Single write-boundary for the inline picker — same filter the
+  // bulk path uses via <CategoryWritePicker>. Strips PFC "Transfer Out"
+  // / "Transfer In" entries that look like transfer-marking but
+  // actually write to `category_override_id`. The dedicated transfer
+  // classification section below is the only legitimate path to set
+  // `is_transfer_override`.
+  const writeOptions = filterCategoryPickerOptions(categoryOptions);
+  const userOpts = writeOptions.filter((o) => o.source === 'user');
+  const pfcOpts = writeOptions.filter((o) => o.source === 'pfc');
 
   function applyCategory(name: string | null) {
     if (!row) return;
