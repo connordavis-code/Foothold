@@ -104,6 +104,36 @@ run is either a no-op OR produces equivalent state. This catches:
 
 ---
 
+## Negative reachability check
+
+For any single-target affordance on a multi-column or multi-control
+surface, add a step that confirms **the affordance fires ONLY from
+its intended trigger** — not from adjacent controls that share the
+same visual neighborhood.
+
+> After confirming the description click opens the detail sheet,
+> click each other column on the same row in turn — checkbox cell,
+> category cell, account cell, amount cell. Confirm none of those
+> open the sheet. Only the description should be the click target.
+
+What this catches:
+- **Whole-row click handlers** that bleed beyond the intended cell —
+  passes the positive reachability check (description click opens
+  the sheet) but undermines keyboard nav or bulk-select gestures
+  on the other columns
+- **Misplaced `onClick`** at the `<tr>` level instead of the
+  intended `<td>` / `<button>` child
+- **Event-bubbling regressions** where a future refactor adds a
+  parent handler that propagates into adjacent cells
+
+**Generalizable rule**: every UAT step that confirms "clicking X
+opens Y" should be paired with "clicking not-X does NOT open Y."
+Without the paired check, "X opens Y" only proves *X is sufficient*
+— not that *X is exclusive*. The exclusivity property is usually
+what users actually rely on.
+
+---
+
 ## Authorship rule
 
 The UAT plan **should not be written by the same person/agent who
