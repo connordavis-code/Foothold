@@ -265,17 +265,22 @@ export function SimulatorClient({
         {/* Right: forecast chart + goal diff cards */}
         <div>
           <div className="space-y-8">
-            <ForecastChart
-              baseline={baselineResult.projection}
-              scenarios={[
-                {
-                  id: selectedScenarioId ?? 'current',
-                  name: selectedScenario?.name ?? 'Current scenario',
-                  projection: engineResult.projection,
-                  colorVar: '--chart-1',
-                },
-              ]}
-            />
+            <div>
+              <ForecastChart
+                baseline={baselineResult.projection}
+                scenarios={[
+                  {
+                    id: selectedScenarioId ?? 'current',
+                    name: selectedScenario?.name ?? 'Current scenario',
+                    projection: engineResult.projection,
+                    colorVar: '--chart-1',
+                  },
+                ]}
+              />
+              <p className="mt-3 font-mono text-xs text-muted-foreground">
+                Movements between your own accounts are excluded — they&rsquo;re not income or spend.
+              </p>
+            </div>
             <GoalDiffCards
               goalImpacts={engineResult.goalImpacts}
               history={history}

@@ -220,6 +220,10 @@ export const transactions = pgTable(
       () => categories.id,
       { onDelete: 'set null' },
     ),
+    // User-overridden transfer classification. Null = no override (use PFC);
+    // true = treat as transfer; false = treat as not-transfer. Aggregation-active
+    // (the forecast query honors this column), unlike categoryOverrideId.
+    isTransferOverride: boolean('is_transfer_override'),
     paymentChannel: text('payment_channel'),
     createdAt: ts('created_at').defaultNow().notNull(),
     updatedAt: ts('updated_at').defaultNow().notNull(),

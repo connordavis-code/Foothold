@@ -45,6 +45,8 @@ export type TransactionListRow = {
   /** Set when the user has manually re-categorized this row. */
   overrideCategoryId: string | null;
   overrideCategoryName: string | null;
+  /** Manual transfer-classification override; null = use the PFC. */
+  isTransferOverride: boolean | null;
 };
 
 export type TransactionListResult = {
@@ -112,6 +114,7 @@ export async function getTransactions(
         accountType: financialAccounts.type,
         overrideCategoryId: transactions.categoryOverrideId,
         overrideCategoryName: categories.name,
+        isTransferOverride: transactions.isTransferOverride,
       })
       .from(transactions)
       .innerJoin(

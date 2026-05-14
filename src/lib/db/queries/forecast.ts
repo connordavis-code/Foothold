@@ -1,4 +1,4 @@
-import { and, eq, gte } from 'drizzle-orm';
+import { and, eq, gte, isNull, notInArray, or } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   financialAccounts,
@@ -7,6 +7,7 @@ import {
   recurringStreams,
   transactions,
 } from '@/lib/db/schema';
+import { INTERNAL_TRANSFER_CATEGORIES } from '@/lib/forecast/exclusions';
 import type { ForecastHistory } from '@/lib/forecast/types';
 
 const TRAILING_MONTHS = 3;
@@ -124,7 +125,14 @@ export async function getForecastHistory(userId: string): Promise<ForecastHistor
         ),
       ),
 
-    // Trailing transactions for category/income history
+    // Trailing transactions for category/income history.
+    // Internal transfers are excluded — they're asset reallocations, not
+    // real cash outflows or inflows. Tri-state precedence: a non-null
+    // is_transfer_override wins outright; otherwise fall back to the
+    // Plaid PFC. Null-PFC + null-override rows are preserved (they bucket
+    // as UNCATEGORIZED downstream). Mirrors shouldTreatAsTransfer in
+    // src/lib/transactions/predicates.ts so JS-side and SQL-side stay in
+    // lockstep.
     db
       .select({
         amount: transactions.amount,
@@ -138,6 +146,21 @@ export async function getForecastHistory(userId: string): Promise<ForecastHistor
         and(
           eq(externalItems.userId, userId),
           gte(transactions.date, sinceDate),
+          or(
+            // Explicit "not a transfer" override wins
+            eq(transactions.isTransferOverride, false),
+            // No override → fall back to PFC
+            and(
+              isNull(transactions.isTransferOverride),
+              or(
+                isNull(transactions.primaryCategory),
+                notInArray(
+                  transactions.primaryCategory,
+                  [...INTERNAL_TRANSFER_CATEGORIES],
+                ),
+              ),
+            ),
+          ),
         ),
       ),
 

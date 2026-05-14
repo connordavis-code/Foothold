@@ -157,3 +157,47 @@ export async function loadMoreTransactionsAction(
     hasMore: result.page < result.totalPages,
   };
 }
+
+export type TransferOverrideResult = {
+  updated: number;
+};
+
+/**
+ * Override the transfer classification of a single transaction. Tri-state:
+ *   value = true  → force-treat as transfer (excluded from cash forecast)
+ *   value = false → force-treat as NOT a transfer (re-included even if PFC is TRANSFER_*)
+ *   value = null  → clear override, fall back to Plaid's PFC
+ *
+ * Defense-in-depth: filterOwnedTransactions whitelists the id before
+ * writing, so a forged id from the client can't reach into someone else's
+ * data. Revalidates every surface that consumes the forecast — the
+ * dashboard hero (EOM projected) and the simulator both compute via the
+ * same getForecastHistory path, and /goals' spend-cap-feed shares the
+ * detail sheet that drives this action.
+ */
+export async function setTransactionTransferOverrideAction(
+  txId: string,
+  value: boolean | null,
+): Promise<TransferOverrideResult> {
+  const session = await auth();
+  if (!session?.user) throw new Error('Unauthorized');
+
+  // Normalize: anything but a real boolean or null becomes null (clear).
+  // Defends against stale clients sending undefined or a stringified value.
+  const normalized: boolean | null =
+    value === true || value === false ? value : null;
+
+  const owned = await filterOwnedTransactions(session.user.id, [txId]);
+  if (owned.length === 0) return { updated: 0 };
+
+  await db
+    .update(transactions)
+    .set({ isTransferOverride: normalized, updatedAt: new Date() })
+    .where(inArray(transactions.id, owned));
+
+  revalidatePath('/transactions');
+  revalidatePath('/dashboard');
+  revalidatePath('/simulator');
+  revalidatePath('/goals');
+  return { updated: owned.length };
+}
