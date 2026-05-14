@@ -1,9 +1,10 @@
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { externalItems } from '@/lib/db/schema';
-import { logError } from '@/lib/logger';
+import { logError, logRun } from '@/lib/logger';
 import { syncItem as syncPlaidItem } from '@/lib/plaid/sync';
 import { syncSnaptradeItem } from '@/lib/snaptrade/sync';
+import { applyTransferHeuristics } from '@/lib/transactions/apply-transfer-heuristics';
 
 export type SyncDispatchResult =
   | { provider: 'plaid'; summary: Awaited<ReturnType<typeof syncPlaidItem>> }
@@ -26,7 +27,10 @@ export async function syncExternalItem(
   externalItemId: string,
 ): Promise<SyncDispatchResult> {
   const [row] = await db
-    .select({ provider: externalItems.provider })
+    .select({
+      provider: externalItems.provider,
+      userId: externalItems.userId,
+    })
     .from(externalItems)
     .where(eq(externalItems.id, externalItemId));
   if (!row) {
@@ -38,15 +42,18 @@ export async function syncExternalItem(
   // Server actions in production wrap thrown errors in a generic
   // "An error occurred in the Server Components render" message that
   // strips the actual cause — without this we'd be flying blind.
+  let result: SyncDispatchResult;
   try {
     switch (row.provider) {
       case 'plaid': {
         const summary = await syncPlaidItem(externalItemId);
-        return { provider: 'plaid', summary };
+        result = { provider: 'plaid', summary };
+        break;
       }
       case 'snaptrade': {
         const summary = await syncSnaptradeItem(externalItemId);
-        return { provider: 'snaptrade', summary };
+        result = { provider: 'snaptrade', summary };
+        break;
       }
       default:
         throw new Error(
@@ -60,5 +67,36 @@ export async function syncExternalItem(
     });
     throw err;
   }
+
+  // Phase 1c: heuristic transfer-override backfill. Runs at the user
+  // level (not the item level) because mirror-image detection needs
+  // cross-provider visibility — an outflow from Plaid checking matched
+  // against an inflow into a SnapTrade brokerage is the prototypical
+  // case. Fail-soft: provider sync succeeded; heuristic failure is
+  // logged but doesn't poison the dispatch result.
+  try {
+    const { mirrorPairs, merchantMatches } = await applyTransferHeuristics(
+      row.userId,
+    );
+    if (mirrorPairs > 0 || merchantMatches > 0) {
+      await logRun(
+        'sync.heuristics.transfer-override',
+        `Auto-classified ${mirrorPairs * 2 + merchantMatches} transfer(s)`,
+        {
+          userId: row.userId,
+          externalItemId,
+          mirrorPairs,
+          merchantMatches,
+        },
+      );
+    }
+  } catch (heuristicErr) {
+    await logError('sync.heuristics.transfer-override', heuristicErr, {
+      userId: row.userId,
+      externalItemId,
+    });
+  }
+
+  return result;
 }
 
