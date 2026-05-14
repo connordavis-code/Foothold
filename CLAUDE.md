@@ -903,6 +903,67 @@ plan at `docs/superpowers/plans/2026-05-07-phase-3-pt3-goal-detail.md`)
   count, success state otherwise renders a primary "View
   investments" CTA.
 
+**Simulator net-worth pivot — Phase 1 (manual + heuristic transfer
+overrides)** (2026-05-14; full handoff at
+[docs/handoffs/2026-05-14-simulator-nw-pivot-phase-1-shipped.md](docs/handoffs/2026-05-14-simulator-nw-pivot-phase-1-shipped.md))
+- Three squash-merged PRs to main: #16 (`93a8321` — action + read
+  filter + manual UI), #18 (`1932a4b` — hotfix: desktop entry point
+  + foot-gun filter + UAT runbook), #17 (`91e0e37` — heuristic
+  backfill via dispatcher hook).
+- **Phase 1a** — `INTERNAL_TRANSFER_CATEGORIES` exclusion list keeps
+  PFC `TRANSFER_IN`/`TRANSFER_OUT` out of the cash forecast.
+- **Phase 1b/1** — `is_transfer_override` boolean column + tri-state
+  SQL filter + matching JS predicate `shouldTreatAsTransfer`.
+  Forecast / dashboard / simulator / goals all consume the same
+  predicate so SQL-side and JS-side stay in lockstep.
+- **Phase 1b/2** — `setTransactionTransferOverrideAction` server
+  action + `TransactionDetailSheet` Mark/Clear affordances. IDOR-safe
+  via `filterOwnedTransactions` whitelist before the UPDATE.
+- **#18 hotfix** — desktop entry point (clickable description cell
+  in `<OperatorTable>` + detail-sheet mount in `<OperatorShell>`,
+  mirroring `<MobileTransactionsShell>`'s pattern). Foot-gun filter:
+  pure helper `filterCategoryPickerOptions` drops PFC `Transfer Out`
+  / `Transfer In` from write-side pickers regardless of source
+  (`source: 'pfc'` AND `source: 'user'` — user-source rows existed
+  as artifacts of pre-fix buggy clicks via
+  `findOrCreateCategoryByName`). New `<CategoryWritePicker>` wrapper
+  is mounted at every category-write boundary; bare
+  `<CategoryPicker>` stays presentational.
+- **Phase 1c** — mirror-image pair detector
+  (`findMirrorImageTransferPairs`) + merchant-vs-investment-
+  institution matcher (`findMatchedInvestmentInstitution`). Runs
+  post-sync in `syncExternalItem` at **user-level**, not item-level,
+  because mirror-image needs cross-provider visibility (Plaid
+  checking outflow paired with SnapTrade brokerage inflow is the
+  prototypical case). Race-safe via re-asserted `IS NULL` in the
+  UPDATE WHERE clause; fail-soft (heuristic errors logged but don't
+  poison the dispatch result). 90-day window derived from
+  `computeBaseline`'s trailing-3-complete-month consumption. Bench
+  in `heuristics.bench.ts`: 5000 candidates + 50 pairs → median
+  303ms (sub-second; O(n²) curve clears 1s at ~10k candidates).
+- **Phase 1d** (single-sided liability matching, for when only one
+  leg of a transfer is connected) deferred. Real-data signal from
+  post-#17 sync cycles decides — inspect
+  `error_log.context.details` for un-paired `LOAN_PAYMENTS` outflows
+  that the mirror-image heuristic missed.
+- **DB-state regression test infrastructure** (`@electric-sql/pglite`
+  or similar) deferred. The bug class that prompted the discussion
+  is now caught by the runbook's manual SQL verification step;
+  automated integration test is a worthwhile follow-up but not
+  hotfix-shaped.
+- **New permanent infrastructure**:
+  [docs/uat-runbook-template.md](docs/uat-runbook-template.md) —
+  every PR shipping a DB write or user-visible interaction must
+  follow: reachability pre-check (literal click path, fresh page
+  load) + action+UI assertion (exact button text, toast wording) +
+  DB-state SELECT verification (literal SQL against target column) +
+  negative reachability check (clicks on adjacent controls must NOT
+  trigger the affordance) + idempotency check + authorship rule
+  (UAT plan written before implementation, or by a different
+  agent). Three new entries in **Lessons learned** below — author-
+  as-UAT-planner, UI-only verification, look-alike-success-paths —
+  each contributes a first strike to the three-strike rule.
+
 ### In progress
 - **Reliability initiative** — make Foothold trustworthy enough to
   replace checking multiple finance apps. Six-phase plan + canonical
