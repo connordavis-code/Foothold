@@ -84,3 +84,42 @@ function daysBetween(a: string, b: string): number {
     new Date(`${b}T00:00:00Z`).getTime();
   return Math.abs(ms / (1000 * 60 * 60 * 24));
 }
+
+const MIN_INSTITUTION_NAME_LENGTH = 4;
+
+/**
+ * Detect whether a transaction's merchant string looks like one of the
+ * user's own investment institutions — a signal that the outflow is a
+ * funding transfer into a brokerage rather than real spend.
+ *
+ * Rule: normalize merchant and each institution to lowercase, strip
+ * punctuation, collapse whitespace; match if a normalized institution
+ * name of length ≥ 4 appears as a whole-phrase substring of the
+ * normalized merchant. The 4-char floor blocks coincidental matches on
+ * 2–3-letter codes ("TD", "AT", "PNC"); callers passing those should
+ * disambiguate upstream.
+ */
+export function merchantMatchesInvestmentInstitution(
+  merchantName: string | null,
+  investmentInstitutions: readonly (string | null)[],
+): boolean {
+  if (!merchantName) return false;
+  const merchant = normalize(merchantName);
+  if (!merchant) return false;
+
+  for (const institution of investmentInstitutions) {
+    if (!institution) continue;
+    const candidate = normalize(institution);
+    if (candidate.length < MIN_INSTITUTION_NAME_LENGTH) continue;
+    if (merchant.includes(candidate)) return true;
+  }
+  return false;
+}
+
+function normalize(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}

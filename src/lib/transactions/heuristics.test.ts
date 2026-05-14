@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   findMirrorImageTransferPairs,
+  merchantMatchesInvestmentInstitution,
   type CandidateTransaction,
 } from './heuristics';
 
@@ -211,5 +212,114 @@ describe('findMirrorImageTransferPairs', () => {
       baseTxn({ id: 'zero-in', amount: 0, accountId: 'brokerage' }),
     ]);
     expect(result).toEqual([]);
+  });
+});
+
+describe('merchantMatchesInvestmentInstitution', () => {
+  it('returns false when there are no investment institutions', () => {
+    expect(
+      merchantMatchesInvestmentInstitution('VANGUARD BUY', []),
+    ).toBe(false);
+  });
+
+  it('returns false when merchant is null', () => {
+    expect(
+      merchantMatchesInvestmentInstitution(null, ['Vanguard']),
+    ).toBe(false);
+  });
+
+  it('returns false when merchant is empty after normalization', () => {
+    expect(
+      merchantMatchesInvestmentInstitution('   ', ['Vanguard']),
+    ).toBe(false);
+  });
+
+  it('matches exact institution name (case-insensitive)', () => {
+    expect(
+      merchantMatchesInvestmentInstitution('VANGUARD', ['Vanguard']),
+    ).toBe(true);
+  });
+
+  it('matches institution name as a substring of a longer merchant string', () => {
+    expect(
+      merchantMatchesInvestmentInstitution(
+        'VANGUARD BUY INVESTMENT',
+        ['Vanguard'],
+      ),
+    ).toBe(true);
+  });
+
+  it('strips punctuation before comparing', () => {
+    expect(
+      merchantMatchesInvestmentInstitution(
+        'Vanguard, Inc.',
+        ['Vanguard'],
+      ),
+    ).toBe(true);
+  });
+
+  it('matches multi-word institutions as a phrase', () => {
+    expect(
+      merchantMatchesInvestmentInstitution(
+        'M1 FINANCE TRANSFER',
+        ['M1 Finance'],
+      ),
+    ).toBe(true);
+  });
+
+  it('does NOT match unrelated merchants', () => {
+    expect(
+      merchantMatchesInvestmentInstitution(
+        'Whole Foods Market',
+        ['Vanguard', 'Fidelity', 'Schwab'],
+      ),
+    ).toBe(false);
+  });
+
+  it('matches against any institution in the list', () => {
+    expect(
+      merchantMatchesInvestmentInstitution(
+        'FIDELITY BROKERAGE SERVICES',
+        ['Vanguard', 'Fidelity', 'Schwab'],
+      ),
+    ).toBe(true);
+  });
+
+  it('rejects very short institution names (false-positive guard, < 4 chars)', () => {
+    // A 3-char institution like "TD" (when given as just "TD") would match
+    // far too liberally. Caller should pass disambiguated names.
+    expect(
+      merchantMatchesInvestmentInstitution(
+        'PEDDLERS MARKET',
+        ['TD'],
+      ),
+    ).toBe(false);
+  });
+
+  it('accepts 4-char institution names (boundary case, TIAA)', () => {
+    expect(
+      merchantMatchesInvestmentInstitution(
+        'TIAA-CREF BUY',
+        ['TIAA'],
+      ),
+    ).toBe(true);
+  });
+
+  it('ignores null entries in the institution list', () => {
+    expect(
+      merchantMatchesInvestmentInstitution(
+        'VANGUARD BUY',
+        [null, 'Vanguard', null],
+      ),
+    ).toBe(true);
+  });
+
+  it('handles whitespace-collapse so "M1   Finance" still matches "M1 FINANCE"', () => {
+    expect(
+      merchantMatchesInvestmentInstitution(
+        'M1 FINANCE TRANSFER',
+        ['M1   Finance'],
+      ),
+    ).toBe(true);
   });
 });
