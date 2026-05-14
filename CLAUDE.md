@@ -393,6 +393,52 @@ added to the `NON_LINK_CONSENTABLE` set). 7 regression tests in
 (app-level only, like `balance`), add it to `NON_LINK_CONSENTABLE`
 in the same PR as the env change.**
 
+### Don't author the feature and its UAT plan from the same mental model (2026-05-13)
+PR #16's `setTransactionTransferOverrideAction` shipped with the correct
+action code, correct `<TransactionDetailSheet>` component, correct
+read-side filter — but the detail sheet was only mounted in
+`<MobileTransactionsShell>`, never in the desktop `<OperatorShell>`. The
+"Mark as transfer" affordance defined at lines 325–338 of the sheet was
+literally unreachable on desktop: no row-click handler, no Enter-on-focus
+binding, no per-row menu. The PR's UAT plan said *"open a transaction in
+/transactions, mark X"* — an instruction with no available path on the
+surface the reviewer tested on.
+
+Reviewer on desktop reached for the visually-adjacent bulk-recategorize
+bar's category picker (which renders PFC entries including "Transfer
+Out" / "Transfer In"), clicked one, saw `"Re-categorized as Transfer Out"`
+success toast, and concluded the test passed. Toast was real, recategorize
+was real, success state was real — but the write went to
+`category_override_id`, a column the forecast filter never reads. Forecast
+didn't move; bug discovered only by querying the DB.
+
+Root failure: the UAT plan was authored by the same agent as the feature.
+The plan was checking the agent's mental model of how the feature worked,
+not testing the feature against the real product. *"Open a transaction"*
+sat unexamined because the author assumed reachability that wasn't there.
+
+Fixed in `bbfea96` (desktop entry point: clickable description cell +
+detail sheet mount in OperatorShell) and `8adc60f` (foot-gun filter:
+`filterCategoryPickerOptions` + `<CategoryWritePicker>` wrapper applied
+at every category-write boundary). New
+[docs/uat-runbook-template.md](docs/uat-runbook-template.md) enforces
+three discipline points per UAT step:
+
+1. **Reachability pre-check** — literal click path from a fresh page
+   load. If you can't write the click sequence, the affordance is
+   unreachable.
+2. **Action + UI assertion** — expected button text, toast wording,
+   visual state change.
+3. **DB-state SELECT verification** — literal SQL that confirms the row
+   matches the UI claim. Toast + caption can fire from optimistic local
+   state OR from the wrong action path; the SELECT cannot lie.
+
+Plus authorship discipline: write the UAT plan BEFORE implementation
+(plan becomes spec), or have a different agent/reviewer pass over it
+independently. In solo-dev mode, the click-path discipline is the
+structural antidote — the act of writing *"click here, then here, then
+here"* exposes gaps that *"open a transaction"* papers over.
+
 ### Don't auto-merge Dependabot major-version bumps (2026-05-11)
 Four dependabot PRs (eslint-config-next 14→16, tailwindcss 3→4,
 typescript 5→6, zod 3→4) auto-merged to main on 2026-05-10 without
