@@ -39,14 +39,33 @@ describe('filterCategoryPickerOptions', () => {
     expect(result.map((o) => o.name)).toEqual(['Loan Payments']);
   });
 
-  it('keeps user-created categories even if they happen to be named "Transfer Out"', () => {
-    // A user who manually created a category called "Transfer Out" has
-    // a deliberate display use for it — don't second-guess them.
+  it('drops user-source "Transfer In" — real-data UAT 2026-05-14 case', () => {
+    // Earlier pre-fix clicks routed through findOrCreateCategoryByName
+    // which inserted user-owned rows named "Transfer Out" / "Transfer In"
+    // into the categories table. Those rows persist after the fix
+    // ships and would re-create the look-alike-path foot-gun if they
+    // remained selectable in the write picker. Source-agnostic filter
+    // closes that hole.
+    const result = filterCategoryPickerOptions([
+      user('Transfer In'),
+      user('Loan Payments'),
+    ]);
+    expect(result.map((o) => o.name)).toEqual(['Loan Payments']);
+  });
+
+  it('drops both user-source AND pfc-source entries with transfer-classification names', () => {
+    // Defensive: any duplicate-source scenario should be cleaned up
+    // by the same rule. The dedicated "Mark as transfer" affordance is
+    // the single source of truth for that semantic — no picker entry
+    // with those names is legitimate.
     const result = filterCategoryPickerOptions([
       user('Transfer Out'),
       pfc('Transfer Out'),
+      user('Transfer In'),
+      pfc('Transfer In'),
+      user('Groceries'),
     ]);
-    expect(result).toEqual([user('Transfer Out')]);
+    expect(result.map((o) => o.name)).toEqual(['Groceries']);
   });
 
   it('keeps unrelated PFC entries intact', () => {
