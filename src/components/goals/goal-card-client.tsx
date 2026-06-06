@@ -56,6 +56,8 @@ export function GoalCardClient({
   } | null>(null);
   // Tracks origin for SPEC Decision #7 source field on the attached move.
   const [source, setSource] = useState<'manual' | 'drift' | 'hike'>('manual');
+  // When non-null, MoveDrawer/MoveEditor operate in UPDATE mode targeting this id.
+  const [editingMoveId, setEditingMoveId] = useState<string | null>(null);
 
   const prefillKey = makePrefillKey(prefill);
   const title = `Add a Move to ${goal.name}`;
@@ -67,26 +69,21 @@ export function GoalCardClient({
   }
 
   function handleEditMove(move: GoalMove) {
-    // KNOWN C1 LIMITATION: this opens MoveDrawer in attach-mode, not update-mode.
-    // The submit path calls attachGoalMoveAction, NOT updateGoalMoveAction.
-    // Behavior consequences:
-    //   - If user submits unchanged params: findDuplicateMove returns the existing
-    //     row's id (idempotent no-op). Safe.
-    //   - If user submits CHANGED params: a NEW goal_move row inserts with the
-    //     new params; the ORIGINAL row stays attached. User now sees both rows.
-    // Proper fix requires plumbing `editingMoveId` through MoveEditor (T10) +
-    // MoveDrawer (T11) so handleFormSubmit branches to updateGoalMoveAction
-    // when editing. Deferred from C1 to a follow-up commit.
+    setEditingMoveId(move.id);
     setPrefill({ templateKey: move.templateKey, params: move.params as Record<string, unknown> });
-    setSource('manual');
+    // Preserve the move's original origin — source records ORIGIN per SPEC Decision #7;
+    // editing doesn't reset it. updateGoalMoveAction only writes params, so this
+    // value is purely cosmetic for the prefill flow, but keep it honest.
+    setSource((move.source ?? 'manual') as 'manual' | 'drift' | 'hike');
     setDrawerOpen(true);
   }
 
   function handleAdded(_moveId: string) {
     setDrawerOpen(false);
     setPrefill(null);
-    // revalidatePath('/goals') fires inside the server action; new move appears
-    // in attachedMoves on next render without this component remounting.
+    setEditingMoveId(null);
+    // revalidatePath('/goals') fires inside the server action; new/updated move
+    // appears in attachedMoves on next render without this component remounting.
   }
 
   return (
@@ -171,6 +168,7 @@ export function GoalCardClient({
             type="button"
             onClick={() => {
               setPrefill(null);
+              setEditingMoveId(null);
               setSource('manual');
               setDrawerOpen(true);
             }}
@@ -199,6 +197,7 @@ export function GoalCardClient({
             : undefined
         }
         source={source}
+        editingMoveId={editingMoveId ?? undefined}
         onAttached={handleAdded}
       />
     </>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { attachGoalMoveAction, attachScenarioMoveAction } from '@/lib/moves/actions';
+import { attachGoalMoveAction, attachScenarioMoveAction, updateGoalMoveAction } from '@/lib/moves/actions';
 import { MovePickerTiles } from './move-picker-tiles';
 import { MoveForm, type MoveFormValues, type CategoryOption } from './move-form';
 import type { MoveTemplateKey } from '@/lib/moves/validation';
@@ -32,6 +32,13 @@ type Props = {
    * Goal context only — scenario moves don't carry a source field.
    */
   source?: 'manual' | 'drift' | 'hike';
+  /**
+   * When present, the editor operates in UPDATE mode: submit calls
+   * updateGoalMoveAction with this id, replacing the row's params atomically
+   * instead of attaching a duplicate. Goal-context only — scenario edits in C2
+   * follow the same shape but target updateScenarioMoveAction.
+   */
+  editingMoveId?: string;
   /** Called with the new moveId after a successful attach. */
   onAttached?: (moveId: string) => void;
   /** For the parent to close the containing drawer/sheet. */
@@ -59,6 +66,7 @@ export function MoveEditor({
   categories,
   prefill,
   source = 'manual',
+  editingMoveId,
   onAttached,
   onCancel,
 }: Props) {
@@ -79,6 +87,20 @@ export function MoveEditor({
     values: MoveFormValues,
   ): Promise<{ ok: true } | { ok: false; error: string }> {
     if (context.kind === 'goal') {
+      if (editingMoveId) {
+        // UPDATE mode: replace params on the existing row. updateGoalMoveAction
+        // re-validates params against the existing row's templateKey, so a caller
+        // can't drift the template contract.
+        const result = await updateGoalMoveAction(editingMoveId, values.params);
+        if (result.ok) {
+          // Reuse onAttached to signal "drawer should close + state should reset".
+          // The parent (GoalCardClient.handleAdded) doesn't use the id beyond
+          // triggering close — passing editingMoveId back is correct.
+          onAttached?.(editingMoveId);
+        }
+        return result.ok ? { ok: true } : { ok: false, error: result.error };
+      }
+
       const input =
         values.templateKey === 'skip-once'
           ? // skip-once is rejected by goalMoveInputSchema — this branch is

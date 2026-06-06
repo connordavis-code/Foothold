@@ -20,6 +20,11 @@ export type MoveDrawerProps = {
   prefill?: { templateKey: MoveTemplateKey; params: Record<string, unknown> };
   /** Forwarded into the attach call as `source`. Goal context only. */
   source?: 'manual' | 'drift' | 'hike';
+  /**
+   * When present, the drawer wraps MoveEditor in UPDATE mode — submit calls
+   * updateGoalMoveAction instead of attachGoalMoveAction. Goal context only.
+   */
+  editingMoveId?: string;
   /** Called with the new moveId after a successful attach. */
   onAttached?: (moveId: string) => void;
 };
@@ -38,6 +43,7 @@ export function MoveDrawer({
   categories,
   prefill,
   source = 'manual',
+  editingMoveId,
   onAttached,
 }: MoveDrawerProps) {
   // Read breakpoint at mount and listen for changes.
@@ -74,6 +80,7 @@ export function MoveDrawer({
             categories={categories}
             prefill={prefill}
             source={source}
+            editingMoveId={editingMoveId}
             onAttached={onAttached}
             onCancel={() => onOpenChange(false)}
           />
