@@ -9,9 +9,8 @@ type Props = {
 
 /**
  * 2-up responsive grid per R.2 prototype. Replaces the horizontally-
- * scrolling tile row. Each goal tile drills to /goals#goal-<id> so the
- * user lands on the goal's section card on the leaderboard (where moves +
- * suggestions + coaching live), not the edit form. Urgency sort preserved.
+ * scrolling tile row. Each goal tile drills to /goals/[id]/edit. Urgency
+ * sort preserved from R.1 implementation.
  */
 export function GoalsRow({ goals }: Props) {
   if (goals.length === 0) return null;
@@ -66,7 +65,7 @@ function GoalTile({ goal }: { goal: GoalWithProgress }) {
 
   return (
     <Link
-      href={`/goals#goal-${goal.id}`}
+      href={`/goals/${goal.id}/edit`}
       className="group flex flex-col gap-3 rounded-card bg-[--surface] p-4 transition-colors hover:bg-[--surface-2]"
     >
       <div className="space-y-1">
