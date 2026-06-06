@@ -7,20 +7,7 @@ import {
   type ScenarioMove,
   type GoalMoveInsert,
 } from '@/lib/db/schema';
-
-// Stable JSON serialization for params equality — sorts keys recursively
-// (JSON.stringify's array replacer only controls top-level key order).
-// Used by findDuplicateMove to dedup attach inputs against existing rows.
-function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    return JSON.stringify(value);
-  }
-  const obj = value as Record<string, unknown>;
-  const parts = Object.keys(obj)
-    .sort()
-    .map((k) => `${JSON.stringify(k)}:${stableStringify(obj[k])}`);
-  return `{${parts.join(',')}}`;
-}
+import { stableStringify } from '@/lib/json';
 
 /**
  * Load all goal moves owned by the user.

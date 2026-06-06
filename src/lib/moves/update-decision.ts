@@ -1,20 +1,5 @@
 import { goalMoveInputSchema } from '@/lib/moves/validation';
-
-// Stable JSON serialization (sorts keys recursively) so structurally
-// identical params with different key insertion order compare as equal.
-// Mirrors the helper in src/lib/db/queries/moves.ts; duplicated to keep
-// this module dependency-free of the DB-query layer. If a third consumer
-// appears, promote to a shared @/lib/json module.
-function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    return JSON.stringify(value);
-  }
-  const obj = value as Record<string, unknown>;
-  const parts = Object.keys(obj)
-    .sort()
-    .map((k) => `${JSON.stringify(k)}:${stableStringify(obj[k])}`);
-  return `{${parts.join(',')}}`;
-}
+import { stableStringify } from '@/lib/json';
 
 export type GoalMoveUpdateDecision =
   | { kind: 'no-op' }
