@@ -3,6 +3,7 @@ import { auth } from '@/auth';
 import { getForecastHistory } from '@/lib/db/queries/forecast';
 import { listScenariosForUser } from '@/lib/db/queries/scenarios';
 import { getSourceHealth } from '@/lib/db/queries/health';
+import { getGoalMoves } from '@/lib/db/queries/moves';
 import { formatFreshness } from '@/lib/format/freshness';
 import {
   parseView,
@@ -21,11 +22,12 @@ export default async function SimulatorPage({
   if (!session?.user?.id) redirect('/login');
 
   const userId = session.user.id;
-  const [params, history, scenarios, sourceHealth] = await Promise.all([
+  const [params, history, scenarios, sourceHealth, initialGoalMoves] = await Promise.all([
     searchParams,
     getForecastHistory(userId),
     listScenariosForUser(userId),
     getSourceHealth(userId),
+    getGoalMoves(userId),
   ]);
 
   const now = new Date();
@@ -54,6 +56,7 @@ export default async function SimulatorPage({
       initialView={initialView}
       initialRange={initialRange}
       freshness={freshness}
+      initialGoalMoves={initialGoalMoves}
     />
   );
 }

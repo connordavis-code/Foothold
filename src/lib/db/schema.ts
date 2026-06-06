@@ -679,6 +679,82 @@ export const forecastSnapshots = pgTable(
 export type ForecastSnapshot = typeof forecastSnapshots.$inferSelect;
 export type ForecastSnapshotInsert = typeof forecastSnapshots.$inferInsert;
 
+// =============================================================================
+// R.4 — Moves: goal_move (commitments) + scenario_move (ephemeral)
+// =============================================================================
+// See docs/redesign/r4-moves-scenarios/SPEC.md § Architecture > Data model.
+//
+// Attaching a Move = commit. A row in goal_move flows into the global
+// override applier (apply-moves.ts) on next render; removing the row
+// undoes the delta. No optimistic UI, no "save" step.
+//
+// scenario_move is the ephemeral counterpart for /simulator — layered on
+// top of the goal_move-augmented baseline. /simulator never reads or writes
+// goal_move; /goals never reads or writes scenario_move.
+//
+// templateKey ∈ 'adjust-recurring' | 'reduce-category' | 'income-event'
+// (+ 'skip-once' for scenario_move only — Zod boundary rejects skip-once
+// on goal_move because committing to a single-instance skip is semantically
+// incoherent; valid only for what-if exploration).
+//
+// source ∈ 'manual' | 'drift' | 'hike' — tracks where the suggestion came
+// from. 'manual' is the default for user-authored attaches; 'drift' / 'hike'
+// are set when a SuggestionChip is the attach origin. Future-analytics
+// surface (R.6+); not consumed by the engine.
+
+export const goalMoves = pgTable(
+  'goal_move',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    goalId: text('goal_id')
+      .notNull()
+      .references(() => goals.id, { onDelete: 'cascade' }),
+    templateKey: text('template_key').notNull(),
+    params: jsonb('params').notNull(),
+    source: text('source').notNull().default('manual'),
+    createdAt: ts('created_at').notNull().defaultNow(),
+    updatedAt: ts('updated_at').notNull().defaultNow(),
+  },
+  (m) => ({
+    userGoalIdx: index('goal_move_user_goal_idx').on(m.userId, m.goalId),
+  }),
+);
+
+export type GoalMove = typeof goalMoves.$inferSelect;
+export type GoalMoveInsert = typeof goalMoves.$inferInsert;
+
+export const scenarioMoves = pgTable(
+  'scenario_move',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    scenarioId: text('scenario_id')
+      .notNull()
+      .references(() => scenarios.id, { onDelete: 'cascade' }),
+    templateKey: text('template_key').notNull(),
+    params: jsonb('params').notNull(),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (m) => ({
+    userScenarioIdx: index('scenario_move_user_scenario_idx').on(
+      m.userId,
+      m.scenarioId,
+    ),
+  }),
+);
+
+export type ScenarioMove = typeof scenarioMoves.$inferSelect;
+export type ScenarioMoveInsert = typeof scenarioMoves.$inferInsert;
+
 /**
  * SnapTrade per-user credential. SnapTrade's auth model is per-USER
  * (one userSecret per Foothold user), not per-connection like Plaid's

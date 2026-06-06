@@ -6,39 +6,71 @@ import { GoalCard } from '@/components/goals/goal-card';
 import { GoalsPageHeader } from '@/components/goals/goals-page-header';
 import { GoalsSummaryStrip } from '@/components/goals/goals-summary-strip';
 import { Button } from '@/components/ui/button';
+import { getCategoryOptions } from '@/lib/db/queries/categories';
+import { getDriftAnalysis } from '@/lib/db/queries/drift';
 import { getGoalsWithProgress } from '@/lib/db/queries/goals';
 import { getBehindSavingsCoachingCategory } from '@/lib/db/queries/goal-detail';
 import { getSourceHealth } from '@/lib/db/queries/health';
+import { getGoalMoves } from '@/lib/db/queries/moves';
+import { getRecurringStreams } from '@/lib/db/queries/recurring';
+import { humanizeCategory } from '@/lib/format/category';
+import { formatFreshness } from '@/lib/format/freshness';
 import { composeCoaching } from '@/lib/goals/coaching';
 import { buildCoachingInput } from '@/lib/goals/coaching-input';
+import { suggestFromDrift, suggestFromHikes } from '@/lib/goals/move-suggestions';
 import { paceVerdict, severityKey } from '@/lib/goals/pace';
-import { formatFreshness } from '@/lib/format/freshness';
 
 export default async function GoalsPage() {
   const session = await auth();
   if (!session?.user) return null;
   const userId = session.user.id;
 
-  // Three-call fetch: goals + source health (for freshness) + page-level
+  // Seven-call fetch: goals + source health (for freshness) + page-level
   // top-discretionary coaching category (shared across all behind-savings
-  // cards, single fetch — see SPEC § N+1 risk resolution).
-  const [goals, sourceHealth, coachingCategory] = await Promise.all([
+  // cards, single fetch — see SPEC § N+1 risk resolution) + R.4 move data
+  // (goalMoves, driftAnalysis, streams, categories shared across all cards).
+  const [goals, sourceHealth, coachingCategory, goalMoves, driftAnalysis, streams, categoryOptions] = await Promise.all([
     getGoalsWithProgress(userId, { includeInactive: true }),
     getSourceHealth(userId),
     getBehindSavingsCoachingCategory(userId),
+    getGoalMoves(userId),
+    getDriftAnalysis(userId),
+    getRecurringStreams(userId),
+    getCategoryOptions(userId),
   ]);
+
+  // getCategoryOptions returns { id, name, source } — map to the { key, label }
+  // shape GoalCard expects (humanizeCategory normalises PFC strings).
+  const categories = categoryOptions.map((opt) => ({
+    key: opt.name,
+    label: humanizeCategory(opt.name),
+  }));
 
   if (goals.length === 0) {
     return <EmptyState />;
   }
 
-  // Pre-compute verdict + coaching at page level so <GoalCard> stays
-  // presentational and we don't recompute per-render.
+  // Pre-compute verdict + coaching + move props at page level so <GoalCard>
+  // stays presentational and we don't recompute per-render.
+  //
+  // movesByGoal is a Map so we avoid an O(n²) filter inside the render loop
+  // — both active and archived sections iterate goals, so the map is shared.
+  const movesByGoal = new Map<string, typeof goalMoves>();
+  for (const m of goalMoves) {
+    if (!m.goalId) continue;
+    const arr = movesByGoal.get(m.goalId) ?? [];
+    arr.push(m);
+    movesByGoal.set(m.goalId, arr);
+  }
+
   const enriched = goals.map((goal) => {
     const verdict = paceVerdict(goal);
     const input = buildCoachingInput(goal, verdict, coachingCategory);
     const coaching = composeCoaching(input);
-    return { goal, verdict, coaching };
+    const attachedMoves = movesByGoal.get(goal.id) ?? [];
+    const driftSuggestions = suggestFromDrift(driftAnalysis, goal, attachedMoves);
+    const hikeSuggestions = suggestFromHikes(streams, goal, attachedMoves);
+    return { goal, verdict, coaching, attachedMoves, driftSuggestions, hikeSuggestions };
   });
 
   const active = enriched
@@ -69,6 +101,11 @@ export default async function GoalsPage() {
             goal={e.goal}
             verdict={e.verdict}
             coaching={e.coaching}
+            attachedMoves={e.attachedMoves}
+            driftSuggestions={e.driftSuggestions}
+            hikeSuggestions={e.hikeSuggestions}
+            streams={streams}
+            categories={categories}
           />
         ))}
       </div>
@@ -92,6 +129,11 @@ export default async function GoalsPage() {
             goal={e.goal}
             verdict={e.verdict}
             coaching={e.coaching}
+            attachedMoves={e.attachedMoves}
+            driftSuggestions={e.driftSuggestions}
+            hikeSuggestions={e.hikeSuggestions}
+            streams={streams}
+            categories={categories}
           />
         ))}
       </ArchivedToggle>

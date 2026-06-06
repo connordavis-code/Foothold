@@ -3,15 +3,25 @@ import { Pencil } from 'lucide-react';
 import type { GoalWithProgress } from '@/lib/db/queries/goals';
 import type { CoachingOutput } from '@/lib/goals/coaching';
 import type { PaceVerdict } from '@/lib/goals/pace';
+import type { MoveSuggestion } from '@/lib/goals/move-suggestions';
+import type { GoalMove } from '@/lib/db/schema';
+import type { RecurringStreamRow } from '@/lib/db/queries/recurring';
 import { ArchiveGoalButton } from './archive-goal-button';
 import { DeleteGoalButton } from './delete-goal-button';
 import { GoalProgress } from './goal-progress';
+import { GoalCardClient } from './goal-card-client';
 import { formatCurrency, formatCurrencyCompact } from '@/lib/utils';
 
 type Props = {
   goal: GoalWithProgress;
   verdict: PaceVerdict;
   coaching: CoachingOutput | null;
+  // R.4 additions — pre-filtered to this goal by the parent page (T15).
+  attachedMoves: GoalMove[];
+  driftSuggestions: MoveSuggestion[];
+  hikeSuggestions: MoveSuggestion[];
+  streams: RecurringStreamRow[];
+  categories: { key: string; label: string }[];
 };
 
 const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
@@ -39,7 +49,16 @@ const monthDeltaText = (
   return { text: `↓${months}mo behind`, tone: 'neg' };
 };
 
-export function GoalCard({ goal, verdict, coaching }: Props) {
+export function GoalCard({
+  goal,
+  verdict,
+  coaching,
+  attachedMoves,
+  driftSuggestions,
+  hikeSuggestions,
+  streams,
+  categories,
+}: Props) {
   const p = goal.progress;
   const intent =
     goal.scopedAccountNames.length > 0
@@ -128,16 +147,18 @@ export function GoalCard({ goal, verdict, coaching }: Props) {
         <GoalProgress goal={goal} verdict={verdict} />
       </div>
 
-      {coaching && (
-        <div className="mt-4 border-t border-[--hairline] pt-4">
-          <p className="text-sm italic text-[--text-2]">{coaching.status}</p>
-          {coaching.action && (
-            <p className="mt-1 text-sm italic text-[--text-2]">
-              {coaching.action}
-            </p>
-          )}
-        </div>
-      )}
+      {/* Dynamic coaching + moves region — client island owns expand/collapse
+          and drawer state. Server passes plain data only (no functions). */}
+      <GoalCardClient
+        goal={goal}
+        verdict={verdict}
+        coaching={coaching}
+        attachedMoves={attachedMoves}
+        driftSuggestions={driftSuggestions}
+        hikeSuggestions={hikeSuggestions}
+        streams={streams}
+        categories={categories}
+      />
     </article>
   );
 }

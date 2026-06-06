@@ -3,6 +3,8 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { isAuthorizedCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { getForecastHistory } from '@/lib/db/queries/forecast';
+import { getGoalMoves } from '@/lib/db/queries/moves';
+import { goalMovesToEngineMoves } from '@/lib/moves/apply';
 import { externalItems, forecastSnapshots } from '@/lib/db/schema';
 import { projectCash } from '@/lib/forecast/engine';
 import { deriveSnapshotKeys } from '@/lib/forecast/snapshot';
@@ -48,8 +50,11 @@ export async function GET(request: NextRequest) {
 
   for (const userId of userIds) {
     try {
-      const history = await getForecastHistory(userId);
-      const result = projectCash({ history, overrides: {}, currentMonth });
+      const [history, goalMoves] = await Promise.all([
+        getForecastHistory(userId),
+        getGoalMoves(userId),
+      ]);
+      const result = projectCash({ history, overrides: {}, goalMoves: goalMovesToEngineMoves(goalMoves), currentMonth });
       await db
         .insert(forecastSnapshots)
         .values({

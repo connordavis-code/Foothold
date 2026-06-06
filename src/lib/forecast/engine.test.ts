@@ -114,4 +114,50 @@ describe('projectCash — integration', () => {
     const b = projectCash(input);
     expect(a).toEqual(b);
   });
+
+  // R.4 additive contract: empty arrays equivalent to omitting the field.
+  it('R.4: empty goalMoves/scenarioMoves match omit-field behavior', () => {
+    const withoutMoves = projectCash({
+      history: baseHistory,
+      overrides: {},
+      currentMonth: '2026-05',
+    });
+    const withEmptyMoves = projectCash({
+      history: baseHistory,
+      overrides: {},
+      currentMonth: '2026-05',
+      goalMoves: [],
+      scenarioMoves: [],
+    });
+    expect(withEmptyMoves).toEqual(withoutMoves);
+  });
+
+  // R.4 engine principle: goalMoves fold into baseline; scenarioMoves
+  // layer on top. Cancel rent commitment (-2000 outflow) + ephemeral
+  // $1000 income raise → net +$3000 to month-0 endCash.
+  it('R.4: goalMoves shift baseline; scenarioMoves shift further on top', () => {
+    const result = projectCash({
+      history: baseHistory,
+      overrides: {},
+      currentMonth: '2026-05',
+      goalMoves: [
+        {
+          kind: 'adjust-recurring',
+          streamId: 'rent',
+          startMonth: '2026-05',
+          newAmount: 0,
+        },
+      ],
+      scenarioMoves: [
+        {
+          kind: 'income-event',
+          startMonth: '2026-05',
+          monthlyAmount: 1000,
+        },
+      ],
+    });
+    // Baseline (from prior test) month-0 endCash = 12,000.
+    // +2000 (rent cancelled) + 1000 (raise) = 15,000.
+    expect(result.projection[0].endCash).toBe(15_000);
+  });
 });

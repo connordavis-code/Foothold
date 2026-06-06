@@ -15,15 +15,50 @@
 
 ---
 
+## ▶ Resume point (as of 2026-05-13 evening)
+
+**R.4 C1 in progress.** Six tasks done; engine + primitives all landed; queries / suggestions / server actions / UI / wire-up pending. Pick up at **T7**.
+
+| Task | Status | Notes |
+|---|---|---|
+| **T1** Pre-flight + SPEC/PLAN/OVERVIEW commit | ✅ `9a42c5f` | Baseline: 691 tests passing, 19 routes building, typecheck clean |
+| **T2** `goal_move` + `scenario_move` tables + RLS | ✅ | Applied to prod Supabase via `docs/migrations/2026-05-13-r4-moves.sql`; smoke-tested end-to-end via postgres-js |
+| **T3** `validation.ts` (Zod boundary, rejects skip-once on goal) | ✅ | +13 tests → 704 |
+| **T4** `appliers.ts` (4 pure per-move appliers) | ✅ | +15 tests → 719 |
+| **T5** `apply.ts` orchestrator + commutativity port | ✅ | +20 tests → 739; SPEC § Edge case #2 per-month last-wins verified |
+| **T6** Engine refactor — `projectCash` accepts `goalMoves` + `scenarioMoves` additively | ✅ | +2 tests → 741; all 5 callers unchanged via default `[]` fast path |
+| **T7** Query helper `db/queries/moves.ts` | — **NEXT** | `getGoalMoves` / `getScenarioMoves` / `findDuplicateMove` |
+| T8–T15 | pending | suggestions · goal-side server actions · `<MoveEditor>` / `<MoveDrawer>` / etc. · GoalCard refactor · /goals page rewire |
+| **T16** Wire `goalMoves` through dashboard + /simulator + /simulator/compare + cron forecast-snapshot + COMMIT C1 | pending | Inserted 2026-05-13 evening per coherence-not-divergence ruling — see commit message in T16 section for the four call sites |
+| T17–T31 (C2 + C3) | pending | Hard-cut migration, /simulator rewire, cleanup, acceptance |
+
+**Test bookmark:** 691 baseline → **741 currently passing** (+50). PLAN target was +40 — already exceeded with T7/T8 still to come.
+
+**Uncommitted working tree** (post-T6):
+- Modified: `src/lib/db/schema.ts`, `src/lib/forecast/engine.ts`, `src/lib/forecast/engine.test.ts`, `src/lib/forecast/types.ts`
+- New: `src/lib/moves/{validation,appliers,apply}.ts` + 4 test files
+- New: `docs/migrations/2026-05-13-r4-moves.sql` (already applied to prod DB — keep in tree for C1 commit)
+- Committed: `9a42c5f docs(r4): lock SPEC + PLAN for moves + scenario unification`
+
+**Resume command:**
+```bash
+cd /Users/cdhome/Desktop/Code/finance-tool/.claude/worktrees/r4-moves-scenario
+git rev-parse --abbrev-ref HEAD  # expect worktree-r4-moves-scenario
+npm test 2>&1 | tail -3          # expect 741 passing
+# Then open PLAN.md § T7 and continue.
+```
+
+---
+
 ## Branching + commit rhythm
 
 All work lands on `worktree-r4-moves-scenario`. **Three atomic commits**, one per SPEC § Decision #9 ship plan unit:
 
 | Commit | Subject prefix | Contents | Tasks |
 |---|---|---|---|
-| C1 | `feat(r4):` | `goal_move` table + Move primitive + `apply-moves` engine + /goals UI | T1–T15 |
-| C2 | `feat(r4):` | `scenario_move` table + hard-cut migration + /simulator rewire | T16–T23 |
-| C3 | `chore(r4):` | Cleanup obsolete components + acceptance gates | T24–T30 |
+| C1 | `feat(r4):` | `goal_move` table + Move primitive + `apply-moves` engine + /goals UI + projection-consumer wire-up | T1–T16 |
+| C2 | `feat(r4):` | `scenario_move` table + hard-cut migration + /simulator rewire | T17–T24 |
+| C3 | `chore(r4):` | Cleanup obsolete components + acceptance gates | T25–T31 |
 
 On ship: PR from `worktree-r4-moves-scenario` → `feat/redesign`. **Use "Rebase and merge"** in GitHub UI — the three commits survive into the redesign branch's history per Decision #9. Full milestone PRs to `main` after R.6.
 
@@ -71,7 +106,7 @@ git rev-parse HEAD > /tmp/r4-baseline-sha.txt
 cat /tmp/r4-baseline-tests.txt
 ```
 
-Record both numbers. Target at T30: baseline + ~40 new tests.
+Record both numbers. Target at T31: baseline + ~40 new tests.
 
 - [ ] **Confirm typecheck + build clean**
 
@@ -122,22 +157,23 @@ These were deferred from SPEC § Open items. Plan-phase decisions:
 | T12 | `<AttachedMoveRow>` + edit affordance | 4 | C1 |
 | T13 | `<SuggestionChip>` | 4 | C1 |
 | T14 | `<GoalCard>` refactor + `<GoalCardClient>` island | 5 | C1 |
-| T15 | `/goals/page.tsx` rewire + commit C1 | 5 | C1 |
-| T16 | Hard-cut migration — `DROP COLUMN scenario.overrides` | 6 | C2 |
-| T17 | Server actions — scenario-side in `moves/actions.ts` | 6 | C2 |
-| T18 | `<SimulatorClient>` state-model collapse | 7 | C2 |
-| T19 | `<GoalImpactsStrip>` (replaces cards row) | 7 | C2 |
-| T20 | `/simulator/page.tsx` rewire | 7 | C2 |
-| T21 | `/simulator/compare` adapter | 7 | C2 |
-| T22 | `scenario-actions.ts` — create/update persist scenario_move rows | 7 | C2 |
-| T23 | Commit C2 | 8 | C2 |
-| T24 | Delete obsolete components (R.3.5 leftovers + overrides editor stack) | 9 | C3 |
-| T25 | Delete `ScenarioOverrides` type + `apply-overrides.ts` + commutativity test | 9 | C3 |
-| T26 | RSC boundary grep — strike-3 watch | 10 | C3 |
-| T27 | Test count + typecheck + build acceptance | 10 | C3 |
-| T28 | Browser UAT walk (per SPEC § Testing strategy) | 10 | C3 |
-| T29 | HANDOFF doc — `docs/redesign/HANDOFF-YYYY-MM-DD-post-r4.md` | 10 | C3 |
-| T30 | Commit C3 + final push | 10 | C3 |
+| T15 | `/goals/page.tsx` rewire | 5 | C1 |
+| T16 | Wire `goalMoves` through dashboard + /simulator + /simulator/compare + cron forecast-snapshot + COMMIT C1 | 5 | C1 |
+| T17 | Hard-cut migration — `DROP COLUMN scenario.overrides` | 6 | C2 |
+| T18 | Server actions — scenario-side in `moves/actions.ts` | 6 | C2 |
+| T19 | `<SimulatorClient>` state-model collapse | 7 | C2 |
+| T20 | `<GoalImpactsStrip>` (replaces cards row) | 7 | C2 |
+| T21 | `/simulator/page.tsx` rewire | 7 | C2 |
+| T22 | `/simulator/compare` adapter | 7 | C2 |
+| T23 | `scenario-actions.ts` — create/update persist scenario_move rows | 7 | C2 |
+| T24 | Commit C2 | 8 | C2 |
+| T25 | Delete obsolete components (R.3.5 leftovers + overrides editor stack) | 9 | C3 |
+| T26 | Delete `ScenarioOverrides` type + `apply-overrides.ts` + commutativity test | 9 | C3 |
+| T27 | RSC boundary grep — strike-3 watch | 10 | C3 |
+| T28 | Test count + typecheck + build acceptance | 10 | C3 |
+| T29 | Browser UAT walk (per SPEC § Testing strategy) | 10 | C3 |
+| T30 | HANDOFF doc — `docs/redesign/HANDOFF-YYYY-MM-DD-post-r4.md` | 10 | C3 |
+| T31 | Commit C3 + final push | 10 | C3 |
 
 ---
 
@@ -186,7 +222,7 @@ These were deferred from SPEC § Open items. Plan-phase decisions:
 
 ### T6 — Engine refactor: `forecast/apply-moves.ts`
 
-**Files:** modify `src/lib/forecast/index.ts`; create `src/lib/forecast/apply-moves.ts`; old `apply-overrides.ts` stays in place until T25.
+**Files:** modify `src/lib/forecast/index.ts`; create `src/lib/forecast/apply-moves.ts`; old `apply-overrides.ts` stays in place until T26.
 
 - [ ] Create `src/lib/forecast/apply-moves.ts` re-exporting `applyMoves` from `src/lib/moves/apply.ts` as the forecast-domain entry
 - [ ] Modify `projectCash()` signature per SPEC § Architecture > Engine refactor — accepts `{ history, goalMoves, scenarioMoves, currentMonth }`
@@ -270,7 +306,7 @@ These were deferred from SPEC § Open items. Plan-phase decisions:
 - [ ] Sticky state: no localStorage; per-mount only (Decision #5 — don't over-engineer)
 - [ ] After move attach + revalidate, expansion state survives (per SPEC edge case #5)
 
-### T15 — `/goals/page.tsx` rewire + COMMIT C1
+### T15 — `/goals/page.tsx` rewire
 
 **Files:** modify `src/app/(app)/goals/page.tsx`
 
@@ -281,25 +317,64 @@ These were deferred from SPEC § Open items. Plan-phase decisions:
 - [ ] Pass into `<GoalCard>` as plain-data props (no functions — RSC discipline)
 - [ ] `composeCoaching` sentence remains in compact view as click target; expanded view replaces it
 - [ ] Run `npm run typecheck` + `npm test`
+
+Commit C1 lands at the end of T16, not here — T16's dashboard/simulator/compare/cron wire-up has to ship in the same atomic unit for surface coherence.
+
+---
+
+### T16 — Wire `goalMoves` through all projection consumers + COMMIT C1
+
+**Goal:** Engine refactor in T6 exposed `goalMoves` as an optional input to `projectCash`, but four call sites still pass an empty default. Until they thread `getGoalMoves(userId)` through, the dashboard / simulator / compare chart / forecast-snapshot cron silently project against a baseline that ignores the user's committed Moves — incoherent with /goals' card pace verdict and breaks the SPEC engine principle ("one baseline, includes commitments"). T16 closes the gap before C1 commits.
+
+**Files:** 4 call sites, ~2 lines each.
+
+- [ ] `src/app/(app)/dashboard/page.tsx` — add `getGoalMoves(userId)` to the existing `Promise.all`; pass `goalMoves` to the `projectCash({ … })` call. Verify the EOM Projected number in `<NetWorthHero>` / `<Kpis>` shifts when a Move is attached on /goals.
+- [ ] `src/app/(app)/simulator/simulator-client.tsx` — accept `goalMoves` as a prop from page.tsx (page-side fetch added in T21 separately for the scenario-move side; goalMoves fetch lands here in C1 since /simulator chart must reflect committed Moves even pre-C2). Thread into both `projectCash` calls (live + baseline).
+- [ ] `src/app/(app)/simulator/simulator/page.tsx` — add `getGoalMoves(userId)` to `Promise.all`; pass to `<SimulatorClient>` as `initialGoalMoves` (T21 will rename/extend when wiring scenarioMoves).
+- [ ] `src/app/(app)/simulator/compare/compare-client.tsx` — adapt the two `projectCash` calls (baseline + scenario) to receive + pass `goalMoves`; ensure the A-vs-B diff is computed against the goal_move-augmented baseline so the diff reflects only scenario delta.
+- [ ] `src/app/(app)/simulator/compare/page.tsx` — add `getGoalMoves(userId)` to its data fetch (or thread from the parent server component); pass to `<CompareClient>`.
+- [ ] `src/app/api/cron/forecast-snapshot/route.ts` — fetch goal_moves per user inside the existing per-user loop; pass to `projectCash`. Stored daily baselines now reflect committed Moves; trend data stays coherent with the live dashboard projection.
+- [ ] Run `npm run typecheck` + `npm test` — full suite stays green (additive change; engine already supports the new field).
+- [ ] **Manual UAT smoke before commit:** load `/goals`, attach an `adjust-recurring` move with newAmount=0 to a recurring stream the user actually has. Reload `/dashboard` and confirm the EOM Projected number reflects the cancellation. If not, the wire-up missed somewhere.
+
 - [ ] **COMMIT C1**:
 
 ```bash
 git rev-parse --abbrev-ref HEAD  # verify worktree-r4-moves-scenario
 git add src/lib/db/schema.ts \
+        src/lib/forecast/types.ts \
+        src/lib/forecast/engine.ts \
+        src/lib/forecast/engine.test.ts \
         src/lib/moves/ \
-        src/lib/forecast/apply-moves.ts src/lib/forecast/index.ts \
         src/lib/db/queries/moves.ts \
-        src/lib/goals/move-suggestions.ts src/lib/goals/move-suggestions.test.ts \
+        src/lib/goals/move-suggestions.ts \
+        src/lib/goals/move-suggestions.test.ts \
         src/components/moves/ \
-        src/components/goals/goal-card.tsx src/components/goals/goal-card-client.tsx \
-        src/app/\(app\)/goals/page.tsx
+        src/components/goals/goal-card.tsx \
+        src/components/goals/goal-card-client.tsx \
+        src/app/\(app\)/goals/page.tsx \
+        src/app/\(app\)/dashboard/page.tsx \
+        src/app/\(app\)/simulator/page.tsx \
+        src/app/\(app\)/simulator/simulator-client.tsx \
+        src/app/\(app\)/simulator/compare/page.tsx \
+        src/app/\(app\)/simulator/compare/compare-client.tsx \
+        src/app/api/cron/forecast-snapshot/route.ts \
+        docs/migrations/2026-05-13-r4-moves.sql
 git commit -m "$(cat <<'EOF'
 feat(r4): C1 — goal_move primitive, apply-moves engine, /goals Moves UI
 
-- Add goal_move + scenario_move tables (RLS-enabled, hard-cut migration in C2)
-- Replace ScenarioOverrides applier with unified Move[] engine
+- Add goal_move + scenario_move tables (RLS-enabled; hard-cut migration in C2)
+- New Move primitive + apply-moves engine (orchestrator + 4 set-appliers)
+- projectCash accepts goalMoves + scenarioMoves additively (optional, default [])
+- Goal_moves fold into baseline; scenarioMoves overlay on top per SPEC #engine
 - /goals: behind goals expand by default, drift+hike chips, attach/detach moves
+- /dashboard, /simulator, /simulator/compare, cron forecast-snapshot all thread
+  goalMoves through projectCash so the projection surface stays coherent across
+  every consumer the moment a Move is attached on /goals
 - composeCoaching demoted to compact-view click target
+
+scenario.overrides JSONB column survives this commit; C2's hard-cut drops it
+alongside the /simulator rewire to scenarioMoves.
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -310,7 +385,7 @@ EOF
 
 ## Commit 2 — `/simulator` rewire + `scenario_move`
 
-### T16 — Hard-cut migration
+### T17 — Hard-cut migration
 
 **Files:** modify `src/lib/db/schema.ts`; manual SQL
 
@@ -318,7 +393,7 @@ EOF
 - [ ] Run `ALTER TABLE public.scenario DROP COLUMN overrides;` directly against the DB (manual; `drizzle-kit push` won't drop columns safely on strict)
 - [ ] Verify: `psql \d scenario` — `overrides` column absent
 
-### T17 — Server actions: scenario-side
+### T18 — Server actions: scenario-side
 
 **Files:** modify `src/lib/moves/actions.ts`
 
@@ -326,7 +401,7 @@ EOF
 - [ ] Implement `detachScenarioMoveAction(moveId)` — DELETE, revalidate
 - [ ] Remove the C1 stubs
 
-### T18 — `<SimulatorClient>` state-model collapse
+### T19 — `<SimulatorClient>` state-model collapse
 
 **Files:** modify `src/app/(app)/simulator/simulator-client.tsx`
 
@@ -338,7 +413,7 @@ EOF
 - [ ] Memoize `projection = applyMoves(baseline, draftMoves)`
 - [ ] Memoize `goalImpacts = computeGoalImpacts(...)` per SPEC § Data flow
 
-### T19 — `<GoalImpactsStrip>`
+### T20 — `<GoalImpactsStrip>`
 
 **Files:** create `src/components/simulator/goal-impacts-strip.tsx`
 
@@ -346,7 +421,7 @@ EOF
 - [ ] Each row: goal name + pace verdict pill + baseline-vs-projection delta in months
 - [ ] Horizontal scroll on mobile; full-width strip ≥md per SPEC
 
-### T20 — `/simulator/page.tsx` rewire
+### T21 — `/simulator/page.tsx` rewire
 
 **Files:** modify `src/app/(app)/simulator/page.tsx`
 
@@ -356,7 +431,7 @@ EOF
 - [ ] Pass `initialGoalMoves`, `initialScenarioMoves` to `<SimulatorClient>`
 - [ ] Freshness annotation (R.2 pattern) preserved
 
-### T21 — `/simulator/compare` adapter
+### T22 — `/simulator/compare` adapter
 
 **Files:** modify `src/app/(app)/simulator/compare/compare-client.tsx` + `page.tsx`
 
@@ -364,7 +439,7 @@ EOF
 - [ ] IA unchanged (still A-vs-B diff); only the engine input shape changes
 - [ ] Verify A-vs-B diff still surfaces meaningful delta per scenario
 
-### T22 — `scenario-actions.ts` revision
+### T23 — `scenario-actions.ts` revision
 
 **Files:** modify `src/lib/forecast/scenario-actions.ts`
 
@@ -373,7 +448,7 @@ EOF
 - [ ] `deleteScenarioAction(scenarioId)` — unchanged; FK `onDelete: 'cascade'` removes `scenario_move` rows
 - [ ] Remove all references to `scenario.overrides`
 
-### T23 — COMMIT C2
+### T24 — COMMIT C2
 
 - [ ] Run `npm run typecheck` + `npm test`
 - [ ] **COMMIT C2**:
@@ -404,7 +479,7 @@ EOF
 
 ## Commit 3 — Cleanup + acceptance
 
-### T24 — Delete obsolete components
+### T25 — Delete obsolete components
 
 **Files:** delete
 
@@ -418,7 +493,7 @@ EOF
 - [ ] `src/components/simulator/goal-impacts.tsx` (cards row replaced by strip)
 - [ ] `src/components/simulator/override-section.tsx`
 
-### T25 — Delete obsolete types + engine
+### T26 — Delete obsolete types + engine
 
 **Files:** modify / delete
 
@@ -427,7 +502,7 @@ EOF
 - [ ] Delete `ScenarioOverrides` TypeScript type from `src/lib/forecast/types.ts`
 - [ ] Grep for any straggler imports of deleted symbols; fix or delete
 
-### T26 — RSC boundary acceptance
+### T27 — RSC boundary acceptance
 
 - [ ] **Grep server components for function-shaped props:**
 
@@ -442,7 +517,7 @@ Expected: zero hits OR only hits inside `'use client'` files. Hits inside server
 
 - [ ] If strike-3 occurs (server component passing functions across boundary): document in CLAUDE.md Lessons and promote to architecture note per three-strike rule
 
-### T27 — Test + build acceptance
+### T28 — Test + build acceptance
 
 - [ ] `npm test 2>&1 | tail -5` — record passing count
 - [ ] Compare to `/tmp/r4-baseline-tests.txt` — expect baseline + ~40
@@ -450,13 +525,13 @@ Expected: zero hits OR only hits inside `'use client'` files. Hits inside server
 - [ ] `npm run lint` — clean (or known-acceptable)
 - [ ] `npm run build` — clean (verify all routes including `/goals`, `/simulator`, `/simulator/compare` build)
 
-### T28 — Browser UAT walk
+### T29 — Browser UAT walk
 
 - [ ] Per SPEC § Testing strategy > Browser UAT axes — walk all 14 rows
 - [ ] Record any UAT-only issues; fix as `fix(r4):` follow-ups rebased into C2 or C3 before final push
 - [ ] Theme parity check: light + dark across goal cards + simulator chart + drawer chrome
 
-### T29 — HANDOFF doc
+### T30 — HANDOFF doc
 
 **Files:** create `docs/redesign/HANDOFF-YYYY-MM-DD-post-r4.md`
 
@@ -464,7 +539,7 @@ Expected: zero hits OR only hits inside `'use client'` files. Hits inside server
 - [ ] Sections: What shipped · Architecture notes · Test count delta · UAT outcome · Next phase (R.5 mobile rebuild)
 - [ ] One paragraph on hard-cut migration aftermath (open-items resolution #5)
 
-### T30 — COMMIT C3 + push
+### T31 — COMMIT C3 + push
 
 - [ ] **COMMIT C3**:
 
@@ -505,11 +580,11 @@ git push -u origin worktree-r4-moves-scenario
 | `goals/move-suggestions.ts` | ~8 |
 | `moves/draft.ts` (if added in T18) | ~2 |
 
-**Target:** baseline + ~40 tests at T27 acceptance.
+**Target:** baseline + ~40 tests at T28 acceptance.
 
 ---
 
-## Acceptance gates (T26–T28 collected)
+## Acceptance gates (T27–T29 collected)
 
 All must pass before C3 commit:
 
@@ -527,8 +602,8 @@ All must pass before C3 commit:
 
 - **Hard-cut migration blast radius is one user.** You. No multi-tenant fallout. If multi-user ships before R.4, this plan needs revisit per OVERVIEW open question Q5.
 - **Engine refactor touches the most-tested module in the codebase** (`apply-overrides.test.ts` had +43 cases from the 2026-05-05 review). Commutativity test port (T5) is the safety net. If commutativity breaks, the new engine has an order-dependence bug — debug before proceeding.
-- **Three-strike RSC watch is hot.** R.3.2 passed it; R.4 has multiple new client/server boundary surfaces (`<GoalCard>` + `<GoalCardClient>`, `<MoveDrawer>`, `<SimulatorClient>`). Treat T26 acceptance as load-bearing, not ceremonial.
-- **Hard-cut migration is irreversible without restoring DB from backup.** Confirm the column drop step (T16) is acceptable before running it. The PR review should call this out specifically.
+- **Three-strike RSC watch is hot.** R.3.2 passed it; R.4 has multiple new client/server boundary surfaces (`<GoalCard>` + `<GoalCardClient>`, `<MoveDrawer>`, `<SimulatorClient>`). Treat T27 acceptance as load-bearing, not ceremonial.
+- **Hard-cut migration is irreversible without restoring DB from backup.** Confirm the column drop step (T17) is acceptable before running it. The PR review should call this out specifically.
 
 ---
 

@@ -6,6 +6,8 @@ import type { Scenario } from '@/lib/db/schema';
 import { projectCash } from '@/lib/forecast/engine';
 import type { FreshnessText } from '@/lib/format/freshness';
 import type { ForecastHistory, ScenarioOverrides } from '@/lib/forecast/types';
+import type { GoalMove } from '@/lib/db/schema';
+import { goalMovesToEngineMoves } from '@/lib/moves/apply';
 import { buildSimulatorUrl, type RangeParam, type ViewParam } from '@/lib/simulator/url-state';
 import { deriveChartMarkers } from '@/lib/simulator/markers';
 import type { MoveTemplateId } from '@/lib/simulator/moves/templates';
@@ -38,6 +40,7 @@ type Props = {
   initialView: ViewParam;
   initialRange: RangeParam;
   freshness: FreshnessText;
+  initialGoalMoves: GoalMove[];
 };
 
 export function SimulatorClient({
@@ -48,6 +51,7 @@ export function SimulatorClient({
   initialView,
   initialRange,
   freshness,
+  initialGoalMoves,
 }: Props) {
   const router = useRouter();
 
@@ -70,14 +74,20 @@ export function SimulatorClient({
     return JSON.stringify(saved) !== JSON.stringify(liveOverrides);
   }, [selectedScenario, liveOverrides]);
 
+  // Memoize the engine-Move conversion so it doesn't re-run on every render.
+  const engineGoalMoves = useMemo(
+    () => goalMovesToEngineMoves(initialGoalMoves),
+    [initialGoalMoves],
+  );
+
   const engineResult = useMemo(
-    () => projectCash({ history, overrides: liveOverrides, currentMonth }),
-    [history, liveOverrides, currentMonth],
+    () => projectCash({ history, overrides: liveOverrides, goalMoves: engineGoalMoves, currentMonth }),
+    [history, liveOverrides, engineGoalMoves, currentMonth],
   );
 
   const baselineResult = useMemo(
-    () => projectCash({ history, overrides: {}, currentMonth }),
-    [history, currentMonth],
+    () => projectCash({ history, overrides: {}, goalMoves: engineGoalMoves, currentMonth }),
+    [history, engineGoalMoves, currentMonth],
   );
 
   const availableMonths = useMemo(

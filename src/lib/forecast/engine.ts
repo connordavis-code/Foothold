@@ -1,3 +1,5 @@
+import { applyMoves } from '@/lib/moves/apply';
+
 import {
   applyCategoryDeltas,
   applyIncomeDelta,
@@ -38,12 +40,27 @@ const HORIZON_MONTHS = 24;
  *   is exactly what the simulator is supposed to surface.
  */
 export function projectCash(input: ProjectCashInput): ProjectionResult {
-  const { history, overrides, currentMonth } = input;
+  const {
+    history,
+    overrides,
+    currentMonth,
+    goalMoves = [],
+    scenarioMoves = [],
+  } = input;
 
-  // Step 1: baseline (no overrides)
-  const baseline = computeBaseline(history, currentMonth, HORIZON_MONTHS);
+  // Step 1: raw baseline (no overrides, no moves)
+  const rawBaseline = computeBaseline(history, currentMonth, HORIZON_MONTHS);
 
-  // Steps 2-6: apply overrides in deterministic order (signed math)
+  // Step 1b: fold goalMoves into baseline. Per SPEC § engine principle:
+  // "baseline INCLUDES commitments." Empty array → same-reference fast path.
+  const baseline = applyMoves(
+    rawBaseline,
+    goalMoves,
+    history.recurringStreams,
+  );
+
+  // Steps 2-6: apply legacy overrides in deterministic order (signed math).
+  // Retained for /simulator pre-C2; C2's hard-cut migration drops this chain.
   let scenario = baseline;
   scenario = applyCategoryDeltas(scenario, overrides.categoryDeltas);
   scenario = applyIncomeDelta(scenario, overrides.incomeDelta);
@@ -51,8 +68,14 @@ export function projectCash(input: ProjectCashInput): ProjectionResult {
   scenario = applySkipRecurringInstances(scenario, history.recurringStreams, overrides.skipRecurringInstances);
   scenario = applyLumpSums(scenario, overrides.lumpSums);
 
+  // Step 6b: fold scenarioMoves on top (R.4 ephemeral overlay). Empty → fast path.
+  scenario = applyMoves(scenario, scenarioMoves, history.recurringStreams);
+
   // Step 7: goal impacts BEFORE clamp — findGoalETA reads month.endCash for
   // the cash gate (W-01) and needs the true (unclamped) cash trajectory.
+  // Baseline here is goal_move-augmented, so the impact comparison is
+  // "scenario delta vs the user's already-committed reality" — exactly
+  // what the simulator's goal-impacts strip needs to surface.
   const goalImpacts = computeGoalImpacts(baseline, scenario, history.goals, overrides);
 
   // Step 8: clamp display fields. startCash/endCash preserved.

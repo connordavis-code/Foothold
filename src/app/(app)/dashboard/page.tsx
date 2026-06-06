@@ -36,6 +36,8 @@ import {
   getWeeklyBriefStats,
 } from '@/lib/db/queries/insights';
 import { getUpcomingRecurringOutflows } from '@/lib/db/queries/recurring';
+import { getGoalMoves } from '@/lib/db/queries/moves';
+import { goalMovesToEngineMoves } from '@/lib/moves/apply';
 import { db } from '@/lib/db';
 import { sourceScopeWhere } from '@/lib/db/source-scope';
 import { financialAccounts, externalItems } from '@/lib/db/schema';
@@ -72,6 +74,7 @@ export default async function DashboardPage({
     forecastHistory,
     categoryOptions,
     sourceHealth,
+    goalMoves,
   ] = await Promise.all([
     getDashboardSummary(userId),
     getNetWorthMonthlyDelta(userId),
@@ -85,6 +88,7 @@ export default async function DashboardPage({
     getForecastHistory(userId),
     getCategoryOptions(userId),
     getSourceHealth(userId),
+    getGoalMoves(userId),
   ]);
 
   // Brief stats + sequence number depend on the resolved insight's week range.
@@ -106,6 +110,7 @@ export default async function DashboardPage({
   const projection = projectCash({
     history: forecastHistory,
     overrides: {},
+    goalMoves: goalMovesToEngineMoves(goalMoves),
     currentMonth,
   });
   const eomProjected = projection.projection[0]?.endCash ?? liquidBalance;

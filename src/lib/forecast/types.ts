@@ -126,12 +126,25 @@ export type GoalImpact = {
 
 /**
  * Engine input — bundled so the function signature is stable as inputs evolve.
+ *
+ * R.4 introduces `goalMoves` and `scenarioMoves` as additive optional fields.
+ * Both default to `[]` (no-op via applyMoves' same-reference fast path) so
+ * existing callers compile and behave identically. C2's hard-cut migration
+ * drops `overrides` entirely; until then both pathways coexist.
+ *
+ * Semantics: goalMoves fold into the baseline BEFORE legacy overrides (commits
+ * become part of "the baseline" per SPEC § engine principle); scenarioMoves
+ * layer on top AFTER legacy overrides (ephemeral overlay).
  */
 export type ProjectCashInput = {
   history: ForecastHistory;
   overrides: ScenarioOverrides;
   /** Current month YYYY-MM. Passed in so the function stays pure (no Date.now). */
   currentMonth: string;
+  /** R.4: committed Moves attached to goals. Fold into baseline. */
+  goalMoves?: readonly import('@/lib/moves/appliers').Move[];
+  /** R.4: ephemeral Moves attached to a simulator scenario. Overlay on top. */
+  scenarioMoves?: readonly import('@/lib/moves/appliers').Move[];
 };
 
 /**

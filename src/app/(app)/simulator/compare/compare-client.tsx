@@ -11,12 +11,15 @@ import type { Scenario } from '@/lib/db/schema';
 import { deriveChartMarkers } from '@/lib/simulator/markers';
 import { projectCash } from '@/lib/forecast/engine';
 import type { ForecastHistory, ScenarioOverrides } from '@/lib/forecast/types';
+import type { GoalMove } from '@/lib/db/schema';
+import { goalMovesToEngineMoves } from '@/lib/moves/apply';
 
 type Props = {
   history: ForecastHistory;
   scenarios: Scenario[];
   currentMonth: string;
   initialScenarioId: string | null;
+  goalMoves: GoalMove[];
 };
 
 /**
@@ -34,6 +37,7 @@ export function CompareClient({
   scenarios,
   currentMonth,
   initialScenarioId,
+  goalMoves,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -61,9 +65,11 @@ export function CompareClient({
     [pathname, router, searchParams],
   );
 
+  const engineGoalMoves = useMemo(() => goalMovesToEngineMoves(goalMoves), [goalMoves]);
+
   const baseline = useMemo(
-    () => projectCash({ history, overrides: {}, currentMonth }).projection,
-    [history, currentMonth],
+    () => projectCash({ history, overrides: {}, goalMoves: engineGoalMoves, currentMonth }).projection,
+    [history, engineGoalMoves, currentMonth],
   );
 
   const scenarioResult = useMemo(() => {
@@ -71,8 +77,8 @@ export function CompareClient({
     const scn = scenarios.find((s) => s.id === selectedScenarioId);
     if (!scn) return null;
     const overrides = scn.overrides as ScenarioOverrides;
-    return projectCash({ history, overrides, currentMonth });
-  }, [selectedScenarioId, scenarios, history, currentMonth]);
+    return projectCash({ history, overrides, goalMoves: engineGoalMoves, currentMonth });
+  }, [selectedScenarioId, scenarios, history, engineGoalMoves, currentMonth]);
 
   const scenarioProjection = scenarioResult?.projection ?? baseline;
   const goalImpacts = scenarioResult?.goalImpacts ?? [];

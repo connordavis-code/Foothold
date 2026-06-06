@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { getForecastHistory } from '@/lib/db/queries/forecast';
 import { listScenariosForUser } from '@/lib/db/queries/scenarios';
+import { getGoalMoves } from '@/lib/db/queries/moves';
 import { CompareClient } from './compare-client';
 
 /**
@@ -24,10 +25,11 @@ export default async function ComparePage({
   if (!session?.user?.id) redirect('/login');
 
   const userId = session.user.id;
-  const [params, history, scenarios] = await Promise.all([
+  const [params, history, scenarios, goalMoves] = await Promise.all([
     searchParams,
     getForecastHistory(userId),
     listScenariosForUser(userId),
+    getGoalMoves(userId),
   ]);
 
   const now = new Date();
@@ -44,6 +46,7 @@ export default async function ComparePage({
       scenarios={scenarios}
       currentMonth={currentMonth}
       initialScenarioId={initialScenarioId}
+      goalMoves={goalMoves}
     />
   );
 }
