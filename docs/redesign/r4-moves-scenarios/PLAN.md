@@ -15,38 +15,19 @@
 
 ---
 
-## ▶ Resume point (as of 2026-05-13 evening)
+## ▶ Resume point
 
-**R.4 C1 in progress.** Six tasks done; engine + primitives all landed; queries / suggestions / server actions / UI / wire-up pending. Pick up at **T7**.
+**C1 shipped + goal-side edit flow DB-verified.** See [RESUME.md](./RESUME.md) for the authoritative state doc — read it FIRST on resume, before running anything.
 
-| Task | Status | Notes |
-|---|---|---|
-| **T1** Pre-flight + SPEC/PLAN/OVERVIEW commit | ✅ `9a42c5f` | Baseline: 691 tests passing, 19 routes building, typecheck clean |
-| **T2** `goal_move` + `scenario_move` tables + RLS | ✅ | Applied to prod Supabase via `docs/migrations/2026-05-13-r4-moves.sql`; smoke-tested end-to-end via postgres-js |
-| **T3** `validation.ts` (Zod boundary, rejects skip-once on goal) | ✅ | +13 tests → 704 |
-| **T4** `appliers.ts` (4 pure per-move appliers) | ✅ | +15 tests → 719 |
-| **T5** `apply.ts` orchestrator + commutativity port | ✅ | +20 tests → 739; SPEC § Edge case #2 per-month last-wins verified |
-| **T6** Engine refactor — `projectCash` accepts `goalMoves` + `scenarioMoves` additively | ✅ | +2 tests → 741; all 5 callers unchanged via default `[]` fast path |
-| **T7** Query helper `db/queries/moves.ts` | — **NEXT** | `getGoalMoves` / `getScenarioMoves` / `findDuplicateMove` |
-| T8–T15 | pending | suggestions · goal-side server actions · `<MoveEditor>` / `<MoveDrawer>` / etc. · GoalCard refactor · /goals page rewire |
-| **T16** Wire `goalMoves` through dashboard + /simulator + /simulator/compare + cron forecast-snapshot + COMMIT C1 | pending | Inserted 2026-05-13 evening per coherence-not-divergence ruling — see commit message in T16 section for the four call sites |
-| T17–T31 (C2 + C3) | pending | Hard-cut migration, /simulator rewire, cleanup, acceptance |
+**State at a glance:**
+- HEAD: `e2d490f` · Tests: 760/760 · Branch synced to origin · Working tree clean
+- T1–T16 shipped on `worktree-r4-moves-scenario` as commit `fa02131` (C1) + four follow-up commits (edit-flow fix, test extraction, stableStringify promotion, dashboard-drilldown revert)
 
-**Test bookmark:** 691 baseline → **741 currently passing** (+50). PLAN target was +40 — already exceeded with T7/T8 still to come.
+**Open gate before T18:**
+- **C2-minus-T17 direction is founder-APPROVED** (R.4 ships only the four cleanly-mappable scenario_move templates; `scenario.overrides` retained as disjoint carrier for un-mapped capabilities; T17 DROP COLUMN deferred until all capabilities have homes).
+- Next session must present the concrete **T18–T26 task adjustments** (T19 hybrid state, T23 disjoint-write rule, T25 keep-list, T26 keep-list) for founder review. **Do not start T18 until that presentation is reviewed.** Transcript-only proposals from the prior session do not count as confirmed.
 
-**Uncommitted working tree** (post-T6):
-- Modified: `src/lib/db/schema.ts`, `src/lib/forecast/engine.ts`, `src/lib/forecast/engine.test.ts`, `src/lib/forecast/types.ts`
-- New: `src/lib/moves/{validation,appliers,apply}.ts` + 4 test files
-- New: `docs/migrations/2026-05-13-r4-moves.sql` (already applied to prod DB — keep in tree for C1 commit)
-- Committed: `9a42c5f docs(r4): lock SPEC + PLAN for moves + scenario unification`
-
-**Resume command:**
-```bash
-cd /Users/cdhome/Desktop/Code/finance-tool/.claude/worktrees/r4-moves-scenario
-git rev-parse --abbrev-ref HEAD  # expect worktree-r4-moves-scenario
-npm test 2>&1 | tail -3          # expect 741 passing
-# Then open PLAN.md § T7 and continue.
-```
+See RESUME.md for the saved-scenario capability table (which buckets are scope-cut candidates vs. NW-pivot-roadmap templates vs. actively-carried), standing policies, and the verified resume command.
 
 ---
 
