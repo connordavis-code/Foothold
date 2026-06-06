@@ -8,6 +8,7 @@ import { goalMoves } from '@/lib/db/schema';
 import { logError } from '@/lib/logger';
 import { getGoalMovesByGoalId, findDuplicateMove } from '@/lib/db/queries/moves';
 import { goalMoveInputSchema } from '@/lib/moves/validation';
+import { decideGoalMoveUpdate } from '@/lib/moves/update-decision';
 
 type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -139,25 +140,23 @@ export async function updateGoalMoveAction(
       return { ok: false, error: 'Move not found' };
     }
 
-    // Re-validate the new params against the existing row's templateKey by
-    // reconstructing a full goalMoveInputSchema-shaped input. This ensures
-    // the params shape matches the template contract and cannot drift.
-    const validationInput = {
-      templateKey: existing.templateKey,
-      goalId: existing.goalId,
-      params,
-    };
-    const parsed = goalMoveInputSchema.safeParse(validationInput);
-    if (!parsed.success) {
-      const first = parsed.error.issues[0];
-      const path = first?.path.join('.') ?? '';
-      const msg = path ? `${path}: ${first?.message}` : (first?.message ?? 'Invalid params');
-      return { ok: false, error: msg };
+    // Delegate the Zod-input reconstruction + no-op-vs-update decision to the
+    // pure helper so it's unit-testable in isolation; the action layer owns
+    // only the auth + DB-write side. The helper's union never returns an
+    // 'insert' arm, so this code path cannot create a duplicate row.
+    const decision = decideGoalMoveUpdate(existing, params);
+    if (decision.kind === 'invalid') {
+      return { ok: false, error: decision.error };
+    }
+    if (decision.kind === 'no-op') {
+      // Params semantically unchanged — skip the UPDATE so updated_at doesn't
+      // drift for a write that would change nothing. Idempotent re-submit.
+      return { ok: true, data: { moveId } };
     }
 
     await db
       .update(goalMoves)
-      .set({ params: parsed.data.params, updatedAt: new Date() })
+      .set({ params: decision.params, updatedAt: new Date() })
       .where(and(eq(goalMoves.id, moveId), eq(goalMoves.userId, userId)));
 
     revalidateMoveConsumers();
