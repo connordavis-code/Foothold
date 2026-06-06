@@ -66,7 +66,7 @@ export function GoalCard({
       : null;
 
   return (
-    <article className="rounded-card bg-[--surface] p-5">
+    <article id={`goal-${goal.id}`} className="scroll-mt-20 rounded-card bg-[--surface] p-5">
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-base font-semibold text-[--text]">

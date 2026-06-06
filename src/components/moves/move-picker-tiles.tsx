@@ -54,7 +54,7 @@ export function MovePickerTiles({ allowSkipOnce = false, activeKey, onSelect }: 
   const tiles = allowSkipOnce ? [...GOAL_TILES, SKIP_ONCE_TILE] : GOAL_TILES;
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="flex flex-col gap-2">
       {tiles.map((tile) => {
         const Icon = tile.icon;
         const isActive = tile.key === activeKey;

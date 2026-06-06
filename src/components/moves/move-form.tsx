@@ -148,7 +148,7 @@ function AdjustRecurringFields({
           type="number"
           inputMode="decimal"
           min={0}
-          step={1}
+          step="any"
           value={newAmount}
           onChange={(e) => { const v = Math.max(0, Number(e.target.value)); setNewAmount(v); emit({ newAmount: v }); }}
           onFocus={(e) => e.target.select()}
@@ -238,8 +238,8 @@ function ReduceCategoryFields({
         <input
           type="number"
           inputMode="decimal"
-          min={0.01}
-          step={10}
+          min={0}
+          step="any"
           value={deltaAmount}
           onChange={(e) => { const v = Number(e.target.value); setDeltaAmount(v); emit({ deltaAmount: v }); }}
           onFocus={(e) => e.target.select()}
@@ -304,7 +304,7 @@ function IncomeEventFields({
         <input
           type="number"
           inputMode="decimal"
-          step={100}
+          step="any"
           value={monthlyAmount}
           onChange={(e) => { const v = Number(e.target.value); setMonthlyAmount(v); emit({ monthlyAmount: v }); }}
           onFocus={(e) => e.target.select()}
