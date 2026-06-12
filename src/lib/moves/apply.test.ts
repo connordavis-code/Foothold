@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ForecastHistory, MonthlyProjection } from '@/lib/forecast/types';
 
-import { applyMoves } from './apply';
+import { applyMoves, goalMovesToEngineMoves, scenarioMovesToEngineMoves } from './apply';
 import type { Move } from './appliers';
 
 // =============================================================================
@@ -240,5 +240,60 @@ describe('applyMoves — same-reference invariants', () => {
     expect(result[0].outflows).toBe(proj[0].outflows);
     expect(result[0].inflows).toBe(proj[0].inflows);
     expect(result[0].endCash).toBe(proj[0].endCash);
+  });
+});
+
+// =============================================================================
+// DB-row → engine-Move converters (goal + scenario)
+// =============================================================================
+
+describe('goalMovesToEngineMoves', () => {
+  it('maps each known templateKey to its engine Move shape', () => {
+    const rows = [
+      { templateKey: 'adjust-recurring', params: { streamId: 'rent', startMonth: '2026-06', endMonth: '2026-08', newAmount: 1200 } },
+      { templateKey: 'reduce-category', params: { categoryKey: 'FOOD_AND_DRINK', startMonth: '2026-06', deltaAmount: 100 } },
+      { templateKey: 'income-event', params: { startMonth: '2026-07', monthlyAmount: 500 } },
+    ];
+    expect(goalMovesToEngineMoves(rows)).toEqual([
+      { kind: 'adjust-recurring', streamId: 'rent', startMonth: '2026-06', endMonth: '2026-08', newAmount: 1200 },
+      { kind: 'reduce-category', categoryKey: 'FOOD_AND_DRINK', startMonth: '2026-06', endMonth: undefined, deltaAmount: 100 },
+      { kind: 'income-event', startMonth: '2026-07', endMonth: undefined, monthlyAmount: 500 },
+    ]);
+  });
+
+  it('drops rows with unrecognised templateKey (schema-drift defence)', () => {
+    const rows = [
+      { templateKey: 'lump-sum', params: { amount: 999 } },
+      { templateKey: 'income-event', params: { startMonth: '2026-07', monthlyAmount: 500 } },
+    ];
+    expect(goalMovesToEngineMoves(rows)).toHaveLength(1);
+  });
+
+  it('skips rows whose params is null or non-object', () => {
+    const rows = [
+      { templateKey: 'income-event', params: null },
+      { templateKey: 'income-event', params: [1, 2, 3] },
+    ];
+    expect(goalMovesToEngineMoves(rows)).toEqual([]);
+  });
+});
+
+describe('scenarioMovesToEngineMoves', () => {
+  it('admits skip-once (scenario-only) which the goal schema rejects', () => {
+    const rows = [
+      { templateKey: 'skip-once', params: { streamId: 'rent', month: '2026-06' } },
+    ];
+    expect(scenarioMovesToEngineMoves(rows)).toEqual([
+      { kind: 'skip-once', streamId: 'rent', month: '2026-06' },
+    ]);
+  });
+
+  it('maps the same four templateKeys as the goal converter', () => {
+    const rows = [
+      { templateKey: 'adjust-recurring', params: { streamId: 'rent', startMonth: '2026-06', newAmount: 0 } },
+      { templateKey: 'skip-once', params: { streamId: 'gym', month: '2026-09' } },
+    ];
+    const result = scenarioMovesToEngineMoves(rows);
+    expect(result.map((m) => m.kind)).toEqual(['adjust-recurring', 'skip-once']);
   });
 });

@@ -1,98 +1,143 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Scenario } from '@/lib/db/schema';
+import { Plus, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
+
+import type { Scenario, GoalMove, ScenarioMove } from '@/lib/db/schema';
 import { projectCash } from '@/lib/forecast/engine';
 import type { FreshnessText } from '@/lib/format/freshness';
 import type { ForecastHistory, ScenarioOverrides } from '@/lib/forecast/types';
-import type { GoalMove } from '@/lib/db/schema';
-import { goalMovesToEngineMoves } from '@/lib/moves/apply';
-import { buildSimulatorUrl, type RangeParam, type ViewParam } from '@/lib/simulator/url-state';
+import {
+  goalMovesToEngineMoves,
+  scenarioMovesToEngineMoves,
+} from '@/lib/moves/apply';
+import type { RangeParam } from '@/lib/simulator/url-state';
 import { deriveChartMarkers } from '@/lib/simulator/markers';
-import type { MoveTemplateId } from '@/lib/simulator/moves/templates';
-import { findTemplate } from '@/lib/simulator/moves/templates';
+import type { RecurringStreamRow } from '@/lib/db/queries/recurring';
+import { createScenario, deleteScenario } from '@/lib/forecast/scenario-actions';
 
-import { ScenarioHeader } from '@/components/simulator/scenario-header';
-import { SimulatorTabs } from '@/components/simulator/simulator-tabs';
-import { OverrideSection } from '@/components/simulator/override-section';
-import { CategoryOverrides } from '@/components/simulator/category-overrides';
-import { LumpSumOverrides } from '@/components/simulator/lump-sum-overrides';
-import { RecurringOverrides } from '@/components/simulator/recurring-overrides';
-import { IncomeOverrides } from '@/components/simulator/income-overrides';
-import { HypotheticalGoalOverrides } from '@/components/simulator/hypothetical-goal-overrides';
-import { GoalTargetOverrides } from '@/components/simulator/goal-target-overrides';
-import { SkipRecurringOverrides } from '@/components/simulator/skip-recurring-overrides';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 import { ForecastChart } from '@/components/simulator/forecast-chart';
 import { ChartRangeTabs } from '@/components/simulator/chart-range-tabs';
-import { ScenarioCards } from '@/components/simulator/scenario-cards';
-import { GoalImpacts } from '@/components/simulator/goal-impacts';
-import { EmptyStateCard } from '@/components/simulator/empty-state-card';
-import { MovesGrid } from '@/components/simulator/moves/moves-grid';
-import { MoveTemplateDrawer } from '@/components/simulator/moves/move-template-drawer';
-import { MobileScenarioSaveBar } from '@/components/simulator/mobile-scenario-save-bar';
+import { ScenarioPicker } from '@/components/simulator/scenario-picker';
+import { GoalImpactsStrip } from '@/components/simulator/goal-impacts-strip';
+import { MoveDrawer } from '@/components/moves/move-drawer';
+import { AttachedScenarioMoveRow } from '@/components/moves/attached-scenario-move-row';
+
+// Stable empty-overrides reference so memo deps don't churn each render.
+const EMPTY_OVERRIDES: ScenarioOverrides = {};
 
 type Props = {
   history: ForecastHistory;
   scenarios: Scenario[];
   currentMonth: string;
-  initialScenario: Scenario | null;
-  initialView: ViewParam;
+  initialScenarioId: string | null;
   initialRange: RangeParam;
   freshness: FreshnessText;
   initialGoalMoves: GoalMove[];
+  initialScenarioMoves: ScenarioMove[];
+  streams: RecurringStreamRow[];
+  categories: { key: string; label: string }[];
 };
 
+/**
+ * R.4 simulator: a minimal, scenario-first what-if sandbox.
+ *
+ * State collapses to { selectedScenarioId, range, drawerOpen } — no draft, no
+ * isDirty. Moves write through immediately to scenario_move (mirror of the
+ * /goals path); revalidatePath('/simulator') re-renders this mounted island
+ * with fresh server props. A scenario_move can't exist without a parent
+ * scenario (FK), so Moves attach only to a selected saved scenario; with zero
+ * scenarios the user creates one first.
+ *
+ * The retained two-store model (T17 DROP COLUMN deferred): a selected
+ * scenario's projection overlays BOTH its legacy `overrides` JSON (unmapped
+ * capabilities — lump sums, hypotheticals) and its `scenario_move` rows (the
+ * four mapped templates). The disjoint-write guard keeps them non-overlapping.
+ */
 export function SimulatorClient({
   history,
   scenarios,
   currentMonth,
-  initialScenario,
-  initialView,
+  initialScenarioId,
   initialRange,
   freshness,
   initialGoalMoves,
+  initialScenarioMoves,
+  streams,
+  categories,
 }: Props) {
   const router = useRouter();
+  const [pending, startTransition] = useTransition();
 
   // State -----------------------------------------------------------------
-  const [view, setViewState] = useState<ViewParam>(initialView);
   const [range, setRangeState] = useState<RangeParam>(initialRange);
   const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(
-    initialScenario?.id ?? null,
+    initialScenarioId,
   );
-  const [liveOverrides, setLiveOverrides] = useState<ScenarioOverrides>(
-    (initialScenario?.overrides as ScenarioOverrides | undefined) ?? {},
-  );
-  const [openSections, setOpenSections] = useState<ReadonlySet<string>>(() => new Set());
-  const [activeMoveTemplate, setActiveMoveTemplate] = useState<MoveTemplateId | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newOpen, setNewOpen] = useState(false);
 
-  const selectedScenario = scenarios.find((s) => s.id === selectedScenarioId) ?? null;
+  const selectedScenario =
+    scenarios.find((s) => s.id === selectedScenarioId) ?? null;
 
-  const isDirty = useMemo(() => {
-    const saved = (selectedScenario?.overrides as ScenarioOverrides | undefined) ?? {};
-    return JSON.stringify(saved) !== JSON.stringify(liveOverrides);
-  }, [selectedScenario, liveOverrides]);
-
-  // Memoize the engine-Move conversion so it doesn't re-run on every render.
+  // Derived engine inputs -------------------------------------------------
   const engineGoalMoves = useMemo(
     () => goalMovesToEngineMoves(initialGoalMoves),
     [initialGoalMoves],
   );
 
+  // Scenario_move rows for the selected scenario (server-owned; refreshed by
+  // revalidatePath after every attach/detach).
+  const scenarioMoveRows = useMemo(
+    () => initialScenarioMoves.filter((m) => m.scenarioId === selectedScenarioId),
+    [initialScenarioMoves, selectedScenarioId],
+  );
+  const engineScenarioMoves = useMemo(
+    () => scenarioMovesToEngineMoves(scenarioMoveRows),
+    [scenarioMoveRows],
+  );
+
+  const overrides = useMemo<ScenarioOverrides>(
+    () => (selectedScenario?.overrides as ScenarioOverrides | undefined) ?? EMPTY_OVERRIDES,
+    [selectedScenario],
+  );
+
   const engineResult = useMemo(
-    () => projectCash({ history, overrides: liveOverrides, goalMoves: engineGoalMoves, currentMonth }),
-    [history, liveOverrides, engineGoalMoves, currentMonth],
+    () =>
+      projectCash({
+        history,
+        overrides,
+        goalMoves: engineGoalMoves,
+        scenarioMoves: engineScenarioMoves,
+        currentMonth,
+      }),
+    [history, overrides, engineGoalMoves, engineScenarioMoves, currentMonth],
   );
 
   const baselineResult = useMemo(
-    () => projectCash({ history, overrides: {}, goalMoves: engineGoalMoves, currentMonth }),
+    () =>
+      projectCash({
+        history,
+        overrides: EMPTY_OVERRIDES,
+        goalMoves: engineGoalMoves,
+        currentMonth,
+      }),
     [history, engineGoalMoves, currentMonth],
-  );
-
-  const availableMonths = useMemo(
-    () => engineResult.projection.map((m) => m.month),
-    [engineResult],
   );
 
   const chartMarkers = useMemo(
@@ -107,325 +152,261 @@ export function SimulatorClient({
     [baselineResult, engineResult, currentMonth, range],
   );
 
-  const currentMonthlyIncome = useMemo(() => {
-    const incomeHistory = history.incomeHistory ?? [];
-    if (incomeHistory.length === 0) return 0;
-    return incomeHistory.reduce((a, b) => a + b, 0) / incomeHistory.length;
-  }, [history.incomeHistory]);
-
-  // URL mirroring --------------------------------------------------------
+  // URL mirroring — only range + scenario survive R.4 (view/tab params dropped).
   const pushUrl = useCallback(
-    (next: { view?: ViewParam; range?: RangeParam; scenarioId?: string | null }) => {
-      const url = buildSimulatorUrl({
-        view: next.view ?? view,
-        range: next.range ?? range,
-        scenarioId: next.scenarioId === undefined ? selectedScenarioId : next.scenarioId,
-      });
-      router.push(url, { scroll: false });
+    (next: { range?: RangeParam; scenarioId?: string | null }) => {
+      const params = new URLSearchParams();
+      params.set('range', next.range ?? range);
+      const sid = next.scenarioId === undefined ? selectedScenarioId : next.scenarioId;
+      if (sid) params.set('scenario', sid);
+      router.push(`/simulator?${params.toString()}`, { scroll: false });
     },
-    [router, view, range, selectedScenarioId],
-  );
-
-  const setView = useCallback(
-    (next: ViewParam) => {
-      setViewState(next);
-      pushUrl({ view: next });
-      // Drawer closes when leaving Moves
-      if (next !== 'moves') setActiveMoveTemplate(null);
-    },
-    [pushUrl],
+    [router, range, selectedScenarioId],
   );
 
   const setRange = useCallback(
-    (next: RangeParam) => {
-      setRangeState(next);
-      pushUrl({ range: next });
+    (nextRange: RangeParam) => {
+      setRangeState(nextRange);
+      pushUrl({ range: nextRange });
     },
     [pushUrl],
   );
 
   const handleSelectScenario = useCallback(
     (id: string | null) => {
-      const scn = id ? scenarios.find((s) => s.id === id) : null;
+      // Write-through means nothing is unsaved — no dirty/discard guard needed.
       setSelectedScenarioId(id);
-      setLiveOverrides((scn?.overrides as ScenarioOverrides | undefined) ?? {});
       pushUrl({ scenarioId: id });
     },
-    [scenarios, pushUrl],
+    [pushUrl],
   );
 
-  // Override accordion ---------------------------------------------------
-  const toggleSection = useCallback((key: string) => {
-    setOpenSections((prev) => {
-      const isMobile =
-        typeof window !== 'undefined' &&
-        window.matchMedia('(max-width: 767px)').matches;
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
+  const handleCreateScenario = () => {
+    const name = newName.trim();
+    if (!name) return;
+    startTransition(async () => {
+      const result = await createScenario({ name, overrides: {} });
+      if (result.ok) {
+        toast.success(`Created "${name}"`);
+        setNewOpen(false);
+        setNewName('');
+        setSelectedScenarioId(result.data.id);
+        pushUrl({ scenarioId: result.data.id });
+        router.refresh();
       } else {
-        if (isMobile) next.clear();
-        next.add(key);
+        toast.error(result.error);
       }
-      return next;
     });
-  }, []);
+  };
 
-  // Move submit ----------------------------------------------------------
-  const handleMoveSubmit = useCallback(
-    (templateId: MoveTemplateId, values: Record<string, unknown>) => {
-      const template = findTemplate(templateId);
-      if (!template) return;
-      // Inject derived current monthly income for job-loss applier
-      const derived = templateId === 'jobLoss'
-        ? { ...values, currentMonthlyIncome }
-        : values;
-      const next = template.applier(derived, liveOverrides);
-      setLiveOverrides(next);
-      setActiveMoveTemplate(null);
-      setView('comparison');
-      setOpenSections((prev) => new Set([...prev, template.targetSection]));
-    },
-    [liveOverrides, currentMonthlyIncome, setView],
-  );
+  const handleDeleteScenario = () => {
+    if (!selectedScenarioId) return;
+    startTransition(async () => {
+      const result = await deleteScenario({ id: selectedScenarioId });
+      if (result.ok) {
+        toast.success('Scenario deleted');
+        setSelectedScenarioId(null);
+        pushUrl({ scenarioId: null });
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    });
+  };
 
-  // Reset ----------------------------------------------------------------
-  const handleReset = useCallback(() => {
-    const saved = (selectedScenario?.overrides as ScenarioOverrides | undefined) ?? {};
-    setLiveOverrides(saved);
-  }, [selectedScenario]);
-
-  // Empty-data guard -----------------------------------------------------
+  // Empty-data guard ------------------------------------------------------
   const hasNoData =
     history.currentCash === 0 &&
     history.recurringStreams.length === 0 &&
     Object.keys(history.categoryHistory).length === 0;
 
+  const header = (
+    <header className="mb-6 flex items-start justify-between gap-4">
+      <div>
+        <p className="text-eyebrow">Plan</p>
+        <h1
+          className="mt-1 font-display italic text-3xl text-foreground md:text-4xl"
+          style={{ letterSpacing: '-0.02em' }}
+        >
+          Simulator
+        </h1>
+      </div>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <ScenarioPicker
+          scenarios={scenarios}
+          selectedScenarioId={selectedScenarioId}
+          onSelect={handleSelectScenario}
+        />
+
+        <AlertDialog open={newOpen} onOpenChange={setNewOpen}>
+          <AlertDialogTrigger asChild>
+            <Button variant="default" size="sm" disabled={pending}>
+              <Plus className="h-4 w-4" />
+              New scenario
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>New scenario</AlertDialogTitle>
+              <AlertDialogDescription>
+                Name this what-if. Add Moves to it once it&apos;s created.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="my-2">
+              <input
+                className="w-full rounded-btn border border-hairline bg-surface px-3 py-2 text-sm"
+                placeholder="e.g. Trim recurring"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleCreateScenario();
+                }}
+                autoFocus
+              />
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleCreateScenario}
+                disabled={!newName.trim() || pending}
+              >
+                Create
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {selectedScenario && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm" disabled={pending}>
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete scenario?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This removes &ldquo;{selectedScenario.name}&rdquo; and its Moves.
+                  Your committed goal Moves are unaffected.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteScenario}>
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+      </div>
+    </header>
+  );
+
   if (hasNoData) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-8">
-        <ScenarioHeader
-          scenarios={scenarios}
-          selectedScenarioId={selectedScenarioId}
-          liveOverrides={liveOverrides}
-          isDirty={isDirty}
-          onSelect={handleSelectScenario}
-          onReset={handleReset}
-        />
+        {header}
         <div className="rounded-card border border-hairline bg-surface p-8 text-center">
           <h2 className="mb-2 text-lg font-medium text-foreground">No data yet</h2>
           <p className="mx-auto max-w-md text-sm text-text-2">
-            The simulator forecasts forward from your synced transactions and recurring streams.
-            Once Plaid finishes its first sync, the forecast will fill in here.
+            The simulator forecasts forward from your synced transactions and
+            recurring streams. Once Plaid finishes its first sync, the forecast
+            will fill in here.
           </p>
         </div>
       </div>
     );
   }
 
-  // Disable Pause/Cancel Moves when no recurring streams exist
-  const disabledMoves = new Set<MoveTemplateId>();
-  if (history.recurringStreams.length === 0) {
-    disabledMoves.add('pauseRecurring');
-    disabledMoves.add('cancelSub');
-  }
-
-  // Chart subtitle (12mo · 2027-05 projected -$X)
-  const lastVisible = (range === '1Y' ? 11 : 23);
-  const horizonProjected =
-    engineResult.projection[lastVisible]?.endCash ?? engineResult.projection.at(-1)?.endCash ?? 0;
+  // Chart subtitle (12mo / 24mo · projected horizon month)
+  const lastVisible = range === '1Y' ? 11 : 23;
   const horizonMonth =
-    engineResult.projection[lastVisible]?.month ?? engineResult.projection.at(-1)?.month ?? '';
+    engineResult.projection[lastVisible]?.month ??
+    engineResult.projection.at(-1)?.month ??
+    '';
   const subtitle = `${range === '1Y' ? '12' : '24'} months · ${horizonMonth} projected`;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 pb-24 sm:px-8 sm:py-8 md:pb-8">
-      <ScenarioHeader
-        scenarios={scenarios}
-        selectedScenarioId={selectedScenarioId}
-        liveOverrides={liveOverrides}
-        isDirty={isDirty}
-        onSelect={handleSelectScenario}
-        onReset={handleReset}
-      />
+    <div className="mx-auto max-w-6xl px-4 py-6 pb-12 sm:px-8 sm:py-8 md:pb-8">
+      {header}
 
-      <SimulatorTabs view={view} onChange={setView} />
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-[320px_1fr] md:gap-10">
+        {/* Left rail — scenario Moves (write-through) */}
+        <div className="space-y-3">
+          <p className="text-eyebrow">Moves</p>
+          {selectedScenario ? (
+            <>
+              {scenarioMoveRows.length > 0 ? (
+                <ul className="space-y-2">
+                  {scenarioMoveRows.map((m) => (
+                    <AttachedScenarioMoveRow
+                      key={m.id}
+                      move={m}
+                      streams={streams}
+                      categories={categories}
+                    />
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-text-3">
+                  No Moves yet. Add one to see its effect on the forecast.
+                </p>
+              )}
 
-      {view === 'empty' && (
+              <button
+                type="button"
+                onClick={() => setDrawerOpen(true)}
+                className="flex items-center gap-1.5 rounded-md border border-[--hairline] px-3 py-1.5 text-sm text-[--text-2] transition-colors hover:border-[--text-3] hover:text-[--text] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[--text-3]"
+              >
+                <Plus className="h-3.5 w-3.5" aria-hidden />
+                Add a Move
+              </button>
+            </>
+          ) : (
+            <div className="rounded-card border border-hairline bg-surface p-4">
+              <p className="text-sm text-text-2">
+                {scenarios.length === 0
+                  ? 'Create a scenario to start exploring what-ifs.'
+                  : 'Select a scenario to add Moves, or create a new one.'}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Right — chart + goal impacts */}
         <div className="space-y-6">
+          <div className="flex items-center justify-end">
+            <ChartRangeTabs range={range} onChange={setRange} />
+          </div>
           <ForecastChart
             baseline={baselineResult.projection}
-            scenario={[]}
+            scenario={engineResult.projection}
             markers={chartMarkers}
             range={range}
-            showScenario={false}
+            showScenario={selectedScenario !== null}
             subtitle={subtitle}
             freshnessHeadline={freshness.headline}
             freshnessCaveat={freshness.caveat}
           />
-          <EmptyStateCard onPickMove={() => setView('moves')} />
+          {selectedScenario && (
+            <GoalImpactsStrip goalImpacts={engineResult.goalImpacts} />
+          )}
         </div>
-      )}
+      </div>
 
-      {view === 'moves' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-medium text-foreground">Pick a Move</h2>
-              <p className="text-xs text-text-3">Each Move adds an override and re-runs the projection</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setView('empty')}
-              className="text-xs text-text-2 hover:text-foreground"
-            >
-              Cancel ×
-            </button>
-          </div>
-          <MovesGrid
-            onPick={(id) => setActiveMoveTemplate(id)}
-            disabledTemplates={disabledMoves}
-          />
-          <MoveTemplateDrawer
-            activeTemplateId={activeMoveTemplate}
-            history={history}
-            liveOverrides={liveOverrides}
-            currentMonth={currentMonth}
-            availableMonths={availableMonths}
-            onSubmit={handleMoveSubmit}
-            onClose={() => setActiveMoveTemplate(null)}
-          />
-        </div>
-      )}
-
-      {view === 'comparison' && (
-        <div className="space-y-8">
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-[260px_1fr] md:gap-10">
-            <div className="rounded-2xl border border-[--hairline] bg-[--surface] p-5">
-              <p className="text-eyebrow mb-3">Overrides</p>
-              <OverrideSection
-                label="Categories"
-                count={liveOverrides.categoryDeltas?.length ?? 0}
-                open={openSections.has('categories')}
-                onToggle={() => toggleSection('categories')}
-              >
-                <CategoryOverrides
-                  value={liveOverrides.categoryDeltas}
-                  onChange={(next) => setLiveOverrides((o) => ({ ...o, categoryDeltas: next }))}
-                  knownCategories={history.categories}
-                />
-              </OverrideSection>
-              <OverrideSection
-                label="Lump sums"
-                count={liveOverrides.lumpSums?.length ?? 0}
-                open={openSections.has('lumpSums')}
-                onToggle={() => toggleSection('lumpSums')}
-              >
-                <LumpSumOverrides
-                  value={liveOverrides.lumpSums}
-                  onChange={(next) => setLiveOverrides((o) => ({ ...o, lumpSums: next }))}
-                  availableMonths={availableMonths}
-                />
-              </OverrideSection>
-              <OverrideSection
-                label="Recurring"
-                count={liveOverrides.recurringChanges?.length ?? 0}
-                open={openSections.has('recurring')}
-                onToggle={() => toggleSection('recurring')}
-              >
-                <RecurringOverrides
-                  value={liveOverrides.recurringChanges}
-                  onChange={(next) => setLiveOverrides((o) => ({ ...o, recurringChanges: next }))}
-                  baseStreams={history.recurringStreams}
-                />
-              </OverrideSection>
-              <OverrideSection
-                label="Income"
-                count={liveOverrides.incomeDelta ? 1 : 0}
-                open={openSections.has('income')}
-                onToggle={() => toggleSection('income')}
-              >
-                <IncomeOverrides
-                  value={liveOverrides.incomeDelta}
-                  onChange={(next) => setLiveOverrides((o) => ({ ...o, incomeDelta: next }))}
-                  availableMonths={availableMonths}
-                />
-              </OverrideSection>
-              <OverrideSection
-                label="Hypothetical goals"
-                count={liveOverrides.hypotheticalGoals?.length ?? 0}
-                open={openSections.has('hypotheticalGoals')}
-                onToggle={() => toggleSection('hypotheticalGoals')}
-              >
-                <HypotheticalGoalOverrides
-                  value={liveOverrides.hypotheticalGoals}
-                  onChange={(next) => setLiveOverrides((o) => ({ ...o, hypotheticalGoals: next }))}
-                />
-              </OverrideSection>
-              <OverrideSection
-                label="Existing goal edits"
-                count={liveOverrides.goalTargetEdits?.length ?? 0}
-                open={openSections.has('goalTargetEdits')}
-                onToggle={() => toggleSection('goalTargetEdits')}
-              >
-                <GoalTargetOverrides
-                  value={liveOverrides.goalTargetEdits}
-                  onChange={(next) => setLiveOverrides((o) => ({ ...o, goalTargetEdits: next }))}
-                  realGoals={history.goals}
-                />
-              </OverrideSection>
-              <OverrideSection
-                label="Skip recurring"
-                count={liveOverrides.skipRecurringInstances?.length ?? 0}
-                open={openSections.has('skipRecurring')}
-                onToggle={() => toggleSection('skipRecurring')}
-              >
-                <SkipRecurringOverrides
-                  value={liveOverrides.skipRecurringInstances}
-                  onChange={(next) => setLiveOverrides((o) => ({ ...o, skipRecurringInstances: next }))}
-                  baseStreams={history.recurringStreams}
-                  availableMonths={availableMonths}
-                />
-              </OverrideSection>
-            </div>
-
-            <div className="space-y-6">
-              <div className="flex items-center justify-end">
-                <ChartRangeTabs range={range} onChange={setRange} />
-              </div>
-              <ForecastChart
-                baseline={baselineResult.projection}
-                scenario={engineResult.projection}
-                markers={chartMarkers}
-                range={range}
-                showScenario={true}
-                subtitle={subtitle}
-                freshnessHeadline={freshness.headline}
-                freshnessCaveat={freshness.caveat}
-              />
-              <ScenarioCards
-                scenarios={scenarios}
-                selectedScenarioId={selectedScenarioId}
-                liveOverrides={liveOverrides}
-                baselineEndCash={baselineResult.projection[lastVisible]?.endCash ?? 0}
-                scenarioEndCash={horizonProjected}
-                baselineLabel={`Projected ${horizonMonth} · no overrides`}
-                scenarioLabel={selectedScenario?.name ?? null}
-                onSelect={handleSelectScenario}
-              />
-              <GoalImpacts goalImpacts={engineResult.goalImpacts} />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {view === 'comparison' && (
-        <MobileScenarioSaveBar
-          scenarios={scenarios}
-          selectedScenarioId={selectedScenarioId}
-          liveOverrides={liveOverrides}
-          isDirty={isDirty}
-          onSelect={handleSelectScenario}
+      {/* Move attach drawer — scenario context, write-through */}
+      {selectedScenario && (
+        <MoveDrawer
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+          title={`Add a Move to ${selectedScenario.name}`}
+          context={{ kind: 'scenario', scenarioId: selectedScenario.id }}
+          streams={streams}
+          categories={categories}
+          onAttached={() => setDrawerOpen(false)}
         />
       )}
     </div>

@@ -2,17 +2,24 @@ import type {
   ForecastHistory,
   MonthlyProjection,
 } from '@/lib/forecast/types';
-import type { GoalMove } from '@/lib/db/schema';
 
 import type { Move } from './appliers';
 
 /**
- * Map DB-side GoalMove rows (nested templateKey + params) into the flat
+ * Structural row shape shared by goal_move and scenario_move. Both tables
+ * carry `templateKey` + jsonb `params`; the converter reads only those two
+ * fields, so a single structural type serves both without coupling to the
+ * Drizzle row types (which differ only in parent-id + the goal-side `source`).
+ */
+type MoveRow = { templateKey: string; params: unknown };
+
+/**
+ * Map DB-side move rows (nested templateKey + params) into the flat
  * engine-side Move discriminated union. Rows with unrecognised templateKey
  * are silently dropped — they can't have been inserted (validation.ts guards
  * the write boundary) but we defend here against schema drift.
  */
-export function goalMovesToEngineMoves(rows: GoalMove[]): Move[] {
+export function goalMovesToEngineMoves(rows: readonly MoveRow[]): Move[] {
   const out: Move[] = [];
   for (const row of rows) {
     const { templateKey, params } = row;
@@ -30,6 +37,17 @@ export function goalMovesToEngineMoves(rows: GoalMove[]): Move[] {
     // Unknown templateKey → skip.
   }
   return out;
+}
+
+/**
+ * Scenario-side converter. Identical mapping to goalMovesToEngineMoves —
+ * scenario_move rows are structurally compatible (templateKey + params) and
+ * additionally admit `skip-once`, which the shared converter already handles.
+ * Kept as a named export so the simulator's intent reads clearly at the call
+ * site (scenario overlay, not committed goal baseline).
+ */
+export function scenarioMovesToEngineMoves(rows: readonly MoveRow[]): Move[] {
+  return goalMovesToEngineMoves(rows);
 }
 
 /**
