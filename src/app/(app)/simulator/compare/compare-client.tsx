@@ -11,8 +11,11 @@ import type { Scenario } from '@/lib/db/schema';
 import { deriveChartMarkers } from '@/lib/simulator/markers';
 import { projectCash } from '@/lib/forecast/engine';
 import type { ForecastHistory, ScenarioOverrides } from '@/lib/forecast/types';
-import type { GoalMove } from '@/lib/db/schema';
-import { goalMovesToEngineMoves } from '@/lib/moves/apply';
+import type { GoalMove, ScenarioMove } from '@/lib/db/schema';
+import {
+  goalMovesToEngineMoves,
+  scenarioMovesToEngineMoves,
+} from '@/lib/moves/apply';
 
 type Props = {
   history: ForecastHistory;
@@ -20,6 +23,7 @@ type Props = {
   currentMonth: string;
   initialScenarioId: string | null;
   goalMoves: GoalMove[];
+  scenarioMoves: ScenarioMove[];
 };
 
 /**
@@ -38,6 +42,7 @@ export function CompareClient({
   currentMonth,
   initialScenarioId,
   goalMoves,
+  scenarioMoves,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -67,6 +72,18 @@ export function CompareClient({
 
   const engineGoalMoves = useMemo(() => goalMovesToEngineMoves(goalMoves), [goalMoves]);
 
+  // Scenario_move rows for the selected scenario — the four mapped templates.
+  // Overlaid on top of the legacy `overrides` JSON (unmapped caps) so the
+  // compare projection reflects BOTH disjoint stores, matching /simulator (T21).
+  const scenarioMoveRows = useMemo(
+    () => scenarioMoves.filter((m) => m.scenarioId === selectedScenarioId),
+    [scenarioMoves, selectedScenarioId],
+  );
+  const engineScenarioMoves = useMemo(
+    () => scenarioMovesToEngineMoves(scenarioMoveRows),
+    [scenarioMoveRows],
+  );
+
   const baseline = useMemo(
     () => projectCash({ history, overrides: {}, goalMoves: engineGoalMoves, currentMonth }).projection,
     [history, engineGoalMoves, currentMonth],
@@ -77,8 +94,14 @@ export function CompareClient({
     const scn = scenarios.find((s) => s.id === selectedScenarioId);
     if (!scn) return null;
     const overrides = scn.overrides as ScenarioOverrides;
-    return projectCash({ history, overrides, goalMoves: engineGoalMoves, currentMonth });
-  }, [selectedScenarioId, scenarios, history, engineGoalMoves, currentMonth]);
+    return projectCash({
+      history,
+      overrides,
+      goalMoves: engineGoalMoves,
+      scenarioMoves: engineScenarioMoves,
+      currentMonth,
+    });
+  }, [selectedScenarioId, scenarios, history, engineGoalMoves, engineScenarioMoves, currentMonth]);
 
   const scenarioProjection = scenarioResult?.projection ?? baseline;
   const goalImpacts = scenarioResult?.goalImpacts ?? [];
@@ -152,6 +175,7 @@ export function CompareClient({
             scenarios={scenarios}
             selectedScenarioId={selectedScenarioId}
             liveOverrides={(selectedScenario?.overrides as ScenarioOverrides) ?? {}}
+            scenarioMoveCount={scenarioMoveRows.length}
             baselineEndCash={baselineEndCash}
             scenarioEndCash={scenarioEndCash}
             baselineLabel="Baseline projection"

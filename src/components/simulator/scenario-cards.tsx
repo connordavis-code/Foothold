@@ -6,7 +6,7 @@ import { cn, formatCurrency } from '@/lib/utils';
 import {
   pickActiveCard as _pickActiveCard,
   formatDelta,
-  describeOverrides,
+  describeScenarioChanges,
 } from './scenario-cards-logic';
 
 export type { ActiveCardId } from './scenario-cards-logic';
@@ -16,6 +16,7 @@ type Props = {
   scenarios: Pick<Scenario, 'id' | 'name'>[];
   selectedScenarioId: string | null;
   liveOverrides: ScenarioOverrides;
+  scenarioMoveCount: number;
   baselineEndCash: number;
   scenarioEndCash: number;
   baselineLabel: string;
@@ -27,6 +28,7 @@ export function ScenarioCards({
   scenarios,
   selectedScenarioId,
   liveOverrides,
+  scenarioMoveCount,
   baselineEndCash,
   scenarioEndCash,
   baselineLabel,
@@ -54,7 +56,7 @@ export function ScenarioCards({
         name={scenarioLabel ?? 'Current scenario'}
         deltaLabel={formatDelta(delta, formatCurrency)}
         figure={scenarioEndCash}
-        meta={describeOverrides(liveOverrides)}
+        meta={describeScenarioChanges(liveOverrides, scenarioMoveCount)}
         onClick={() => {/* current scenario already active */}}
       />
 
