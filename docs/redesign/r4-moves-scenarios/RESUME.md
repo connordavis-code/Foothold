@@ -7,7 +7,7 @@
 
 ## Resume in one line
 
-**C1 shipped, and C2 is shipped through T21** (scenario-move actions + disjoint guard + full /simulator write-through rewire). **UAT-T19 by-hand DB verification PASSED** (2026-06, founder-run). Next task is **T22 — `/simulator/compare` adapter** (compare route still reads the dropped `overrides` shape). T17 (the destructive column drop) remains deferred, not approved — `scenario.overrides` stays as the disjoint carrier.
+**C1 shipped, and C2 is shipped through T22** (scenario-move actions + disjoint guard, /simulator write-through rewire, and compare-route scenario_move overlay). **UAT-T19 by-hand DB verification PASSED** (2026-06, founder-run). Next task is **T23 — scenario-actions revision** (re-assess vs. the shipped write-through model; remove remaining `overrides` reads on the write path while keeping the disjoint carrier). T17 (the destructive column drop) remains deferred, not approved — `scenario.overrides` stays as the disjoint carrier.
 
 ---
 
@@ -25,8 +25,9 @@
   - `05dc1f2` docs(r4): commit RESUME.md as authoritative state doc + point PLAN.md at it
   - `c36f085` feat(r4): **T18** — scenario-move attach/detach + disjoint-stores guard (`moves/disjoint.ts` + `checkDisjointWithOverrides`, `findDuplicateScenarioMove`, `getScenarioMovesByScenarioId`)
   - `46ce255` feat(r4): **T19–T21** — /simulator write-through rewire (SimulatorClient state collapse, `<GoalImpactsStrip>` [=T20], page.tsx rewire, `<AttachedScenarioMoveRow>`, `moves/summary.ts`)
-- **HEAD:** `46ce255`. **Tests: 799/799** (67 files). **Origin: in sync** — `46ce255` is pushed (local-only for Vercel-preview purposes; branch exists on origin, no PR).
-- **Task-numbering note:** the shipped commits use PLAN's original T-numbers but under the **C2-minus-T17 remap** — T17 (DROP COLUMN) is skipped, so `scenario.overrides` still exists and T18 gained the disjoint-write guard. Shipped **through T21**. See PLAN.md § Task index for the remaining rows.
+  - `a99cb97` feat(r4): **T22** — /simulator/compare scenario_move overlay + honest card caption (`describeScenarioChanges` helper, `<ScenarioCards scenarioMoveCount>`, compare projects both stores)
+- **HEAD:** `a99cb97`. **Tests: 805/805** (68 files). **Origin:** `08127d3` pushed; `c36f085`+`46ce255` also pushed; `a99cb97` (T22) is **local-only** until next push.
+- **Task-numbering note:** the shipped commits use PLAN's original T-numbers but under the **C2-minus-T17 remap** — T17 (DROP COLUMN) is skipped, so `scenario.overrides` still exists and T18 gained the disjoint-write guard. Shipped **through T22**. See PLAN.md § Task index for the remaining rows (T23, then C3 = T25–T31).
 - **PR policy:** ONE PR off `worktree-r4-moves-scenario` → `feat/redesign`, rebase-and-merge, **only after C3 closes.** No merge-ready PR before then. Backup pushes and draft PRs are fine.
 
 ## Verified this session (C1 goal-side + C2 scenario-side)
@@ -103,10 +104,10 @@ So `scenario.overrides`' disjoint bucket actively carries 1 row (the lump sum); 
 
 ## Immediate next actions (in order)
 
-1. Run the resume command; confirm branch, HEAD (`46ce255`), dirty state (clean or only untracked docs), test count (799).
-2. **T22 — `/simulator/compare` adapter.** `compare-client.tsx` + `compare/page.tsx` still consume the per-scenario `overrides` shape; migrate them to `goalMoves` + per-scenario `scenarioMoves` (via `getScenarioMoves` / `getScenarioMovesByScenarioId`). IA unchanged (A-vs-B diff); only the engine input shape changes. Verify the diff still surfaces meaningful per-scenario delta. See PLAN.md § T22.
-3. **T23 — `scenario-actions` revision.** Re-assess against the write-through model already shipped in T18–T21: attach persists individual `scenario_move` rows live, so the original "create scenario + batch-insert moves from draftMoves" may be partly satisfied already. Confirm what create/update/delete-scenario actually do now (find the actions module — it was NOT at `src/lib/forecast/scenario-actions.ts` as PLAN assumed; locate the current path first) and close any gap. Must remove remaining `scenario.overrides` reads on the write path while leaving the disjoint carrier intact for the un-mapped capabilities.
-4. **C3 (T25–T31)** with the keep-lists below: T25 KEEPS `lump-sum-overrides.tsx` (founder has 1 live lump-sum row per UAT §4), `hypothetical-goal-overrides.tsx`, `goal-target-overrides.tsx`, `recurring-overrides.tsx` (action='add'); T26 does NOT delete `ScenarioOverrides` type or `apply-overrides.ts` while `overrides` still carries data. See "LOAD-BEARING DECISION" above.
+1. Run the resume command; confirm branch, HEAD (`a99cb97`), dirty state (clean or only untracked docs), test count (805).
+2. ~~**T22 — `/simulator/compare` adapter.**~~ ✅ DONE (`a99cb97`). Compare now overlays per-scenario `scenario_move` rows on top of the legacy `overrides` JSON (both stores), mirroring T21; `<ScenarioCards>` caption made honest via `describeScenarioChanges`. Note: compare still renders the OLD `<GoalImpacts>` (not the T20 `<GoalImpactsStrip>`) — intentional, swapped in T25 per founder decision 2026-07-02.
+3. **T23 — `scenario-actions` revision (NEXT).** Re-assess against the write-through model shipped in T18–T22: attach persists individual `scenario_move` rows live (`createScenario` / `deleteScenario` are imported in `simulator-client.tsx` from `@/lib/forecast/scenario-actions` — that module DOES exist at that path; the T22 grep miss was a false negative). Confirm what create/update/delete-scenario do now and close any gap. Must remove remaining `scenario.overrides` reads on the write path while leaving the disjoint carrier intact for the un-mapped capabilities.
+4. **C3 (T25–T31)** with the keep-lists below (T25 also swaps compare's `<GoalImpacts>` → `<GoalImpactsStrip>` and deletes `goal-impacts.tsx`): T25 KEEPS `lump-sum-overrides.tsx` (founder has 1 live lump-sum row per UAT §4), `hypothetical-goal-overrides.tsx`, `goal-target-overrides.tsx`, `recurring-overrides.tsx` (action='add'); T26 does NOT delete `ScenarioOverrides` type or `apply-overrides.ts` while `overrides` still carries data. See "LOAD-BEARING DECISION" above.
 
 ## Deferred / banked (separate work items, not part of R.4 C2)
 

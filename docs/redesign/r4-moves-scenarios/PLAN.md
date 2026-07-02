@@ -20,10 +20,10 @@
 **C1 shipped. C2 shipped through T21** (T18 scenario-move actions + disjoint guard; T19–T21 /simulator write-through rewire). **UAT-T19 DB verification PASSED.** See [RESUME.md](./RESUME.md) for the authoritative state doc — read it FIRST on resume, before running anything.
 
 **State at a glance:**
-- HEAD: `46ce255` · Tests: 799/799 (67 files) · Branch synced to origin · Working tree clean (or only untracked docs)
-- Commit ladder: `fa02131` (C1 T1–T16) + edit-flow/test/stableStringify follow-ups → `e2d490f` → `05dc1f2` (docs) → `c36f085` (**T18**) → `46ce255` (**T19–T21**, includes T20 `<GoalImpactsStrip>`)
+- HEAD: `a99cb97` · Tests: 805/805 (68 files) · Working tree clean (or only untracked docs)
+- Commit ladder: `fa02131` (C1 T1–T16) + edit-flow/test/stableStringify follow-ups → `e2d490f` → `05dc1f2` (docs) → `c36f085` (**T18**) → `46ce255` (**T19–T21**, includes T20 `<GoalImpactsStrip>`) → `a99cb97` (**T22** compare scenario_move overlay)
 
-**Next task: T22 — `/simulator/compare` adapter.** `compare-client.tsx` still reads the per-scenario `overrides` shape; migrate to `goalMoves` + per-scenario `scenarioMoves`. Then T23 (scenario-actions revision — re-assess vs. the shipped write-through model; the actions module is NOT at the PLAN-assumed `src/lib/forecast/scenario-actions.ts`, locate it first), then C3 (T25–T31).
+**Next task: T23 — scenario-actions revision.** `src/lib/forecast/scenario-actions.ts` (it DOES exist there — the PLAN-assumed path was right; the T22 grep miss was a false negative) still writes `scenario.overrides` in `createScenario`/`updateScenario` with zero scenario_move refs. Under the shipped write-through model (Moves attach individually via `attachScenarioMoveAction`), re-assess what create/update should persist and remove remaining `overrides` write-path reads while keeping the disjoint carrier. Then C3 (T25–T31).
 
 **C2-minus-T17 remap (load-bearing — governs remaining tasks):**
 - T17 (`DROP COLUMN scenario.overrides`) is **skipped/deferred** — `scenario.overrides` survives as the disjoint carrier for the four un-mapped capabilities. T18 accordingly gained a disjoint-write guard (`checkDisjointWithOverrides`).
