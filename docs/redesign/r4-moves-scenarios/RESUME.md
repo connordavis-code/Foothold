@@ -7,7 +7,7 @@
 
 ## Resume in one line
 
-C1 shipped and the goal-side edit flow is DB-verified. Next gate is **C2 — but T17 (the destructive column drop) is deferred, not approved.** Before any C2 work, confirm the one open capability-usage question (bottom of this doc) and verify two possibly-unlanded items.
+**C1 shipped, and C2 is shipped through T21** (scenario-move actions + disjoint guard + full /simulator write-through rewire). **UAT-T19 by-hand DB verification PASSED** (2026-06, founder-run). Next task is **T22 — `/simulator/compare` adapter** (compare route still reads the dropped `overrides` shape). T17 (the destructive column drop) remains deferred, not approved — `scenario.overrides` stays as the disjoint carrier.
 
 ---
 
@@ -21,19 +21,25 @@ C1 shipped and the goal-side edit flow is DB-verified. Next gate is **C2 — but
   - `213dd03` fix(r4): UAT polish — picker layout, currency-input step, dashboard goal drilldown
   - `e5c4ad5` revert: dashboard-drilldown hunks from 213dd03 (improvised scope, no task ID)
   - `e1be65e` test: extracted `decideGoalMoveUpdate` + tests; action thinned to a caller
-  - `e2d490f` refactor: promoted `stableStringify` to `@/lib/json` — single equality source for findDuplicateMove + decideGoalMoveUpdate
-- **HEAD:** `e2d490f`. **Tests: 760/760.** **Origin: in sync** with local (last backup push fired after `e2d490f`).
-- **PR policy (reconciled this session):** ONE PR off `worktree-r4-moves-scenario` → `feat/redesign`, carrying all three commits (C1+C2+C3), rebase-and-merge, **only after C3 closes.** No merge-ready PR before then. Backup pushes and draft PRs are fine.
+  - `e2d490f` refactor: promoted `stableStringify` to `@/lib/json` — single equality source
+  - `05dc1f2` docs(r4): commit RESUME.md as authoritative state doc + point PLAN.md at it
+  - `c36f085` feat(r4): **T18** — scenario-move attach/detach + disjoint-stores guard (`moves/disjoint.ts` + `checkDisjointWithOverrides`, `findDuplicateScenarioMove`, `getScenarioMovesByScenarioId`)
+  - `46ce255` feat(r4): **T19–T21** — /simulator write-through rewire (SimulatorClient state collapse, `<GoalImpactsStrip>` [=T20], page.tsx rewire, `<AttachedScenarioMoveRow>`, `moves/summary.ts`)
+- **HEAD:** `46ce255`. **Tests: 799/799** (67 files). **Origin: in sync** — `46ce255` is pushed (local-only for Vercel-preview purposes; branch exists on origin, no PR).
+- **Task-numbering note:** the shipped commits use PLAN's original T-numbers but under the **C2-minus-T17 remap** — T17 (DROP COLUMN) is skipped, so `scenario.overrides` still exists and T18 gained the disjoint-write guard. Shipped **through T21**. See PLAN.md § Task index for the remaining rows.
+- **PR policy:** ONE PR off `worktree-r4-moves-scenario` → `feat/redesign`, rebase-and-merge, **only after C3 closes.** No merge-ready PR before then. Backup pushes and draft PRs are fine.
 
-## Verified this session
+## Verified this session (C1 goal-side + C2 scenario-side)
 
-- **Edit-flow is real and correct.** SELECT against `goal_move` after attach-then-edit returned ONE row, same `id`, `params.newAmount` = edited value, `source` preserved, `updated_at` diverged from `created_at`. Definitive in-place UPDATE, not delete+insert or duplicate. The look-alike-success bug class is closed on the goal side.
-- `findDuplicateMove` has 7 tests (from T7 review cleanup). `decideGoalMoveUpdate` has the 3 behavior tests (no-op / update / invalid; the union has no insert arm by construction).
+- **Goal-side edit-flow is real and correct.** SELECT against `goal_move` after attach-then-edit returned ONE row, same `id`, `params.newAmount` = edited value, `source` preserved, `updated_at` diverged from `created_at`. Definitive in-place UPDATE, not delete+insert. Look-alike-success class closed on the goal side.
+- **Scenario-side write-through PASSED UAT-T19** (`UAT-T19-write-through.md`). §2 parentage: newest `scenario_move` joins to the probe scenario; §3a: zero orphan/baseline writes; §3b: each move binds to the scenario selected at attach time; §3c: no-op gestures move neither count. This is the ONLY proof of DB write-through — all 799 vitest tests are pure helpers that never touch the write path.
+- **UAT §4 (overrides precondition) outcome:** founder's saved data carries **1 lump-sum row** in `scenario.overrides` (non-empty). Confirms T25 must **KEEP** the lump-sum editor — do not delete the override stack. Matches the load-bearing decision below.
 
-## ✓ Landed this session (no action needed on resume — but verify via resume command)
+## ✓ Landed (verify via resume command)
 
-1. **`stableStringify` promotion** → done in `e2d490f`. New file `src/lib/json.ts` exports the single helper; both `findDuplicateMove` (in `db/queries/moves.ts`) and `decideGoalMoveUpdate` (in `moves/update-decision.ts`) import it. Local copies deleted. 760 tests still pass.
-2. **Backup push** → done. Local HEAD `e2d490f` matches origin. Resume command should show clean.
+1. **T18–T21 shipped** (`c36f085` + `46ce255`), 799 tests green, pushed to origin.
+2. **UAT-T19 passed**; `UAT-T19-write-through.md` committed as the record.
+3. Stale pre-T18 stray drafts (`moves.ts`/`moves.test.ts`) on the **main** checkout were deleted 2026-07-02 (they predated the `@/lib/json` promotion; canonical versions live in the branch).
 
 ---
 
@@ -92,14 +98,15 @@ So `scenario.overrides`' disjoint bucket actively carries 1 row (the lump sum); 
 
 ## Strategy state
 
-- **C2-minus-T17 direction: founder-APPROVED.** R.4 ships the four cleanly-mappable scenario_move templates (`reduce-category` cuts, `adjust-recurring` pause/edit, `skip-once`, `income-event`). `scenario.overrides` is retained as the disjoint carrier for capabilities the templates can't represent yet. T17 (DROP COLUMN) is deferred — column drops only when all four un-mapped capabilities have scenario_move homes or are formally cut, and only by the founder by hand after a backup.
-- **Remaining in-session gate before T18:** the agent must present the concrete T18–T26 task adjustments (T19 hybrid state, T23 disjoint-write rule, T25 keep-list, T26 keep-list) for founder review. **Do not start T18 until that presentation is reviewed in the new session.** The transcript proposal from the prior session does not count as confirmed.
+- **C2-minus-T17 direction: founder-APPROVED and IMPLEMENTED through T21.** R.4 ships the four cleanly-mappable scenario_move templates (`reduce-category` cuts, `adjust-recurring` pause/edit, `skip-once`, `income-event`). `scenario.overrides` is retained as the disjoint carrier for capabilities the templates can't represent yet. T17 (DROP COLUMN) stays deferred — column drops only when all four un-mapped capabilities have scenario_move homes or are formally cut, and only by the founder by hand after a backup.
+- **T18 disjoint-write rule shipped** in `c36f085` as `checkDisjointWithOverrides` (`src/lib/moves/disjoint.ts`, `DisjointViolationError` sentinel, per-kind match rules, env-aware error handling). Wired at the `attachScenarioMoveAction` boundary. 28 tests.
 
 ## Immediate next actions (in order)
 
-1. Run the resume command; confirm branch, HEAD (`e2d490f`), dirty state (clean), test count (760).
-2. Present the concrete T18–T26 task adjustment table for founder review (see "C2 plan" section above for the agreed direction; the agent expands each row into a specific scope statement).
-3. Once founder reviews + confirms: begin T18 — implement `attachScenarioMoveAction` / `detachScenarioMoveAction` for the four scenario_move templates (the stubs from T9 throw `"not yet implemented — wired in C2"`). Enforce the disjoint-stores rule at the action boundary: scenario_move writes must not duplicate any capability that already lives in `scenario.overrides`.
+1. Run the resume command; confirm branch, HEAD (`46ce255`), dirty state (clean or only untracked docs), test count (799).
+2. **T22 — `/simulator/compare` adapter.** `compare-client.tsx` + `compare/page.tsx` still consume the per-scenario `overrides` shape; migrate them to `goalMoves` + per-scenario `scenarioMoves` (via `getScenarioMoves` / `getScenarioMovesByScenarioId`). IA unchanged (A-vs-B diff); only the engine input shape changes. Verify the diff still surfaces meaningful per-scenario delta. See PLAN.md § T22.
+3. **T23 — `scenario-actions` revision.** Re-assess against the write-through model already shipped in T18–T21: attach persists individual `scenario_move` rows live, so the original "create scenario + batch-insert moves from draftMoves" may be partly satisfied already. Confirm what create/update/delete-scenario actually do now (find the actions module — it was NOT at `src/lib/forecast/scenario-actions.ts` as PLAN assumed; locate the current path first) and close any gap. Must remove remaining `scenario.overrides` reads on the write path while leaving the disjoint carrier intact for the un-mapped capabilities.
+4. **C3 (T25–T31)** with the keep-lists below: T25 KEEPS `lump-sum-overrides.tsx` (founder has 1 live lump-sum row per UAT §4), `hypothetical-goal-overrides.tsx`, `goal-target-overrides.tsx`, `recurring-overrides.tsx` (action='add'); T26 does NOT delete `ScenarioOverrides` type or `apply-overrides.ts` while `overrides` still carries data. See "LOAD-BEARING DECISION" above.
 
 ## Deferred / banked (separate work items, not part of R.4 C2)
 
@@ -122,7 +129,7 @@ echo "--- tests (expect 760/760) ---" && npm test 2>&1 | grep -E "Tests +[0-9]+ 
 
 Expected output:
 - branch: `worktree-r4-moves-scenario`
-- HEAD: `e2d490f refactor(r4): promote stableStringify to @/lib/json — single equality source`
-- dirty: empty
-- remote: same `e2d490f` SHA
-- tests: `760 passed (760)`, `65 passed (65)` files
+- HEAD: `46ce255 feat(r4): T19-T21 — /simulator write-through scenario_move rewire`
+- dirty: empty (or only untracked docs under `docs/redesign/r4-moves-scenarios/`)
+- remote: same `46ce255` SHA
+- tests: `799 passed (799)`, `67 passed (67)` files

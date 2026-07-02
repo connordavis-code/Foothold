@@ -17,17 +17,20 @@
 
 ## ▶ Resume point
 
-**C1 shipped + goal-side edit flow DB-verified.** See [RESUME.md](./RESUME.md) for the authoritative state doc — read it FIRST on resume, before running anything.
+**C1 shipped. C2 shipped through T21** (T18 scenario-move actions + disjoint guard; T19–T21 /simulator write-through rewire). **UAT-T19 DB verification PASSED.** See [RESUME.md](./RESUME.md) for the authoritative state doc — read it FIRST on resume, before running anything.
 
 **State at a glance:**
-- HEAD: `e2d490f` · Tests: 760/760 · Branch synced to origin · Working tree clean
-- T1–T16 shipped on `worktree-r4-moves-scenario` as commit `fa02131` (C1) + four follow-up commits (edit-flow fix, test extraction, stableStringify promotion, dashboard-drilldown revert)
+- HEAD: `46ce255` · Tests: 799/799 (67 files) · Branch synced to origin · Working tree clean (or only untracked docs)
+- Commit ladder: `fa02131` (C1 T1–T16) + edit-flow/test/stableStringify follow-ups → `e2d490f` → `05dc1f2` (docs) → `c36f085` (**T18**) → `46ce255` (**T19–T21**, includes T20 `<GoalImpactsStrip>`)
 
-**Open gate before T18:**
-- **C2-minus-T17 direction is founder-APPROVED** (R.4 ships only the four cleanly-mappable scenario_move templates; `scenario.overrides` retained as disjoint carrier for un-mapped capabilities; T17 DROP COLUMN deferred until all capabilities have homes).
-- Next session must present the concrete **T18–T26 task adjustments** (T19 hybrid state, T23 disjoint-write rule, T25 keep-list, T26 keep-list) for founder review. **Do not start T18 until that presentation is reviewed.** Transcript-only proposals from the prior session do not count as confirmed.
+**Next task: T22 — `/simulator/compare` adapter.** `compare-client.tsx` still reads the per-scenario `overrides` shape; migrate to `goalMoves` + per-scenario `scenarioMoves`. Then T23 (scenario-actions revision — re-assess vs. the shipped write-through model; the actions module is NOT at the PLAN-assumed `src/lib/forecast/scenario-actions.ts`, locate it first), then C3 (T25–T31).
 
-See RESUME.md for the saved-scenario capability table (which buckets are scope-cut candidates vs. NW-pivot-roadmap templates vs. actively-carried), standing policies, and the verified resume command.
+**C2-minus-T17 remap (load-bearing — governs remaining tasks):**
+- T17 (`DROP COLUMN scenario.overrides`) is **skipped/deferred** — `scenario.overrides` survives as the disjoint carrier for the four un-mapped capabilities. T18 accordingly gained a disjoint-write guard (`checkDisjointWithOverrides`).
+- **T25 keep-list** (do NOT delete): `lump-sum-overrides.tsx` (founder has 1 live lump-sum row per UAT §4), `hypothetical-goal-overrides.tsx`, `goal-target-overrides.tsx`, `recurring-overrides.tsx` (action='add').
+- **T26 adjustment**: do NOT delete `ScenarioOverrides` type or `apply-overrides.ts` while `overrides` still carries data.
+
+See RESUME.md for the saved-scenario capability table (scope-cut candidates vs. NW-pivot-roadmap templates vs. actively-carried), standing policies, and the verified resume command.
 
 ---
 
